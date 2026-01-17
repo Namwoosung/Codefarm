@@ -17,6 +17,9 @@ repo-root/
 │   │   └── nginx.conf
 │   ├── scripts/            # 배포 및 운영 스크립트
 │   │   ├── deploy.sh
+│   │   ├── deploy-dev.sh
+│   │   ├── deploy-prod.sh
+│   │   ├── rollback.sh
 │   │   └── healthcheck.sh
 │   └── README.md
 └── README.md
