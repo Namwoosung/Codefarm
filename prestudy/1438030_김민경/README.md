@@ -1,4 +1,0 @@
-### PRELIMINARY STUDY 1438030
-
-
-공부하기 시러영
