@@ -24,7 +24,7 @@ deploy-dev:
     script:
         - echo "Deploy to dev"
         - mkdir -p ~/.ssh
-        - ssh-keyscan $DEV_HOST >> ~/.ssh/known_hosts
+        - ssh-keyscan "$DEV_HOST" >> ~/.ssh/known_hosts
         - chmod 600 "$DEV_SSH_KEY"
         - ssh -i "$DEV_SSH_KEY" "$DEV_USER@$DEV_HOST" "cd /home/deploy/app && git pull"
     rules:
