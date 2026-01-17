@@ -6,7 +6,7 @@ stages:
 build:
     stage: build
     script:
-        - echo "Build"
+        - echo "Build!"
     rules:
         - if: '$CI_COMMIT_BRANCH'
 
