@@ -35,16 +35,16 @@ test-fast:
         - echo "Fast tests for feature/infra/fix"
         # 여기에 가벼운 테스트만 (예: lint, unit 일부)
     rules:
-        - if: "$CI_COMMIT_BRANCH =~ /^feature\/.+/ || $CI_COMMIT_BRANCH =~ /^infra\/.+/ || $CI_COMMIT_BRANCH =~ /^fix\/.+/"
+        - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\/.+/'
 
 # develop/main: 신뢰성 최우선 (풀 테스트)
 test-full:
-  stage: test
-  script:
-    - echo "Full tests for develop/main"
-    # 여기에 전체 테스트 (unit + integration 등)
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+    stage: test
+    script:
+        - echo "Full tests for develop/main"
+        # 여기에 전체 테스트 (unit + integration 등)
+    rules:
+        - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
 
 # -----------------------
 # DEPLOY (브랜치별 환경 분리)
