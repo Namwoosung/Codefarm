@@ -3,6 +3,20 @@ stages:
     - test
     - deploy
 
+workflow:
+    rules:
+    # 브랜치 파이프라인만 생성 (MR 파이프라인 등은 필요시 추가)
+        - if: $CI_COMMIT_BRANCH
+          when: always
+
+default:
+    before_script:
+        - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
+
+
+# -----------------------
+# BUILD (빠른 피드백)
+# -----------------------
 build:
     stage: build
     script:
@@ -10,17 +24,34 @@ build:
     rules:
         - if: '$CI_COMMIT_BRANCH'
 
-test:
+# -----------------------
+# TEST (브랜치별 강도 분리)
+# -----------------------
+
+# feature/infra/fix: 가벼운 테스트 (빠르게)
+test-fast:
     stage: test
     script:
-        - echo "Test"
+        - echo "Fast tests for feature/infra/fix"
+        # 여기에 가벼운 테스트만 (예: lint, unit 일부)
     rules:
-        - if: '$CI_COMMIT_BRANCH'
+        - if: "$CI_COMMIT_BRANCH =~ /^feature\/.+/ || $CI_COMMIT_BRANCH =~ /^infra\/.+/ || $CI_COMMIT_BRANCH =~ /^fix\/.+/"
+
+# develop/main: 신뢰성 최우선 (풀 테스트)
+test-full:
+  stage: test
+  script:
+    - echo "Full tests for develop/main"
+    # 여기에 전체 테스트 (unit + integration 등)
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+
+# -----------------------
+# DEPLOY (브랜치별 환경 분리)
+# -----------------------
 
 deploy-dev:
     stage: deploy
-    tags:
-        - ec2-dev
     script:
         - echo "Deploy to dev"
         - mkdir -p ~/.ssh
@@ -29,3 +60,16 @@ deploy-dev:
         - ssh -i "$DEV_SSH_KEY" "$DEV_USER@$DEV_HOST" "cd /home/deploy/app && git pull"
     rules:
         - if: '$CI_COMMIT_BRANCH == "develop"'
+
+deploy-prod:
+    stage: deploy
+    script:
+        - echo "Deploy to prod"
+        - mkdir -p ~/.ssh
+        - ssh-keyscan "$PROD_HOST" >> ~/.ssh/known_hosts
+        - chmod 600 "$PROD_SSH_KEY"
+        - ssh -i "$PROD_SSH_KEY" "$PROD_USER@$PROD_HOST" "cd /home/deploy/app && git pull"
+    rules:
+        - if: '$CI_COMMIT_BRANCH == "main"'
+          when: manual
+          allow_failure: false
