@@ -25,7 +25,8 @@ deploy-dev:
         - echo "Deploy to dev"
         - mkdir -p ~/.ssh
         - ssh-keyscan $DEV_HOST >> ~/.ssh/known_hosts
-        - chmod 600 "$DEV_SSH_KEY"
-        - ssh -i "$DEV_SSH_KEY" $DEV_USER@$DEV_HOST "cd /home/deploy/app && git pull"
+        - echo "$DEV_SSH_KEY" | base64 -d > dev.pem
+        - chmod 600 dev.pem
+        - ssh -i dev.pem $DEV_USER@$DEV_HOST "cd /home/deploy/app && git pull"
     rules:
         - if: '$CI_COMMIT_BRANCH == "develop"'
