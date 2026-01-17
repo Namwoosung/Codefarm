@@ -23,8 +23,7 @@ deploy-dev:
         - ec2-dev
     script:
         - echo "Deploy to dev"
-        - echo "$DEV_SSH_KEY" | tr -d '\r' > dev.key
-        - chmod 600 dev.key
-        - ssh -i dev.key $DEV_USER@$DEV_HOST "cd /home/deploy/app && git pull"
+        - chmod 600 "$DEV_SSH_KEY"
+        - ssh -i "$DEV_SSH_KEY" $DEV_USER@$DEV_HOST "cd /home/deploy/app && git pull"
     rules:
         - if: '$CI_COMMIT_BRANCH == "develop"'
