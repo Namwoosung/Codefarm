@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-$ENV="$1"                 # dev | prod
+ENV="$1"                 # dev | prod
 APP_DIR="/srv/app-$ENV"
 
 echo "[rollback] start"
