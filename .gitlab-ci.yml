@@ -46,9 +46,9 @@ deploy-dev:
   stage: deploy
   script:
     - mkdir -p ~/.ssh
-    - ssh-keyscan "$DEV_HOST" >> ~/.ssh/known_hosts
-    - chmod 600 "$DEV_SSH_KEY"
-    - ssh -i "$DEV_SSH_KEY" "$DEV_USER@$DEV_HOST" "bash /srv/app/infra/scripts/deploy-dev.sh"
+    - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
+    - chmod 600 "$SSH_KEY"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "bash /srv/app-dev/infra/scripts/deploy-dev.sh"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
@@ -56,9 +56,9 @@ deploy-prod:
   stage: deploy
   script:
     - mkdir -p ~/.ssh
-    - ssh-keyscan "$PROD_HOST" >> ~/.ssh/known_hosts
-    - chmod 600 "$PROD_SSH_KEY"
-    - ssh -i "$PROD_SSH_KEY" "$PROD_USER@$PROD_HOST" "bash /srv/app/infra/scripts/deploy-prod.sh"
+    - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
+    - chmod 600 "$SSH_KEY"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "bash /srv/app-prod/infra/scripts/deploy-prod.sh"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
