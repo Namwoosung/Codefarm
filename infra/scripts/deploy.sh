@@ -19,3 +19,5 @@ else
 fi
 
 echo "[deploy] completed"
+
+bash $APP_DIR/infra/scripts/healthcheck.sh $ENV
