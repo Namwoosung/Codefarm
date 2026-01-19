@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="/srv/app"
+$ENV="$1"                 # dev | prod
+APP_DIR="/srv/app-$ENV"
 
 echo "[healthcheck] start"
 

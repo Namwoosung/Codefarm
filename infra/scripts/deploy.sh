@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ENV="$1"                 # dev | prod
-APP_DIR="/srv/app"
+APP_DIR="/srv/app-$ENV"
 REPO_URL="https://lab.ssafy.com/s14-webmobile2-sub1/S14P11B109.git"
 
 echo "[deploy] env=$ENV"
