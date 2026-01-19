@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ENV="$1"                 # dev | prod
+ENV="${1:?usage: deploy.sh <dev|prod>}"
 APP_DIR="/srv/app-$ENV"
 REPO_URL="https://lab.ssafy.com/s14-webmobile2-sub1/S14P11B109.git"
 
-echo "[deploy] env=$ENV"
+echo "[deploy] env=$ENV dir=$APP_DIR"
 
 mkdir -p "$APP_DIR"
 
