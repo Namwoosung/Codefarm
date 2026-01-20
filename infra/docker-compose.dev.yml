@@ -1,0 +1,26 @@
+services:
+  backend:
+    image: ${CI_REGISTRY_IMAGE}/backend:${IMAGE_TAG}
+    container_name: app-dev-backend
+    restart: always
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+    ports:
+      - "8080:8080"
+    networks:
+      - appnet
+
+  frontend:
+    image: ${CI_REGISTRY_IMAGE}/frontend:${IMAGE_TAG}
+    container_name: app-dev-frontend
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - appnet
+
+networks:
+  appnet:
+    driver: bridge

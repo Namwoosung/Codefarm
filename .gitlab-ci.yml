@@ -8,25 +8,53 @@ workflow:
     - if: $CI_COMMIT_BRANCH
       when: always
 
+variables:
+  # docker:dind 쓰는 표준 설정
+  DOCKER_TLS_CERTDIR: ""
+
+  # 이미지 태그 전략 (sha 추천)
+  IMAGE_TAG: "$CI_COMMIT_SHA"
+
 default:
   before_script:
     - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
 # -----------------------
-# BUILD
+# BUILD (docker build & push)
 # -----------------------
-build:
+.build-template:
   stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  before_script:
+    - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
+    - docker info
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+
+build-backend:
+  extends: .build-template
   script:
-    - echo "Build"
+    - docker build -t "$CI_REGISTRY_IMAGE/backend:$IMAGE_TAG" -f backend/Dockerfile backend
+    - docker push "$CI_REGISTRY_IMAGE/backend:$IMAGE_TAG"
   rules:
     - if: '$CI_COMMIT_BRANCH'
+
+build-frontend:
+  extends: .build-template
+  script:
+    - docker build -t "$CI_REGISTRY_IMAGE/frontend:$IMAGE_TAG" -f frontend/Dockerfile frontend
+    - docker push "$CI_REGISTRY_IMAGE/frontend:$IMAGE_TAG"
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
 
 # -----------------------
 # TEST
 # -----------------------
 test-fast:
   stage: test
+  image: alpine:3.19
   script:
     - echo "Fast tests for feature/infra/fix"
   rules:
@@ -34,31 +62,98 @@ test-fast:
 
 test-full:
   stage: test
+  image: alpine:3.19
   script:
     - echo "Full tests for develop/main/hotfix"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
+
 # -----------------------
-# DEPLOY
+# DEPLOY (EC2에서 docker pull & compose up)
 # -----------------------
-deploy-dev:
+.deploy-template:
   stage: deploy
-  script:
+  image: alpine:3.19
+  before_script:
+    - apk add --no-cache openssh-client
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
+
+deploy-dev:
+  extends: .deploy-template
+  script:
+    # SSH_KEY가 "File" 타입 변수면 경로가 들어오므로 chmod 가능
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "bash /srv/app-dev/infra/scripts/deploy.sh dev"
+    # EC2에서 레지스트리 로그인 + 이미지 pull + compose up
+    - >
+      ssh -i "$SSH_KEY" "$USER@$HOST"
+      "export CI_REGISTRY='$CI_REGISTRY'
+              CI_REGISTRY_USER='$CI_REGISTRY_USER'
+              CI_REGISTRY_PASSWORD='$CI_REGISTRY_PASSWORD'
+              CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE'
+              IMAGE_TAG='$IMAGE_TAG';
+       bash /srv/app-dev/infra/scripts/deploy.sh dev"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
 
 deploy-prod:
-  stage: deploy
+  extends: .deploy-template
   script:
+    - chmod 600 "$SSH_KEY"
+    - >
+      ssh -i "$SSH_KEY" "$USER@$HOST"
+      "export CI_REGISTRY='$CI_REGISTRY'
+              CI_REGISTRY_USER='$CI_REGISTRY_USER'
+              CI_REGISTRY_PASSWORD='$CI_REGISTRY_PASSWORD'
+              CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE'
+              IMAGE_TAG='$IMAGE_TAG';
+       bash /srv/app-prod/infra/scripts/deploy.sh prod"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      when: manual
+      allow_failure: false
+
+# -----------------------
+# ROLLBACK (manual)
+# -----------------------
+.rollback-template:
+  stage: deploy
+  image: alpine:3.19
+  before_script:
+    - apk add --no-cache openssh-client
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
+
+rollback-dev:
+  needs: ["deploy-dev"]
+  extends: .rollback-template
+  script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "bash /srv/app-prod/infra/scripts/deploy.sh prod"
+    - >
+      ssh -i "$SSH_KEY" "$USER@$HOST"
+      "export CI_REGISTRY='$CI_REGISTRY'
+              CI_REGISTRY_USER='$CI_REGISTRY_USER'
+              CI_REGISTRY_PASSWORD='$CI_REGISTRY_PASSWORD'
+              CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE';
+       bash /srv/app-dev/infra/scripts/rollback.sh dev"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      when: manual
+      allow_failure: false
+
+rollback-prod:
+  needs: ["deploy-prod"]
+  extends: .rollback-template
+  script:
+    - chmod 600 "$SSH_KEY"
+    - >
+      ssh -i "$SSH_KEY" "$USER@$HOST"
+      "export CI_REGISTRY='$CI_REGISTRY'
+              CI_REGISTRY_USER='$CI_REGISTRY_USER'
+              CI_REGISTRY_PASSWORD='$CI_REGISTRY_PASSWORD'
+              CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE';
+       bash /srv/app-prod/infra/scripts/rollback.sh prod"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
