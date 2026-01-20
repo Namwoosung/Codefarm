@@ -35,7 +35,7 @@ build-backend:
     - docker build -t "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA" -f backend/Dockerfile backend
     - docker push "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA"
   rules:
-    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
 build-frontend:
   extends: .build-template
@@ -43,13 +43,15 @@ build-frontend:
     - docker build -t "$DOCKERHUB_USERNAME/frontend:$CI_COMMIT_SHA" -f frontend/Dockerfile frontend
     - docker push "$DOCKERHUB_USERNAME/frontend:$CI_COMMIT_SHA"
   rules:
-    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
 
 
 # -----------------------
 # TEST
 # -----------------------
 test-fast:
+  tags: shell
   stage: test
   script:
     - echo "Fast tests for feature/infra/fix"
@@ -57,6 +59,7 @@ test-fast:
     - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\/.+/'
 
 test-full:
+  tags: shell
   stage: test
   script:
     - echo "Full tests for develop/main/hotfix"
@@ -94,7 +97,7 @@ deploy-prod:
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
-      allow_failure: false
+      allow_failure: true
 
 # -----------------------
 # ROLLBACK (manual)
@@ -106,7 +109,6 @@ deploy-prod:
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
 rollback-dev:
-  needs: ["deploy-dev"]
   extends: .rollback-template
   script:
     - chmod 600 "$SSH_KEY"
@@ -114,10 +116,9 @@ rollback-dev:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: manual
-      allow_failure: false
+      allow_failure: true
 
 rollback-prod:
-  needs: ["deploy-prod"]
   extends: .rollback-template
   script:
     - chmod 600 "$SSH_KEY"
