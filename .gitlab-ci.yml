@@ -51,6 +51,8 @@ build-frontend:
 # TEST
 # -----------------------
 test-fast:
+  tags: 
+    - ec2-mono
   stage: test
   script:
     - echo "Fast tests for feature/infra/fix"
@@ -58,6 +60,8 @@ test-fast:
     - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\/.+/'
 
 test-full:
+  tags:
+    - ec2-mono
   stage: test
   script:
     - echo "Full tests for develop/main/hotfix"
