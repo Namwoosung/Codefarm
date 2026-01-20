@@ -79,6 +79,8 @@ deploy-dev:
   needs: ["build-backend", "build-frontend"]
   extends: .deploy-template
   script:
+    - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
+    - echo "token_set=$([ -n "${DOCKERHUB_TOKEN:-}" ] && echo yes || echo no)"
     # SSH_KEY가 "File" 타입 변수면 경로가 들어오므로 chmod 가능
     - chmod 600 "$SSH_KEY"
     # EC2에서 레지스트리 로그인 + 이미지 pull + compose up
