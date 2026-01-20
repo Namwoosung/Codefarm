@@ -11,7 +11,7 @@ ENV GRADLE_USER_HOME=/home/gradle/.gradle
 
 # 1) 의존성 캐시를 최대한 살리기 위해 "먼저" 빌드 스크립트만 복사
 # - 프로젝트 구조에 맞게 파일명이 다르면 수정하세요.
-COPY build.gradle settings.gradle gradle.properties ./
+COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
 COPY gradlew ./
 
