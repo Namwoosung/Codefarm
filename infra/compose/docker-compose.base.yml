@@ -50,7 +50,7 @@ services:
       - appnet
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "sh", "-lc", "wget -qO- http://localhost/ >/dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 12
