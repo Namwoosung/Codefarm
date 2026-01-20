@@ -24,33 +24,24 @@ default:
 # -----------------------
 .build-template:
   stage: build
-  image: docker:27
-  services:
-    - docker:27-dind
   before_script:
     - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
     - docker info
-    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
-    - echo "CI_REGISTRY=$CI_REGISTRY"
-    - echo "CI_REGISTRY_IMAGE=$CI_REGISTRY_IMAGE"
-    - echo "CI_SERVER_HOST=$CI_SERVER_HOST"
-    - echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" -u "$CI_REGISTRY_USER" --password-stdin
-
-
+    - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
 build-backend:
   extends: .build-template
   script:
-    - docker build -t "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA" -f backend/Dockerfile backend
-    - docker push "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHA"
+    - docker build -t "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA" -f backend/Dockerfile backend
+    - docker push "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH'
 
 build-frontend:
   extends: .build-template
   script:
-    - docker build -t "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA" -f frontend/Dockerfile frontend
-    - docker push "$CI_REGISTRY_IMAGE/frontend:$CI_COMMIT_SHA"
+    - docker build -t "$DOCKERHUB_USERNAME/frontend:$CI_COMMIT_SHA" -f frontend/Dockerfile frontend
+    - docker push "$DOCKERHUB_USERNAME/frontend:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH'
 
@@ -87,34 +78,34 @@ test-full:
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
 deploy-dev:
+  needs: ["build-backend", "build-frontend"]
   extends: .deploy-template
   script:
     # SSH_KEY가 "File" 타입 변수면 경로가 들어오므로 chmod 가능
     - chmod 600 "$SSH_KEY"
     # EC2에서 레지스트리 로그인 + 이미지 pull + compose up
     - >
-      ssh -i "$SSH_KEY" "$USER@$HOST"
-      "export CI_REGISTRY='$CI_REGISTRY'
-              CI_REGISTRY_USER='$CI_REGISTRY_USER'
-              CI_REGISTRY_PASSWORD='$CI_REGISTRY_PASSWORD'
-              CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE'
+      ssh -i "$SSH_KEY" "$USER@$HOST" "
+        export DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME'
+              DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN'
               IMAGE_TAG='$IMAGE_TAG';
-       bash /srv/app-dev/infra/scripts/deploy.sh dev"
+        bash /srv/app-dev/infra/scripts/deploy.sh dev
+      "
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
 
 deploy-prod:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
     - >
-      ssh -i "$SSH_KEY" "$USER@$HOST"
-      "export CI_REGISTRY='$CI_REGISTRY'
-              CI_REGISTRY_USER='$CI_REGISTRY_USER'
-              CI_REGISTRY_PASSWORD='$CI_REGISTRY_PASSWORD'
-              CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE'
+      ssh -i "$SSH_KEY" "$USER@$HOST" "
+        export DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME'
+              DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN'
               IMAGE_TAG='$IMAGE_TAG';
-       bash /srv/app-prod/infra/scripts/deploy.sh prod"
+        bash /srv/app-prod/infra/scripts/deploy.sh prod
+      "
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
@@ -137,11 +128,10 @@ rollback-dev:
   script:
     - chmod 600 "$SSH_KEY"
     - >
-      ssh -i "$SSH_KEY" "$USER@$HOST"
-      "export CI_REGISTRY='$CI_REGISTRY'
-              CI_REGISTRY_USER='$CI_REGISTRY_USER'
-              CI_REGISTRY_PASSWORD='$CI_REGISTRY_PASSWORD'
-              CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE';
+      ssh -i "$SSH_KEY" "$USER@$HOST" "
+        export DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME'
+              DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN'
+              IMAGE_TAG='$IMAGE_TAG';
        bash /srv/app-dev/infra/scripts/rollback.sh dev"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
@@ -154,11 +144,10 @@ rollback-prod:
   script:
     - chmod 600 "$SSH_KEY"
     - >
-      ssh -i "$SSH_KEY" "$USER@$HOST"
-      "export CI_REGISTRY='$CI_REGISTRY'
-              CI_REGISTRY_USER='$CI_REGISTRY_USER'
-              CI_REGISTRY_PASSWORD='$CI_REGISTRY_PASSWORD'
-              CI_REGISTRY_IMAGE='$CI_REGISTRY_IMAGE';
+      ssh -i "$SSH_KEY" "$USER@$HOST" "
+        export DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME'
+              DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN'
+              IMAGE_TAG='$IMAGE_TAG';
        bash /srv/app-prod/infra/scripts/rollback.sh prod"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'

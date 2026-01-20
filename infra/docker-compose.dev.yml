@@ -1,6 +1,6 @@
 services:
   backend:
-    image: ${CI_REGISTRY_IMAGE}/backend:${IMAGE_TAG}
+    image: ${DOCKERHUB_USERNAME}/backend:${IMAGE_TAG}
     container_name: app-dev-backend
     restart: always
     environment:
@@ -11,7 +11,7 @@ services:
       - appnet
 
   frontend:
-    image: ${CI_REGISTRY_IMAGE}/frontend:${IMAGE_TAG}
+    image: ${DOCKERHUB_USERNAME}/frontend:${IMAGE_TAG}
     container_name: app-dev-frontend
     restart: always
     ports:
