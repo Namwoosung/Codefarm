@@ -21,7 +21,6 @@ RUN npm run build
 FROM nginx:alpine
 
 # nginx 설정 복사
-COPY infra/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY infra/nginx/conf.d/ /etc/nginx/conf.d/
 
 # Vue dist 복사
