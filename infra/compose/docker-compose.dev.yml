@@ -1,22 +1,35 @@
+version: "3.9"
+
 services:
-  backend:
-    container_name: app-dev-backend
-    environment:
-      SPRING_PROFILES_ACTIVE: dev
+  api:
+    build:
+      context: ../../backend
+      dockerfile: Dockerfile
+    container_name: api-dev
+    # dev에서 api 직접 접근 필요 없으면 아래 ports는 지워도 OK
     ports:
       - "8080:8080"
+    restart: unless-stopped
 
-  frontend:
-    container_name: app-dev-frontend
+  web:
+    build:
+      context: ../../
+      dockerfile: infra/nginx/Dockerfile
+    container_name: web-dev
     ports:
       - "80:80"
+    restart: unless-stopped
 
   postgres:
-    container_name: app-dev-postgres
-    ports:
-      - "5432:5432"
+    container_name: postgres-dev
+    # dev에서 DB 외부 접속 필요할 때만 오픈
+    # ports:
+    #   - "5432:5432"
+    restart: unless-stopped
 
   redis:
-    container_name: app-dev-redis
-    ports:
-      - "6379:6379"
+    container_name: redis-dev
+    # dev에서 redis 외부 접속 필요할 때만 오픈
+    # ports:
+    #   - "6379:6379"
+    restart: unless-stopped
