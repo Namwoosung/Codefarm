@@ -1,0 +1,21 @@
+services:
+  backend:
+    container_name: app-prod-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+    # 외부 노출 필요 없으면 아래처럼 localhost로만 묶거나, 아예 ports 제거
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  frontend:
+    container_name: app-prod-frontend
+    ports:
+      - "80:80"
+
+  postgres:
+    container_name: app-prod-postgres
+    # 운영은 보통 DB 포트 외부 공개 X -> ports 없음
+
+  redis:
+    container_name: app-prod-redis
+    # 운영은 보통 외부 공개 X -> ports 없음

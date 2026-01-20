@@ -1,0 +1,22 @@
+services:
+  backend:
+    container_name: app-dev-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+    ports:
+      - "8080:8080"
+
+  frontend:
+    container_name: app-dev-frontend
+    ports:
+      - "80:80"
+
+  postgres:
+    container_name: app-dev-postgres
+    ports:
+      - "5432:5432"
+
+  redis:
+    container_name: app-dev-redis
+    ports:
+      - "6379:6379"
