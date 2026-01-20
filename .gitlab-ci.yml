@@ -51,7 +51,6 @@ build-frontend:
 # -----------------------
 test-fast:
   stage: test
-  image: alpine:3.19
   script:
     - echo "Fast tests for feature/infra/fix"
   rules:
@@ -59,7 +58,6 @@ test-fast:
 
 test-full:
   stage: test
-  image: alpine:3.19
   script:
     - echo "Full tests for develop/main/hotfix"
   rules:
@@ -84,22 +82,15 @@ deploy-dev:
     # SSH_KEY가 "File" 타입 변수면 경로가 들어오므로 chmod 가능
     - chmod 600 "$SSH_KEY"
     # EC2에서 레지스트리 로그인 + 이미지 pull + compose up
-    - >
-      ssh -i "$SSH_KEY" "$USER@$HOST"
-      "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' \
-      bash /srv/app-dev/infra/scripts/deploy.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-dev/infra/scripts/deploy.sh dev"
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
 
 deploy-prod:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - >
-      ssh -i "$SSH_KEY" "$USER@$HOST"
-      "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' \
-      bash /srv/app-prod/infra/scripts/deploy.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-prod/infra/scripts/deploy.sh prod"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
@@ -119,10 +110,7 @@ rollback-dev:
   extends: .rollback-template
   script:
     - chmod 600 "$SSH_KEY"
-    - >
-      ssh -i "$SSH_KEY" "$USER@$HOST"
-      "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' \
-      bash /srv/app-dev/infra/scripts/rollback.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-dev/infra/scripts/rollback.sh dev"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: manual
@@ -133,10 +121,7 @@ rollback-prod:
   extends: .rollback-template
   script:
     - chmod 600 "$SSH_KEY"
-    - >
-      ssh -i "$SSH_KEY" "$USER@$HOST"
-      "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' \
-      bash /srv/app-prod/infra/scripts/rollback.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-prod/infra/scripts/rollback.sh prod"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
