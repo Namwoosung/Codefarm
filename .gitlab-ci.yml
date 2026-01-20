@@ -71,9 +71,7 @@ test-full:
 # -----------------------
 .deploy-template:
   stage: deploy
-  image: alpine:3.19
   before_script:
-    - apk add --no-cache openssh-client
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
@@ -116,9 +114,7 @@ deploy-prod:
 # -----------------------
 .rollback-template:
   stage: deploy
-  image: alpine:3.19
   before_script:
-    - apk add --no-cache openssh-client
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
