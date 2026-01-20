@@ -14,6 +14,7 @@ ENV GRADLE_USER_HOME=/home/gradle/.gradle
 COPY build.gradle settings.gradle ./
 COPY gradle ./gradle
 COPY gradlew ./
+RUN chmod +x gradlew
 
 # 2) 의존성만 미리 받아 캐시 (소스 없이 실행)
 # - 테스트는 CI에서 분리하고 싶으면 -x test 유지
