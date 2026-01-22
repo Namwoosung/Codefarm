@@ -1,0 +1,9 @@
+services:
+  exec-server:
+    build: .
+    ports:
+      - "8088:8088"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
+    restart: always
