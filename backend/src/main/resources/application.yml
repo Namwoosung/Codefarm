@@ -10,24 +10,58 @@ spring:
 
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+    # JDBC URL에 타임아웃 파라미터 추가 (초 단위)
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:codefarm}?connectTimeout=10&socketTimeout=10
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:}
+    hikari:
+      # 연결 풀 설정
+      minimum-idle: 5
+      maximum-pool-size: 10
+      connection-timeout: 10000  # 10초 (밀리초) - 연결 시도 타임아웃
+      idle-timeout: 600000  # 10분
+      max-lifetime: 1800000  # 30분
+      leak-detection-threshold: 60000  # 연결 누수 감지 (1분)
+      # 연결 검증
+      connection-test-query: SELECT 1
+      validation-timeout: 3000
+      # 연결 실패 시 즉시 실패 (무한 재시도 방지)
+      initialization-fail-timeout: -1
 
   jpa:
+    # PostgreSQL Dialect 명시적 설정
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: create
     properties:
       hibernate:
+        # Dialect 명시적 설정
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        # 네이밍 전략 (CamelCase -> snake_case)
+        physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        # 성능 최적화
         enable_lazy_load_no_trans: false
-        show_sql: false
-        format_sql: false
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+        # 로깅
+        show_sql: ${SHOW_SQL:false}
+        format_sql: ${FORMAT_SQL:false}
+        use_sql_comments: false
     open-in-view: false
+    show-sql: false
 
   data:
     redis:
-      host: ${REDIS_HOST}
-      port: ${REDIS_PORT}
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
 
 management:
   endpoints:
@@ -38,3 +72,16 @@ management:
     health:
       probes:
         enabled: true
+      show-details: when-authorized
+  health:
+    db:
+      enabled: true
+    redis:
+      enabled: true
+
+logging:
+  level:
+    org.hibernate.SQL: ${LOG_SQL:DEBUG}
+    org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_PARAM:TRACE}
+    org.springframework.web: INFO
+    com.ssafy.codefarm: DEBUG
