@@ -13,31 +13,7 @@ CI/CD, 배포 및 운영 방식에 대한 **최종 기준 문서**이다.
 를 이해하는 것을 목표로 한다.
 
 ## Directory Structure
-
-```bash
-repo-root/
-├── backend/                 # Spring Boot 애플리케이션
-│   └── Dockerfile
-├── frontend/                # Vue.js 애플리케이션
-│   └── Dockerfile
-├── infra/
-│   ├── compose/             # Docker Compose 정의
-│   │   ├── docker-compose.base.yml
-│   │   ├── docker-compose.dev.yml
-│   │   ├── docker-compose.prod.yml
-│   │   ├── dev.env.example
-│   │   └── prod.env.example
-│   ├── nginx/               # Nginx 설정 (web 컨테이너용)
-│   │   └── conf.d/
-│   │       └── default.conf
-│   ├── scripts/             # 배포/운영 스크립트
-│   │   ├── deploy.sh
-│   │   ├── healthcheck.sh
-│   │   └── rollback.sh
-│   └── README.md            # 인프라 문서 (본 문서)
-├── .gitlab-ci.yml            # CI/CD 파이프라인 정의
-└── README.md                 # 프로젝트 전반 문서
-````
+- 추가예정
 
 ## Branch Strategy (Infra Perspective)
 

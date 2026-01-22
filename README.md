@@ -104,3 +104,13 @@ Frontend 예시
 Backend 예시
 
 * `feature/backend/receipt/ocr-parser-SSR-208`
+
+
+### Commit Message Convention
+
+- 태그는 6개중 하나 사용(fix, feature, refactor, docs, chore, ci)
+- 태그는 소문자
+- 내용은 영어로 작성, 동사로 시작
+- 예시
+    - feat(backend): add controller advice
+    - docs(infra): update commit message convention to README
