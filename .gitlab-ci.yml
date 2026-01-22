@@ -37,21 +37,20 @@ build-backend:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
-build-frontend:
+build-web:
   extends: .build-template
   script:
-    - docker build -t "$DOCKERHUB_USERNAME/frontend:$CI_COMMIT_SHA" -f frontend/Dockerfile frontend
-    - docker push "$DOCKERHUB_USERNAME/frontend:$CI_COMMIT_SHA"
+    - docker build -t "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA" -f infra/nginx/Dockerfile .
+    - docker push "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-
-
 
 # -----------------------
 # TEST
 # -----------------------
 test-fast:
-  tags: shell
+  tags: 
+    - ec2-mono
   stage: test
   script:
     - echo "Fast tests for feature/infra/fix"
@@ -59,7 +58,8 @@ test-fast:
     - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\/.+/'
 
 test-full:
-  tags: shell
+  tags:
+    - ec2-mono
   stage: test
   script:
     - echo "Full tests for develop/main/hotfix"
@@ -77,7 +77,7 @@ test-full:
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
 deploy-dev:
-  needs: ["build-backend", "build-frontend"]
+  needs: ["build-backend", "build-web"]
   extends: .deploy-template
   script:
     - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
