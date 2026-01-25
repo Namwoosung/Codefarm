@@ -85,3 +85,8 @@ logging:
     org.hibernate.type.descriptor.sql.BasicBinder: ${LOG_PARAM:TRACE}
     org.springframework.web: INFO
     com.ssafy.codefarm: DEBUG
+
+jwt:
+  secret-key: ${JWT_SECRET_KEY}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
