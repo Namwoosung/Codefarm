@@ -31,7 +31,7 @@ public class UserService {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
 
-    public UserSignupResponseDto signup(UserSignupRequestDto userSignupRequestDto) {
+    public UserResponseDto signup(UserSignupRequestDto userSignupRequestDto) {
         if (userRepository.existsByEmail(userSignupRequestDto.getEmail())) {
             throw new CustomException(
                     "이미 사용 중인 이메일입니다.",
@@ -58,7 +58,7 @@ public class UserService {
 
         userRepository.save(user);
 
-        return UserSignupResponseDto.from(user);
+        return UserResponseDto.from(user);
     }
 
     @Transactional(readOnly = true)
@@ -108,5 +108,13 @@ public class UserService {
 
 
 
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponseDto getUserProfile(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException("유저 정보를 찾을 수 없습니다", ErrorCode.RESOURCE_NOT_FOUND));
+
+        return UserResponseDto.from(user);
     }
 }

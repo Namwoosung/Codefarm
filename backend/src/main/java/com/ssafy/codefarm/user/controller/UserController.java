@@ -1,19 +1,18 @@
 package com.ssafy.codefarm.user.controller;
 
+import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.dto.SuccessResponse;
 import com.ssafy.codefarm.user.dto.request.CheckEmailRequestDto;
 import com.ssafy.codefarm.user.dto.request.CheckNicknameRequestDto;
 import com.ssafy.codefarm.user.dto.request.LoginRequestDto;
 import com.ssafy.codefarm.user.dto.request.UserSignupRequestDto;
-import com.ssafy.codefarm.user.dto.response.CheckEmailResponseDto;
-import com.ssafy.codefarm.user.dto.response.CheckNicknameResponseDto;
-import com.ssafy.codefarm.user.dto.response.LoginResponseDto;
-import com.ssafy.codefarm.user.dto.response.UserSignupResponseDto;
+import com.ssafy.codefarm.user.dto.response.*;
 import com.ssafy.codefarm.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @Slf4j
@@ -27,8 +26,8 @@ public class UserController {
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.CREATED)
     public SuccessResponse signup(@RequestBody @Valid UserSignupRequestDto userSignupRequestDto) {
-        UserSignupResponseDto userSignupResponseDto = userService.signup(userSignupRequestDto);
-        return SuccessResponse.success("회원가입에 성공했습니다.", userSignupResponseDto);
+        UserResponseDto userResponseDto = userService.signup(userSignupRequestDto);
+        return SuccessResponse.success("회원가입에 성공했습니다.", userResponseDto);
     }
 
     @PostMapping("/check/emails")
@@ -87,6 +86,16 @@ public class UserController {
         // 추후 refresh token 도입 후 추가 작업 진행
 
         return SuccessResponse.success("로그아웃 성공", null);
+    }
+
+    @GetMapping("/profiles")
+    public SuccessResponse getMyProfile(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+
+        UserResponseDto userResponseDto = userService.getUserProfile(userDetails.getUserId());
+
+        return SuccessResponse.success("유저 정보 조회 성공", userResponseDto);
     }
 
 }
