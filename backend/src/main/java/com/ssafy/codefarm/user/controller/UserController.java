@@ -78,4 +78,15 @@ public class UserController {
         );
     }
 
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.OK)
+    public SuccessResponse logout() {
+
+        // Stateless이므로 서버에서 할 작업 없음
+        // 클라이언트가 accessToken 삭제하면 끝
+        // 추후 refresh token 도입 후 추가 작업 진행
+
+        return SuccessResponse.success("로그아웃 성공", null);
+    }
+
 }
