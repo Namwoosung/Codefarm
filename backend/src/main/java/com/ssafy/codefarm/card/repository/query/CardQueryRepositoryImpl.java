@@ -22,7 +22,22 @@ public class CardQueryRepositoryImpl implements CardQueryRepository{
 
     @Override
     public List<MyCardQueryDto> findMyCards(Long userId) {
-        return null;
+        return query
+                .select(
+                        com.querydsl.core.types.Projections.constructor(
+                                MyCardQueryDto.class,
+                                card.id,
+                                card.name,
+                                card.grade,
+                                card.image,
+                                userCard.id.count()
+                        )
+                )
+                .from(userCard)
+                .join(userCard.card, card)
+                .where(userCard.user.id.eq(userId))
+                .groupBy(card.id)
+                .fetch();
     }
 
     @Override

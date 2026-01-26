@@ -1,6 +1,7 @@
 package com.ssafy.codefarm.card.controller;
 
 import com.ssafy.codefarm.card.dto.response.DrawCardResponseDto;
+import com.ssafy.codefarm.card.dto.response.MyCardListResponseDto;
 import com.ssafy.codefarm.card.service.CardService;
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.dto.SuccessResponse;
@@ -8,10 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @Slf4j
 @RestController
@@ -29,5 +27,16 @@ public class CardController {
                 cardService.drawCard(userDetails.getUserId());
 
         return SuccessResponse.success("카드 뽑기 성공", drawCardResponseDto);
+    }
+
+    @GetMapping("/me")
+    @ResponseStatus(HttpStatus.OK)
+    public SuccessResponse getMyCards(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+        MyCardListResponseDto myCardListResponseDto =
+                cardService.getMyCards(userDetails.getUserId());
+
+        return SuccessResponse.success("내 카드 목록 조회 성공", myCardListResponseDto);
     }
 }

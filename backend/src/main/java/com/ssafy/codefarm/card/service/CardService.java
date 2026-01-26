@@ -1,6 +1,7 @@
 package com.ssafy.codefarm.card.service;
 
 import com.ssafy.codefarm.card.dto.response.DrawCardResponseDto;
+import com.ssafy.codefarm.card.dto.response.MyCardListResponseDto;
 import com.ssafy.codefarm.card.entity.Card;
 import com.ssafy.codefarm.card.entity.CardGrade;
 import com.ssafy.codefarm.card.entity.UserCard;
@@ -57,5 +58,13 @@ public class CardService {
         userCardRepository.save(userCard);
 
         return DrawCardResponseDto.from(card, isNew);
+    }
+
+    @Transactional(readOnly = true)
+    public MyCardListResponseDto getMyCards(Long userId) {
+        return MyCardListResponseDto.from(
+                cardRepository.findMyCards(userId)
+        );
+
     }
 }
