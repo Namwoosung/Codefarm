@@ -9,19 +9,13 @@ workflow:
       when: always
 
 variables:
-  # docker:dind 쓰는 표준 설정
-  DOCKER_TLS_CERTDIR: ""
-
-  # 이미지 태그 전략 (sha 추천)
   IMAGE_TAG: "$CI_COMMIT_SHA"
 
 default:
   before_script:
     - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
-# -----------------------
 # BUILD (docker build & push)
-# -----------------------
 .build-template:
   stage: build
   before_script:
@@ -45,9 +39,7 @@ build-web:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
-# -----------------------
 # TEST
-# -----------------------
 test-fast:
   tags: 
     - ec2-mono
@@ -67,9 +59,7 @@ test-full:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
 
-# -----------------------
 # DEPLOY (EC2에서 docker pull & compose up)
-# -----------------------
 .deploy-template:
   stage: deploy
   before_script:
@@ -82,9 +72,7 @@ deploy-dev:
   script:
     - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
     - echo "token_set=$([ -n "${DOCKERHUB_TOKEN:-}" ] && echo yes || echo no)"
-    # SSH_KEY가 "File" 타입 변수면 경로가 들어오므로 chmod 가능
     - chmod 600 "$SSH_KEY"
-    # EC2에서 레지스트리 로그인 + 이미지 pull + compose up
     - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-dev/infra/scripts/deploy.sh dev"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
@@ -99,9 +87,7 @@ deploy-prod:
       when: manual
       allow_failure: true
 
-# -----------------------
 # ROLLBACK (manual)
-# -----------------------
 .rollback-template:
   stage: deploy
   before_script:
