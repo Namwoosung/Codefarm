@@ -72,7 +72,8 @@ public class SecurityConfig {
                         // 인증 관련 API
                         .requestMatchers(
                                 "/api/v1/users/login",
-                                "/api/v1/users/signup"
+                                "/api/v1/users/signup",
+                                "/api/v1/users/check/emails"
                         ).permitAll()
 
                         // 개발 단계 테스트
@@ -88,19 +89,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowCredentials(true); // 쿠키를 포함한 요청 허용
-        configuration.setAllowedOrigins(List.of(
-                "http://localhost:3000",
-                "https://localhost:3000",
-                "http://localhost:5173",
-                "https://localhost:5173"
-        )); // 허용할 프론트엔드 도메인
+        configuration.setAllowedOriginPatterns(List.of("*")); // 허용할 프론트엔드 도메인(개발 단계에서는 모두 허용)
         configuration.setAllowedMethods(
                 List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")); // 허용할 메서드
-        configuration.setAllowedHeaders(List.of(
-                "Authorization",
-                "Content-Type",
-                "X-Requested-With"
-        )); //프론트엔드에서 요청을 보낼 때 포함할 수 있는 헤더
+        configuration.setAllowedHeaders(List.of("*")); //프론트엔드에서 요청을 보낼 때 포함할 수 있는 헤더
         configuration.setExposedHeaders(List.of("Authorization")); // 프론트에서 응답에서 조회할 수 있는 헤더
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

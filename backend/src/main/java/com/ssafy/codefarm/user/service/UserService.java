@@ -2,7 +2,9 @@ package com.ssafy.codefarm.user.service;
 
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
+import com.ssafy.codefarm.user.dto.request.CheckEmailRequestDto;
 import com.ssafy.codefarm.user.dto.request.UserSignupRequestDto;
+import com.ssafy.codefarm.user.dto.response.CheckEmailResponseDto;
 import com.ssafy.codefarm.user.dto.response.UserSignupResponseDto;
 import com.ssafy.codefarm.user.entity.User;
 import com.ssafy.codefarm.user.repository.UserRepository;
@@ -49,5 +51,10 @@ public class UserService {
         userRepository.save(user);
 
         return UserSignupResponseDto.from(user);
+    }
+
+    @Transactional(readOnly = true)
+    public CheckEmailResponseDto checkEmailDuplicate(CheckEmailRequestDto checkEmailRequestDto) {
+        return new CheckEmailResponseDto(!userRepository.existsByEmail(checkEmailRequestDto.getEmail()));
     }
 }

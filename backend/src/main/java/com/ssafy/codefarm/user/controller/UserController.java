@@ -1,7 +1,9 @@
 package com.ssafy.codefarm.user.controller;
 
 import com.ssafy.codefarm.common.dto.SuccessResponse;
+import com.ssafy.codefarm.user.dto.request.CheckEmailRequestDto;
 import com.ssafy.codefarm.user.dto.request.UserSignupRequestDto;
+import com.ssafy.codefarm.user.dto.response.CheckEmailResponseDto;
 import com.ssafy.codefarm.user.dto.response.UserSignupResponseDto;
 import com.ssafy.codefarm.user.service.UserService;
 import jakarta.validation.Valid;
@@ -23,6 +25,22 @@ public class UserController {
     public SuccessResponse signup(@RequestBody @Valid UserSignupRequestDto userSignupRequestDto) {
         UserSignupResponseDto userSignupResponseDto = userService.signup(userSignupRequestDto);
         return SuccessResponse.success("회원가입에 성공했습니다.", userSignupResponseDto);
+    }
+
+    @PostMapping("/check/emails")
+    @ResponseStatus(HttpStatus.OK)
+    public SuccessResponse checkEmailDuplicate(
+            @RequestBody @Valid CheckEmailRequestDto checkEmailRequestDto
+    ) {
+
+        CheckEmailResponseDto checkEmailResponseDto =
+                userService.checkEmailDuplicate(checkEmailRequestDto);
+
+        String message = checkEmailResponseDto.isAvailable()
+                ? "사용 가능한 이메일입니다."
+                : "이미 존재하는 이메일입니다.";
+
+        return SuccessResponse.success(message, checkEmailResponseDto);
     }
 
 }
