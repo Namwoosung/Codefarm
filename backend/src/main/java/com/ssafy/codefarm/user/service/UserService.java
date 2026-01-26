@@ -101,7 +101,7 @@ public class UserService {
                                         ErrorCode.RESOURCE_NOT_FOUND
                                 ));
 
-        return LoginResponseDto.of(
+        return LoginResponseDto.from(
                 UserResponseDto.from(user),
                 TokenResponseDto.from(accessToken)
         );

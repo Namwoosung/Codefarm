@@ -47,6 +47,14 @@ build-execution:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
+build-sandbox:
+  extends: .build-template
+  script:
+    - docker build -t "$DOCKERHUB_USERNAME/sandbox:$CI_COMMIT_SHA" -f execution/runner/python/Dockerfile .
+    - docker push "$DOCKERHUB_USERNAME/sandbox:$CI_COMMIT_SHA"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
 # TEST
 test-fast:
   tags: 
