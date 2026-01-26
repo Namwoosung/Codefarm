@@ -3,9 +3,11 @@ package com.ssafy.codefarm.user.controller;
 import com.ssafy.codefarm.common.dto.SuccessResponse;
 import com.ssafy.codefarm.user.dto.request.CheckEmailRequestDto;
 import com.ssafy.codefarm.user.dto.request.CheckNicknameRequestDto;
+import com.ssafy.codefarm.user.dto.request.LoginRequestDto;
 import com.ssafy.codefarm.user.dto.request.UserSignupRequestDto;
 import com.ssafy.codefarm.user.dto.response.CheckEmailResponseDto;
 import com.ssafy.codefarm.user.dto.response.CheckNicknameResponseDto;
+import com.ssafy.codefarm.user.dto.response.LoginResponseDto;
 import com.ssafy.codefarm.user.dto.response.UserSignupResponseDto;
 import com.ssafy.codefarm.user.service.UserService;
 import jakarta.validation.Valid;
@@ -59,6 +61,21 @@ public class UserController {
                 : "이미 존재하는 닉네임입니다.";
 
         return SuccessResponse.success(message, checkNicknameResponseDto);
+    }
+
+    @PostMapping("/login")
+    @ResponseStatus(HttpStatus.OK)
+    public SuccessResponse login(
+            @RequestBody @Valid LoginRequestDto loginRequestDto
+    ) {
+
+        LoginResponseDto loginResponseDto =
+                userService.login(loginRequestDto);
+
+        return SuccessResponse.success(
+                "로그인에 성공했습니다.",
+                loginResponseDto
+        );
     }
 
 }

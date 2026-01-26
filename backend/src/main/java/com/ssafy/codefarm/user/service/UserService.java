@@ -1,17 +1,21 @@
 package com.ssafy.codefarm.user.service;
 
+import com.ssafy.codefarm.common.authority.JwtTokenProvider;
+import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.user.dto.request.CheckEmailRequestDto;
 import com.ssafy.codefarm.user.dto.request.CheckNicknameRequestDto;
+import com.ssafy.codefarm.user.dto.request.LoginRequestDto;
 import com.ssafy.codefarm.user.dto.request.UserSignupRequestDto;
-import com.ssafy.codefarm.user.dto.response.CheckEmailResponseDto;
-import com.ssafy.codefarm.user.dto.response.CheckNicknameResponseDto;
-import com.ssafy.codefarm.user.dto.response.UserSignupResponseDto;
+import com.ssafy.codefarm.user.dto.response.*;
 import com.ssafy.codefarm.user.entity.User;
 import com.ssafy.codefarm.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +28,8 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final AuthenticationManager authenticationManager;
+    private final JwtTokenProvider jwtTokenProvider;
 
     public UserSignupResponseDto signup(UserSignupRequestDto userSignupRequestDto) {
         if (userRepository.existsByEmail(userSignupRequestDto.getEmail())) {
@@ -63,5 +69,44 @@ public class UserService {
     @Transactional(readOnly = true)
     public CheckNicknameResponseDto checkNicknameDuplicate(CheckNicknameRequestDto checkNicknameRequestDto) {
         return new CheckNicknameResponseDto(!userRepository.existsByNickname(checkNicknameRequestDto.getNickname()));
+    }
+
+    @Transactional(readOnly = true)
+    public LoginResponseDto login(LoginRequestDto loginRequestDto) {
+        //인증을 위한 UsernamePasswordAuthenticationToken을 생성
+        UsernamePasswordAuthenticationToken authenticate
+                = new UsernamePasswordAuthenticationToken(loginRequestDto.getEmail(), loginRequestDto.getPassword());
+
+        //spring security를 통해 인증 수행 => authenticationManager에게 생성한 토큰 인증을 요구, 인증 완료 후 결과를 Authentication으로 받음
+        Authentication authentication;
+        try {
+            authentication =
+                    authenticationManager.authenticate(authenticate);
+        } catch (Exception e) {
+            throw new CustomException(
+                    "이메일 또는 비밀번호가 올바르지 않습니다.",
+                    ErrorCode.UNAUTHORIZED
+            );
+        }
+
+        //인증받은 Authentication을 통해 token을 발급 받음
+        String accessToken = jwtTokenProvider.createAccessToken(authentication);
+
+        CustomUserDetails userDetails =
+                (CustomUserDetails) authentication.getPrincipal();
+
+        User user = userRepository.findById(userDetails.getUserId())
+                        .orElseThrow(() -> new CustomException(
+                                        "해당 유저가 존재하지 않습니다.",
+                                        ErrorCode.RESOURCE_NOT_FOUND
+                                ));
+
+        return LoginResponseDto.of(
+                UserResponseDto.from(user),
+                TokenResponseDto.from(accessToken)
+        );
+
+
+
     }
 }
