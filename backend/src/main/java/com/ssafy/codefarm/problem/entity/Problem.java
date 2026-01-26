@@ -26,6 +26,9 @@ public class Problem {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    @Column(columnDefinition = "TEXT")
+    private String concept;
+
     @NotNull
     @Column(columnDefinition = "TEXT")
     private String inputDescription;
