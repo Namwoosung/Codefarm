@@ -1,24 +1,14 @@
 services:
-  # ----------------------------
-  # Backend (Spring Boot)
-  # ----------------------------
   api:
-    # dev/prod에서 build로 바꾸거나, image 태그 정책을 바꿀 수 있도록 base는 image로 둠
-    # (dev override에서 build: 로 덮어써도 됨)
     image: ${DOCKERHUB_USERNAME}/backend:${IMAGE_TAG}
     expose:
       - "8080"
     environment:
-      # --- Postgres ---
-      # 반드시 host는 "postgres" (서비스명)로
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/appdb}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-app}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-app}
-      # --- Redis ---
-      # 반드시 host는 "redis" (서비스명)로
       SPRING_DATA_REDIS_HOST: ${SPRING_DATA_REDIS_HOST:-redis}
       SPRING_DATA_REDIS_PORT: ${SPRING_DATA_REDIS_PORT:-6379}
-      # 프로파일(원하면 dev/prod env에서 바꿔치기)
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
     depends_on:
       postgres:
@@ -29,17 +19,12 @@ services:
       - appnet
     restart: unless-stopped
     healthcheck:
-      # actuator가 없다면 /health 같은 엔드포인트로 바꾸세요.
       test: ["CMD", "sh", "-lc", "curl -fsS http://localhost:8080/actuator/health || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 12
 
-  # ----------------------------
-  # Front (Nginx serving Vue dist)
-  # ----------------------------
   web:
-    # nginx+dist를 담은 web 이미지를 사용할 것을 전제로 함
     image: ${DOCKERHUB_USERNAME}/web:${IMAGE_TAG}
     depends_on:
       api:
@@ -55,9 +40,6 @@ services:
       timeout: 3s
       retries: 12
 
-  # ----------------------------
-  # Postgres
-  # ----------------------------
   postgres:
     image: postgres:16-alpine
     environment:
@@ -78,9 +60,6 @@ services:
       timeout: 3s
       retries: 12
 
-  # ----------------------------
-  # Redis
-  # ----------------------------
   redis:
     image: redis:7-alpine
     command: ["redis-server", "--appendonly", "yes"]
