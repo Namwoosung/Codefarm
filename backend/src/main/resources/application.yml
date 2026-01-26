@@ -11,9 +11,9 @@ spring:
   datasource:
     driver-class-name: org.postgresql.Driver
     # JDBC URL에 타임아웃 파라미터 추가 (초 단위)
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?connectTimeout=10&socketTimeout=10
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_NAME}?connectTimeout=10&socketTimeout=10
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
     hikari:
       # 연결 풀 설정
       minimum-idle: 5
