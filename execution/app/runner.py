@@ -11,6 +11,9 @@ def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int,
         main_path = os.path.join(tmp, "main.py")
         with open(main_path, "w", encoding="utf-8") as f:
             f.write(code)
+
+        os.chmod(tmp, 0o755)
+        os.chmod(main_path, 0o644)
         
         # 절대 경로 사용 (Docker 볼륨 마운트를 위해)
         tmp_abs = os.path.abspath(tmp)
