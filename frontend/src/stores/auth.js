@@ -25,7 +25,7 @@ export const useAuthStore = defineStore('auth', {
          * @param {string} signupData.name - 이름
          * @param {string} signupData.nickname - 닉네임
          * @param {number} signupData.age - 나이
-         * @param {string} signupData.codingLevel - 코딩 레벨 (LEVEL1~5)
+         * @param {number} signupData.codingLevel - 코딩 레벨 (1~5)
          * @returns {Promise} API 응답 데이터
          * @throws {Error} API 요청 실패 시 에러 발생
          */
@@ -33,23 +33,11 @@ export const useAuthStore = defineStore('auth', {
             // 로딩 상태 시작
             this.isLoading = true
             try {
-                // codingLevel 문자열을 숫자로 변환 (LEVEL1 → 1, LEVEL2 → 2, ...)
-                // 백엔드는 Integer 타입(1~5)을 기대하므로 변환 필요
-                let codingLevelNumber = signupData.codingLevel
-                
-                // 문자열인 경우 숫자로 변환
-                if (typeof signupData.codingLevel === 'string') {
-                    if (signupData.codingLevel.startsWith('LEVEL')) {
-                        // "LEVEL1" → 1, "LEVEL2" → 2, ... "LEVEL5" → 5
-                        codingLevelNumber = parseInt(signupData.codingLevel.replace('LEVEL', ''), 10)
-                    } else {
-                        // 숫자 문자열인 경우 (예: "1", "2", ...)
-                        codingLevelNumber = parseInt(signupData.codingLevel, 10)
-                    }
-                }
-                
-                // 변환된 값이 유효한 숫자인지 확인
-                if (isNaN(codingLevelNumber) || codingLevelNumber < 1 || codingLevelNumber > 5) {
+                // codingLevel은 이미 숫자 타입으로 전달됨 (프론트엔드에서 v-model.number 사용)
+                // 유효성 검사만 수행
+                if (typeof signupData.codingLevel !== 'number' || 
+                    signupData.codingLevel < 1 || 
+                    signupData.codingLevel > 5) {
                     throw new Error(`유효하지 않은 코딩 레벨입니다: ${signupData.codingLevel}`)
                 }
                 
@@ -60,11 +48,8 @@ export const useAuthStore = defineStore('auth', {
                     name: signupData.name,
                     nickname: signupData.nickname,
                     age: signupData.age,
-                    codingLevel: codingLevelNumber
+                    codingLevel: signupData.codingLevel
                 }
-                
-                // 디버깅: 전송되는 데이터 확인
-                console.log('회원가입 요청 데이터:', requestData)
                 
                 const response = await api.post('/users/signup', requestData)
                 // 성공 시 응답 데이터 반환
