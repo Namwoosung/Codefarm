@@ -73,7 +73,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/users/login",
                                 "/api/v1/users/signup",
-                                "/api/v1/users/check/emails"
+                                "/api/v1/users/check/emails",
+                                "/api/v1/users/check/nicknames"
                         ).permitAll()
 
                         // 개발 단계 테스트
