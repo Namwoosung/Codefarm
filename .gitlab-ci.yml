@@ -39,6 +39,14 @@ build-web:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
+build-execution:
+  extends: .build-template
+  script:
+    - docker build -t "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA" -f execution/Dockerfile execution
+    - docker push "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
 # TEST
 test-fast:
   tags: 
@@ -67,7 +75,7 @@ test-full:
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
 deploy-dev:
-  needs: ["build-backend", "build-web"]
+  needs: ["build-backend", "build-web", "build-execution"]
   extends: .deploy-template
   script:
     - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
