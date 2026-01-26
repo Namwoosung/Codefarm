@@ -4,7 +4,7 @@ public record LoginResponseDto(
         UserResponseDto user,
         TokenResponseDto token
 ) {
-    public static LoginResponseDto of(
+    public static LoginResponseDto from(
             UserResponseDto user,
             TokenResponseDto token
     ) {
