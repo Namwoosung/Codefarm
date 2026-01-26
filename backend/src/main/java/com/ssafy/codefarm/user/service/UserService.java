@@ -4,10 +4,7 @@ import com.ssafy.codefarm.common.authority.JwtTokenProvider;
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
-import com.ssafy.codefarm.user.dto.request.CheckEmailRequestDto;
-import com.ssafy.codefarm.user.dto.request.CheckNicknameRequestDto;
-import com.ssafy.codefarm.user.dto.request.LoginRequestDto;
-import com.ssafy.codefarm.user.dto.request.UserSignupRequestDto;
+import com.ssafy.codefarm.user.dto.request.*;
 import com.ssafy.codefarm.user.dto.response.*;
 import com.ssafy.codefarm.user.entity.User;
 import com.ssafy.codefarm.user.repository.UserRepository;
@@ -116,5 +113,26 @@ public class UserService {
                 .orElseThrow(() -> new CustomException("유저 정보를 찾을 수 없습니다", ErrorCode.RESOURCE_NOT_FOUND));
 
         return UserResponseDto.from(user);
+    }
+
+    public UserResponseDto updateProfile(Long userId, UpdateUserProfileRequestDto updateUserProfileRequestDto) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException("해당 유저가 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (updateUserProfileRequestDto.getNickname() != null) {
+            if (userRepository.existsByNickname(updateUserProfileRequestDto.getNickname())
+                    && !user.getNickname().equals(updateUserProfileRequestDto.getNickname())) {
+                throw new CustomException("이미 존재하는 닉네임입니다.", ErrorCode.DUPLICATE_RESOURCE);
+            }
+        }
+
+        user.updateProfile(
+                updateUserProfileRequestDto.getName(),
+                updateUserProfileRequestDto.getNickname(),
+                updateUserProfileRequestDto.getAge(),
+                updateUserProfileRequestDto.getCodingLevel()
+        );
+
+        return getUserProfile(userId);
     }
 }

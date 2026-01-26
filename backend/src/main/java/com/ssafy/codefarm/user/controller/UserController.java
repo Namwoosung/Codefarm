@@ -2,10 +2,7 @@ package com.ssafy.codefarm.user.controller;
 
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.dto.SuccessResponse;
-import com.ssafy.codefarm.user.dto.request.CheckEmailRequestDto;
-import com.ssafy.codefarm.user.dto.request.CheckNicknameRequestDto;
-import com.ssafy.codefarm.user.dto.request.LoginRequestDto;
-import com.ssafy.codefarm.user.dto.request.UserSignupRequestDto;
+import com.ssafy.codefarm.user.dto.request.*;
 import com.ssafy.codefarm.user.dto.response.*;
 import com.ssafy.codefarm.user.service.UserService;
 import jakarta.validation.Valid;
@@ -96,6 +93,16 @@ public class UserController {
         UserResponseDto userResponseDto = userService.getUserProfile(userDetails.getUserId());
 
         return SuccessResponse.success("유저 정보 조회 성공", userResponseDto);
+    }
+
+    @PatchMapping("/profiles")
+    public SuccessResponse updateProfile(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @RequestBody @Valid UpdateUserProfileRequestDto updateUserProfileRequestDto
+    ) {
+        UserResponseDto userResponseDto = userService.updateProfile(userDetails.getUserId(), updateUserProfileRequestDto);
+
+        return SuccessResponse.success("유저 정보 수정 성공", userResponseDto);
     }
 
 }
