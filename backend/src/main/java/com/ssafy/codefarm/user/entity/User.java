@@ -51,8 +51,7 @@ public class User {
     private Integer age;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    private CodingLevel codingLevel;
+    private Integer codingLevel;
 
     @NotNull
     @Builder.Default
@@ -68,7 +67,7 @@ public class User {
         this.age = age;
     }
 
-    public void updateCodingLevel(CodingLevel level) {
+    public void updateCodingLevel(Integer level) {
         this.codingLevel = level;
     }
 
