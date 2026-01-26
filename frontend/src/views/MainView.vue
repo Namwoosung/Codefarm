@@ -6,6 +6,7 @@
       <p class="font-sans text-xl max-w-2xl mx-auto mt-4">
         퍼센트, 쉼표, 더하기, 빼기, 화살표 등 UI 요소로 활용되는 기호들의 가독성을 높여, 넓은 여백으로 디자인했죠. 또한 다른 글자와의 균형과 일관성을 고려.
       </p>
+      <router-link to="/login">로그인</router-link>
       <div class="mt-6">
         <Button label="D2Coding 버튼" icon="pi pi-check" />
       </div>
