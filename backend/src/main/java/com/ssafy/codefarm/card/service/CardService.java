@@ -1,5 +1,6 @@
 package com.ssafy.codefarm.card.service;
 
+import com.ssafy.codefarm.card.dto.response.CardDetailResponseDto;
 import com.ssafy.codefarm.card.dto.response.DrawCardResponseDto;
 import com.ssafy.codefarm.card.dto.response.MyCardListResponseDto;
 import com.ssafy.codefarm.card.entity.Card;
@@ -16,6 +17,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -66,5 +68,24 @@ public class CardService {
                 cardRepository.findMyCards(userId)
         );
 
+    }
+
+    @Transactional(readOnly = true)
+    public CardDetailResponseDto getCardDetail(Long cardId, Long userId) {
+        Card card = cardRepository.findById(cardId)
+                .orElseThrow(() ->
+                        new CustomException(
+                                "카드를 찾을 수 없습니다.",
+                                ErrorCode.RESOURCE_NOT_FOUND
+                        )
+                );
+
+        long count = userCardRepository
+                .countByUserIdAndCardId(userId, cardId);
+
+        List<LocalDateTime> history =
+                cardRepository.findAcquiredHistory(userId, cardId);
+
+        return CardDetailResponseDto.from(card, count, history);
     }
 }

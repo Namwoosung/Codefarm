@@ -1,5 +1,6 @@
 package com.ssafy.codefarm.card.controller;
 
+import com.ssafy.codefarm.card.dto.response.CardDetailResponseDto;
 import com.ssafy.codefarm.card.dto.response.DrawCardResponseDto;
 import com.ssafy.codefarm.card.dto.response.MyCardListResponseDto;
 import com.ssafy.codefarm.card.service.CardService;
@@ -38,5 +39,24 @@ public class CardController {
                 cardService.getMyCards(userDetails.getUserId());
 
         return SuccessResponse.success("내 카드 목록 조회 성공", myCardListResponseDto);
+    }
+
+    @GetMapping("/{cardId}")
+    @ResponseStatus(HttpStatus.OK)
+    public SuccessResponse getCardDetail(
+            @PathVariable Long cardId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+
+        CardDetailResponseDto cardDetailResponseDto =
+                cardService.getCardDetail(
+                        cardId,
+                        userDetails.getUserId()
+                );
+
+        return SuccessResponse.success(
+                "카드 상세 조회 성공",
+                cardDetailResponseDto
+        );
     }
 }
