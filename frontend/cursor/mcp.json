@@ -3,6 +3,10 @@
         "primevue": {
             "command": "npx",
             "args": ["-y", "@primevue/mcp"]
+        },
+        "tailwindcss": {
+            "command": "npx",
+            "args": ["-y", "@tailwindcss-mcp"]
         }
     }
 }

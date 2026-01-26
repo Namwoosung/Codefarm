@@ -2,19 +2,27 @@
 
 /* Fonts */
 @import url('https://static.toss.im/toss-fonts/font.css');
-
-@font-face {
-  font-family: 'D2Coding';
-  src: url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_three@1.0/D2Coding.woff') format('woff');
-  font-weight: normal;
-  font-style: normal;
-}
+@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_three@1.0/D2Coding.css');
 
 @theme {
   --font-mono: "D2Coding", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-sans: "Toss Product Sans", sans-serif;
+
+  /* Theme Colors */
+  --color-farm-green-light: #B5D99C;
+  --color-farm-green: #7BAE5F;
+  --color-farm-green-dark: #5E8D48;
+  --color-farm-brown: #7A5C3E;
+  --color-farm-brown-dark: #4E3B2A;
+  --color-farm-yellow: #FFE082;
+  --color-farm-cream: #F5F2E8;
+  --color-farm-paper: #FFFDF5;
+  --color-farm-olive: #4A4A29;
+  --color-farm-point: #E07A5F;
 }
 
 :root {
-  font-family: "D2Coding", sans-serif;
+  font-family: "Toss Product Sans", sans-serif;
+  background-color: var(--color-farm-cream);
+  color: var(--color-farm-brown-dark);
 }
