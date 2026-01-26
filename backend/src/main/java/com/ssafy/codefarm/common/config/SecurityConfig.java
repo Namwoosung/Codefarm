@@ -71,8 +71,8 @@ public class SecurityConfig {
 
                         // 인증 관련 API
                         .requestMatchers(
-                                "/api/users/login",
-                                "/api/users/signup"
+                                "/api/v1/users/login",
+                                "/api/v1/users/signup"
                         ).permitAll()
 
                         // 개발 단계 테스트
