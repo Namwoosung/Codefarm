@@ -61,10 +61,23 @@ public class User {
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
-    public void updateProfile(String name, String nickname, Integer age) {
-        this.name = name;
-        this.nickname = nickname;
-        this.age = age;
+    public void updateProfile(String name, String nickname, Integer age, Integer codingLevel) {
+
+        if (name != null) {
+            this.name = name;
+        }
+
+        if (nickname != null) {
+            this.nickname = nickname;
+        }
+
+        if (age != null) {
+            this.age = age;
+        }
+
+        if (codingLevel != null) {
+            this.codingLevel = codingLevel;
+        }
     }
 
     public void updateCodingLevel(Integer level) {
