@@ -196,16 +196,16 @@
           </label>
           <select
             id="codingLevel"
-            v-model="formData.codingLevel"
+            v-model.number="formData.codingLevel"
             required
             class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
           >
-            <option value="">선택해주세요</option>
-            <option value="LEVEL1">LEVEL1</option>
-            <option value="LEVEL2">LEVEL2</option>
-            <option value="LEVEL3">LEVEL3</option>
-            <option value="LEVEL4">LEVEL4</option>
-            <option value="LEVEL5">LEVEL5</option>
+            <option :value="null">선택해주세요</option>
+            <option :value="1">LEVEL1</option>
+            <option :value="2">LEVEL2</option>
+            <option :value="3">LEVEL3</option>
+            <option :value="4">LEVEL4</option>
+            <option :value="5">LEVEL5</option>
           </select>
           <p v-if="errors.codingLevel" class="mt-1 text-sm text-red-600">
             {{ errors.codingLevel }}
@@ -269,7 +269,7 @@ const formData = reactive({
   name: '',              // 이름
   nickname: '',          // 닉네임
   age: null,             // 나이 (number 타입)
-  codingLevel: ''        // 코딩 레벨 (LEVEL1~5)
+  codingLevel: null     // 코딩 레벨 (1~5, number 타입)
 })
 
 /**
@@ -403,9 +403,12 @@ const validateForm = () => {
     isValid = false
   }
 
-  // 코딩 레벨 선택 검사: 빈 문자열이 아닌 값이 선택되었는지 확인
-  if (!formData.codingLevel) {
+  // 코딩 레벨 선택 검사: null이 아니고 1~5 사이의 값인지 확인
+  if (formData.codingLevel === null || formData.codingLevel === undefined) {
     errors.codingLevel = '코딩 레벨을 선택해주세요'
+    isValid = false
+  } else if (formData.codingLevel < 1 || formData.codingLevel > 5) {
+    errors.codingLevel = '올바른 코딩 레벨을 선택해주세요'
     isValid = false
   }
 
