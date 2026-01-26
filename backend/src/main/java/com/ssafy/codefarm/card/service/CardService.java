@@ -23,22 +23,31 @@ import java.util.concurrent.ThreadLocalRandom;
 @Transactional
 @RequiredArgsConstructor
 public class CardService {
+    private static final int DRAW_COST = 100;
+
     private final CardRepository cardRepository;
     private final UserCardRepository userCardRepository;
     private final UserRepository userRepository;
 
     public DrawCardResponseDto drawCard(Long userId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CustomException("유저가 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
 
-        if(user.getPoint() < 100){ // 카드 뽑기 포인트는 100으로 가정
-            throw new CustomException("유저의 포인트가 100 미만입니다.", ErrorCode.BAD_REQUEST);
+        // 포인트 차감 (Atomic Update) - 동시성 제어
+        int updatedRows = userRepository.decreasePointIfEnough(userId, DRAW_COST);
+        if (updatedRows == 0) {
+            throw new CustomException("포인트가 부족합니다.", ErrorCode.BAD_REQUEST);
         }
 
-        Card card = getRandomCard();
+        // 랜덤 등급 선택
+        CardGrade randomGrade = CardGrade.pickRandom();
 
-        long beforeCount =
-                userCardRepository.countByUserIdAndCardId(userId, card.getId());
+        // 해당 등급의 카드 중 랜덤 1장 조회
+        Card card = cardRepository.findRandomCardByGrade(randomGrade)
+                .orElseThrow(() -> new CustomException("해당 등급의 카드가 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        // 유저-카드 매핑 저장
+        User user = userRepository.getReferenceById(userId); // 프록시만 조회
+
+        boolean isNew = !userCardRepository.existsByUserIdAndCardId(userId, card.getId());
 
         UserCard userCard = UserCard.builder()
                 .user(user)
@@ -47,41 +56,6 @@ public class CardService {
 
         userCardRepository.save(userCard);
 
-        user.decreasePoint(100);
-
-        boolean isNew = beforeCount == 0;
-
         return DrawCardResponseDto.from(card, isNew);
-    }
-
-    private Card getRandomCard() {
-
-        List<Card> cards = cardRepository.findAll();
-        if (cards.isEmpty()) {
-            throw new CustomException("카드 데이터가 없습니다.",
-                    ErrorCode.RESOURCE_NOT_FOUND);
-        }
-
-        int random = ThreadLocalRandom.current().nextInt(100);
-
-        CardGrade grade;
-
-        if (random < 70) {
-            grade = CardGrade.BRONZE;
-        } else if (random < 95) {
-            grade = CardGrade.SILVER;
-        } else {
-            grade = CardGrade.GOLD;
-        }
-
-        List<Card> filtered =
-                cards.stream()
-                        .filter(c -> c.getGrade() == grade)
-                        .toList();
-
-        return filtered.get(
-                ThreadLocalRandom.current().nextInt(filtered.size())
-        );
-
     }
 }
