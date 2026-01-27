@@ -90,4 +90,13 @@ public class SessionService {
 
         return SessionResponseDto.from(session);
     }
+
+    @Transactional(readOnly = true)
+    public SessionResponseDto getActiveSession(Long userId) {
+        Session session = sessionRepository.findByUserIdAndStatus(userId, SessionStatus.ACTIVE)
+                .orElseThrow(() ->
+                        new CustomException("활성 세션이 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        return SessionResponseDto.from(session);
+    }
 }

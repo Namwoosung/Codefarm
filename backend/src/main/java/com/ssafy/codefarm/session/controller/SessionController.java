@@ -56,4 +56,15 @@ public class SessionController {
 
         return SuccessResponse.success("세션 상세 조회 성공", sessionResponseDto);
     }
+
+    @GetMapping("/active")
+    public SuccessResponse getActiveSession(
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+
+        SessionResponseDto sessionResponseDto =
+                sessionService.getActiveSession(userDetails.getUserId());
+
+        return SuccessResponse.success("활성 세션 조회 성공", sessionResponseDto);
+    }
 }
