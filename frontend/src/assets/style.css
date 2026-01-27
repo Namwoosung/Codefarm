@@ -1,8 +1,11 @@
-@import "tailwindcss";
+/* PrimeIcons - CDN 사용 */
+@import url('https://cdn.jsdelivr.net/npm/primeicons@6.0.1/primeicons.css');
 
 /* Fonts */
 @import url('https://static.toss.im/toss-fonts/font.css');
 @import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_three@1.0/D2Coding.css');
+
+@import "tailwindcss";
 
 @theme {
   --font-mono: "D2Coding", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;

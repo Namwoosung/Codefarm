@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -11,7 +12,26 @@ const router = createRouter({
     {
       path: '/profile/:id',
       name: 'profile',
-      component: () => import('@/views/ProfileView.vue')
+      component: () => import('@/views/ProfileView.vue'),
+      beforeEnter: (to, from, next) => {
+        const authStore = useAuthStore()
+        const userId = to.params.id
+        
+        // 로그인하지 않은 경우
+        if (!authStore.isLoggedIn || !authStore.user) {
+          next('/login')
+          return
+        }
+        
+        // URL의 id가 현재 로그인한 사용자의 id와 다른 경우
+        if (userId !== String(authStore.user.userId)) {
+          // 자신의 프로필로 리다이렉트
+          next(`/profile/${authStore.user.userId}`)
+          return
+        }
+        
+        next()
+      }
     },
     {
       path: '/problem/:id',
