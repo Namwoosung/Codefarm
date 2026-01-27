@@ -28,6 +28,7 @@ public class SessionService {
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
     private final ProblemRepository problemRepository;
+    private final SessionCodeRedisService sessionCodeRedisService;
 
     public SessionResponseDto createSession(Long userId, CreateSessionRequestDto createSessionRequestDto) {
 
@@ -58,6 +59,8 @@ public class SessionService {
             );
         }
 
+        sessionCodeRedisService.initialize(session.getId());
+
         return SessionResponseDto.from(session);
     }
 
@@ -74,6 +77,8 @@ public class SessionService {
         }
 
         session.close();
+
+        sessionCodeRedisService.delete(sessionId);
 
         return SessionResponseDto.from(session);
     }

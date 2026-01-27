@@ -14,7 +14,8 @@ public enum CardGrade {
 
     BRONZE(70),
     SILVER(25),
-    GOLD(5);
+    GOLD(4),
+    SPECIAL(1);
 
     private final int weight;
 
