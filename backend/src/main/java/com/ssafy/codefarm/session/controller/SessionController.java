@@ -32,4 +32,16 @@ public class SessionController {
 
         return SuccessResponse.success("세션 생성 성공", sessionResponseDto);
     }
+
+    @PatchMapping("/{sessionId}/close")
+    public SuccessResponse closeSession(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long sessionId
+    ) {
+
+        SessionResponseDto sessionResponseDto =
+                sessionService.closeSession(userDetails.getUserId(), sessionId);
+
+        return SuccessResponse.success("세션 종료 성공", sessionResponseDto);
+    }
 }
