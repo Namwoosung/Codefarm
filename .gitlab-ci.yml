@@ -15,7 +15,9 @@ default:
   before_script:
     - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
+########################
 # BUILD (docker build & push)
+########################
 .build-template:
   stage: build
   before_script:
@@ -31,33 +33,30 @@ build-backend:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
+# web (Vue build + Nginx serve dist) - root Dockerfile
 build-web:
   extends: .build-template
   script:
-    - docker build -t "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA" -f infra/nginx/Dockerfile .
+    - docker build -t "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA" -f Dockerfile .
     - docker push "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
+# execution server image (사용자 제출 코드 실행 서버)
 build-execution:
   extends: .build-template
   script:
-    - docker build -t "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA" -f execution/Dockerfile execution
+    # ✅ 레포 기준: docker/runner/python/Dockerfile (너가 서버에 /srv/app/docker/runner/python/Dockerfile로 둔 것과 매칭)
+    - docker build -t "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA" -f docker/runner/python/Dockerfile .
     - docker push "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
-build-sandbox:
-  extends: .build-template
-  script:
-    - docker build -t "$DOCKERHUB_USERNAME/sandbox:$CI_COMMIT_SHA" -f execution/runner/python/Dockerfile .
-    - docker push "$DOCKERHUB_USERNAME/sandbox:$CI_COMMIT_SHA"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-
+########################
 # TEST
+########################
 test-fast:
-  tags: 
+  tags:
     - ec2-mono
   stage: test
   script:
@@ -74,36 +73,53 @@ test-full:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
-
+########################
 # DEPLOY (EC2에서 docker pull & compose up)
+########################
 .deploy-template:
   stage: deploy
   before_script:
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
+# (선택) foundation은 infra가 자주 바뀌지 않으면 manual로 두는 걸 추천
+deploy-foundation:
+  needs: ["build-execution"]   # db는 공식 이미지라 빌드 불필요, execution만 필요
+  extends: .deploy-template
+  script:
+    - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
+    - chmod 600 "$SSH_KEY"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
+  rules:
+    # develop/main/hotfix에서만 띄우되, 자주 안 건드리면 manual 추천
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      when: manual
+      allow_failure: true
+
 deploy-dev:
   needs: ["build-backend", "build-web", "build-execution"]
   extends: .deploy-template
   script:
     - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
-    - echo "token_set=$([ -n "${DOCKERHUB_TOKEN:-}" ] && echo yes || echo no)"
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-dev/infra/scripts/deploy.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
 
 deploy-prod:
+  needs: ["build-backend", "build-web", "build-execution"]
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-prod/infra/scripts/deploy.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh prod"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
       allow_failure: true
 
+########################
 # ROLLBACK (manual)
+########################
 .rollback-template:
   stage: deploy
   before_script:
@@ -114,7 +130,7 @@ rollback-dev:
   extends: .rollback-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-dev/infra/scripts/rollback.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh dev"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: manual
@@ -124,8 +140,18 @@ rollback-prod:
   extends: .rollback-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-prod/infra/scripts/rollback.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh prod"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      when: manual
+      allow_failure: true
+
+rollback-foundation:
+  extends: .rollback-template
+  script:
+    - chmod 600 "$SSH_KEY"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh foundation"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
       allow_failure: true
