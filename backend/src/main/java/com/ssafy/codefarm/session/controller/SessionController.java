@@ -2,6 +2,8 @@ package com.ssafy.codefarm.session.controller;
 
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.dto.SuccessResponse;
+import com.ssafy.codefarm.result.dto.requset.SaveCodeSnapshotRequestDto;
+import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
 import com.ssafy.codefarm.session.dto.response.SessionResponseDto;
 import com.ssafy.codefarm.session.service.SessionService;
@@ -67,4 +69,21 @@ public class SessionController {
 
         return SuccessResponse.success("활성 세션 조회 성공", sessionResponseDto);
     }
+
+    @PostMapping("/{sessionId}/codes")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SuccessResponse saveCodeSnapshot(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long sessionId,
+            @RequestBody @Valid SaveCodeSnapshotRequestDto saveCodeSnapshotRequestDto
+    ) {
+
+        SaveCodeSnapshotResponseDto saveCodeSnapshotResponseDto =
+                sessionService.saveCodeSnapshot(userDetails.getUserId(), sessionId, saveCodeSnapshotRequestDto);
+
+        return SuccessResponse.success("코드 스냅샷 저장 성공", saveCodeSnapshotResponseDto);
+    }
+
+
+
 }
