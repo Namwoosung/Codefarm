@@ -6,7 +6,6 @@
 ### 1) 기본 규칙
 
 * 브랜치명은 **소문자(kebab-case)** 를 사용한다.
-* 단어 구분은 `-`를 사용한다. (예: `login-page`, `receipt-ocr`)
 * 슬래시(`/`)는 계층 구분에만 사용한다.
 * 브랜치명은 “무엇을” 하는지 식별 가능해야 한다. (추상명 금지: `test`, `tmp`, `new` 등)
 
@@ -15,31 +14,30 @@
 #### Frontend
 
 ```
-feature/frontend/<domain>/<task-name>
+feature/frontend/<task-name>
 ```
 
 예시
 
-* `feature/frontend/auth/login-ui`
-* `feature/frontend/dashboard/settlement-widget`
-* `feature/frontend/receipt/upload-flow`
-* `feature/frontend/common/header-refactor`
+* `feature/frontend/auth`
+* `feature/frontend/dashboard`
+* `feature/frontend/receipt`
+* `feature/frontend/common`
 
 #### Backend
 
 ```
-feature/backend/<domain>/<task-name>
+feature/backend/<task-name>
 ```
 
 예시
 
-* `feature/backend/auth/jwt-refresh`
-* `feature/backend/ledger/export-endpoint`
-* `feature/backend/receipt/ocr-parser`
-* `feature/backend/common/exception-handler`
+* `feature/backend/auth`
+* `feature/backend/ledger`
+* `feature/backend/receipt`
+* `feature/backend/common`
 
-> `<domain>`: 기능 영역(예: auth, dashboard, receipt, ledger, common)
-> `<task-name>`: 작업 내용(예: login-ui, export-endpoint)
+> `<task-name>`: 작업 (예: dashboard, receipt)
 
 ### 3) infra / fix / hotfix 브랜치 규칙
 
