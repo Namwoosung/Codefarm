@@ -37,7 +37,7 @@ build-backend:
 build-web:
   extends: .build-template
   script:
-    - docker build -t "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA" -f Dockerfile .
+    - docker build -t "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA" -f infra/nginx/Dockerfile .
     - docker push "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
@@ -46,8 +46,7 @@ build-web:
 build-execution:
   extends: .build-template
   script:
-    # ✅ 레포 기준: docker/runner/python/Dockerfile (너가 서버에 /srv/app/docker/runner/python/Dockerfile로 둔 것과 매칭)
-    - docker build -t "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA" -f docker/runner/python/Dockerfile .
+    - docker build -t "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA" -f execution/Dockerfile .
     - docker push "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
