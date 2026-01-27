@@ -16,6 +16,9 @@
   "dependencies": {
     "@primeuix/themes": "^2.0.3",
     "axios": "^1.13.3",
+    "monaco-editor": "^0.55.1",
+    "monaco-editor-vue3": "^1.0.5",
+    "monaco-themes": "^0.4.8",
     "pinia": "^3.0.4",
     "primevue": "^4.5.4",
     "vue": "^3.5.26",
@@ -34,6 +37,7 @@
     "pinia-plugin-persistedstate": "^4.7.1",
     "postcss": "^8.5.6",
     "prettier": "^3.8.1",
+    "sass-embedded": "^1.97.3",
     "tailwindcss": "^4.1.18",
     "vite": "^7.3.0",
     "vite-plugin-vue-devtools": "^8.0.5"
