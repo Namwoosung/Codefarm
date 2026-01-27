@@ -5,6 +5,7 @@ import com.ssafy.codefarm.common.dto.SuccessResponse;
 import com.ssafy.codefarm.result.dto.requset.SaveCodeSnapshotRequestDto;
 import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
+import com.ssafy.codefarm.session.dto.response.LatestCodeResponseDto;
 import com.ssafy.codefarm.session.dto.response.SessionResponseDto;
 import com.ssafy.codefarm.session.service.SessionService;
 import jakarta.validation.Valid;
@@ -84,6 +85,16 @@ public class SessionController {
         return SuccessResponse.success("코드 스냅샷 저장 성공", saveCodeSnapshotResponseDto);
     }
 
+    @GetMapping("/{sessionId}/codes/latest")
+    @ResponseStatus(HttpStatus.OK)
+    public SuccessResponse getLatestCode(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long sessionId
+    ) {
 
+        LatestCodeResponseDto latestCodeResponseDto = sessionService.getLatestCode(userDetails.getUserId(), sessionId);
+
+        return SuccessResponse.success("최신 코드 조회 성공", latestCodeResponseDto);
+    }
 
 }

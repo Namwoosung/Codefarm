@@ -8,6 +8,7 @@ import com.ssafy.codefarm.result.dto.requset.SaveCodeSnapshotRequestDto;
 import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
+import com.ssafy.codefarm.session.dto.response.LatestCodeResponseDto;
 import com.ssafy.codefarm.session.dto.response.SessionResponseDto;
 import com.ssafy.codefarm.session.entity.Session;
 import com.ssafy.codefarm.session.entity.SessionStatus;
@@ -132,5 +133,28 @@ public class SessionService {
 
         return SaveCodeSnapshotResponseDto.from(now);
 
+    }
+
+    @Transactional(readOnly = true)
+    public LatestCodeResponseDto getLatestCode(Long userId, Long sessionId) {
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() ->
+                        new CustomException("세션을 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!session.getUser().getId().equals(userId)) {
+            throw new CustomException("해당 세션에 접근할 수 없습니다.", ErrorCode.FORBIDDEN);
+        }
+
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new CustomException("종료된 세션에는 코드를 저장할 수 없습니다.", ErrorCode.BAD_REQUEST);
+        }
+
+        CodeSnapshotRedisDto snapshot = sessionCodeRedisService.getLatestSnapshot(sessionId);
+
+        if (snapshot == null) {
+            throw new CustomException("저장된 코드가 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND);
+        }
+
+        return LatestCodeResponseDto.from(snapshot.getCode(), snapshot.getLanguage(), snapshot.getSavedAt());
     }
 }

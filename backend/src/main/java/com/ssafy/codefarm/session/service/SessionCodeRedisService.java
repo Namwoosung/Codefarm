@@ -48,6 +48,26 @@ public class SessionCodeRedisService {
         }
     }
 
+    public CodeSnapshotRedisDto getLatestSnapshot(Long sessionId) {
+
+        String key = buildKey(sessionId);
+
+        String json = redisTemplate.opsForList().index(key, -1);
+
+        if (json == null) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(json, CodeSnapshotRedisDto.class);
+        } catch (JsonProcessingException e) {
+            throw new CustomException(
+                    "코드 스냅샷 역직렬화 실패",
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
     public void delete(Long sessionId) {
         redisTemplate.delete(buildKey(sessionId));
     }
