@@ -133,7 +133,6 @@ docker compose \
 ## Environment Variables
 
 * 실제 값은 **서버에만 존재**
-* 레포에는 `.env.example`만 관리
 
 ### dev.env / prod.env 포함 항목
 
