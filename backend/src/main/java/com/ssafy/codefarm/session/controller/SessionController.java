@@ -44,4 +44,16 @@ public class SessionController {
 
         return SuccessResponse.success("세션 종료 성공", sessionResponseDto);
     }
+
+    @GetMapping("/{sessionId}")
+    public SuccessResponse getSessionDetail(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long sessionId
+    ) {
+
+        SessionResponseDto sessionResponseDto =
+                sessionService.getSessionDetail(userDetails.getUserId(), sessionId);
+
+        return SuccessResponse.success("세션 상세 조회 성공", sessionResponseDto);
+    }
 }

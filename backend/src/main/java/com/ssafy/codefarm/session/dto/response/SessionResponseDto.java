@@ -12,6 +12,7 @@ public record SessionResponseDto(
         LocalDateTime endedAt,
         Integer maxHint,
         Integer usedHint,
+        Long userId,
         Long problemId
 ) {
 
@@ -23,6 +24,7 @@ public record SessionResponseDto(
                 session.getEndedAt(),
                 session.getMaxHint(),
                 session.getUsedHint(),
+                session.getUser().getId(),
                 session.getProblem().getId()
         );
     }

@@ -77,4 +77,17 @@ public class SessionService {
 
         return SessionResponseDto.from(session);
     }
+
+    @Transactional(readOnly = true)
+    public SessionResponseDto getSessionDetail(Long userId, Long sessionId) {
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() ->
+                        new CustomException("세션을 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        if (!session.getUser().getId().equals(userId)) {
+            throw new CustomException("해당 세션에 접근할 수 없습니다.", ErrorCode.FORBIDDEN);
+        }
+
+        return SessionResponseDto.from(session);
+    }
 }
