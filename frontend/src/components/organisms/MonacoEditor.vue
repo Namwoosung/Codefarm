@@ -1,5 +1,5 @@
 <template>
-  <div style="height: 400px;">
+  <div class="h-full">
     <CodeEditor
       v-model:value="code"
       language="python"

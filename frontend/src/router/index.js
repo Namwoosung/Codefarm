@@ -39,11 +39,6 @@ const router = createRouter({
       component: () => import('@/views/ProblemView.vue')
     },
     {
-      path: '/ide/:id',
-      name: 'ide',
-      component: () => import('@/views/ProblemView.vue')
-    },
-    {
       path: '/roadmap',
       name: 'roadmap',
       component: () => import('@/views/RoadmapView.vue')
@@ -59,7 +54,7 @@ const router = createRouter({
       component: () => import('@/views/SignupView.vue')
     },
     {
-      path: '/ide/:problemId?',
+      path: '/ide/:id',
       name: 'ide',
       component: () => import('@/views/IdeView.vue')
     },

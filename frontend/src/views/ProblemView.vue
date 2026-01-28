@@ -102,7 +102,7 @@
 
       <!-- 오른쪽: 코드 에디터 영역 (Monaco Editor가 여기에 표시됨) -->
       <div class="w-1/2 bg-farm-paper">
-        <!-- Monaco Editor는 기존 코드가 여기에 렌더링됩니다 -->
+        <MonacoEditor />
       </div>
     </div>
   </div>
@@ -112,6 +112,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProblemDetail } from '@/api/problem'
+import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 
 const route = useRoute()
 const problem = ref(null)
