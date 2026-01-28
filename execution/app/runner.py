@@ -21,12 +21,18 @@ def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int,
         
         # --- Auto-generated execution logic ---
         if __name__ == "__main__":
+            import resource
             if "solution" in globals() and callable(globals()["solution"]):
                 try:
                     solution()
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
+            
+            # Print max RSS memory usage in KB
+            # ru_maxrss is in KB on Linux
+            mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            print(f"\\nMEM_USAGE: {mem}")
         """)
 
         with open(main_path, "w", encoding="utf-8") as f:
@@ -99,8 +105,25 @@ def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int,
             logger.warning(f"Execution timed out after {timeout_sec}s")
 
         exec_time_ms = int((time.time() - start) * 1000)
+        
+        # Parse memory usage from stdout if present
+        memory_usage = 0
+        if stdout:
+            lines = stdout.splitlines()
+            new_lines = []
+            for line in lines:
+                if line.startswith("MEM_USAGE:"):
+                    try:
+                        memory_usage = int(line.split(":")[1].strip())
+                    except:
+                        pass
+                else:
+                    new_lines.append(line)
+            stdout = "\n".join(new_lines) + ("\n" if lines and not stdout.endswith("\n") else "")
+            
         logger.info(f"Total execution time: {exec_time_ms}ms")
-        return stdout, stderr, exec_time_ms, is_timeout
+        logger.info(f"Max memory usage: {memory_usage}KB")
+        return stdout, stderr, exec_time_ms, memory_usage, is_timeout
     finally:
         # 임시 디렉토리 정리
         try:

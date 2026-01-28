@@ -15,4 +15,5 @@ class ExecuteResult(BaseModel):
     stdout: str
     stderr: str
     execTime: int          # ms
+    memoryUsage: int       # KB
     isTimeout: bool

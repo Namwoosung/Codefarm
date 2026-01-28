@@ -192,6 +192,7 @@ public class SessionService {
                         RunSessionResponseDto.from(
                                 result.stdout(),
                                 result.stderr(),
+                                result.memoryUsage(),
                                 result.execTime(),
                                 result.isTimeout()
                         )
