@@ -110,6 +110,7 @@ trivy_scan_images:
 
 trivy_fs:
   tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
   stage: security
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
@@ -118,6 +119,7 @@ trivy_fs:
 
 trivy_config:
   tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
   stage: security
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
