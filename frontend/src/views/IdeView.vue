@@ -29,14 +29,20 @@
     <!-- 좌우 분할 레이아웃 -->
     <div class="ide-layout">
       <!-- 왼쪽 패널: 문제 설명 영역 -->
-      <aside class="ide-panel-left">
+      <aside class="ide-panel-left" :style="{ width: leftPanelWidth + '%' }">
         <div class="ide-panel-content">
           <ProblemPanel />
         </div>
       </aside>
 
+      <!-- 리사이저 바 -->
+      <div 
+        class="ide-resizer"
+        @mousedown="startResize"
+      ></div>
+
       <!-- 오른쪽 패널: 에디터 영역 -->
-      <main class="ide-panel-right">
+      <main class="ide-panel-right" :style="{ width: (100 - leftPanelWidth) + '%' }">
         <div class="ide-editor-container">
           <MonacoEditor />
         </div>
@@ -64,7 +70,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
@@ -75,6 +81,43 @@ import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
 
 const router = useRouter()
 const terminalPanel = ref(null)
+
+// 패널 리사이저 관련
+const leftPanelWidth = ref(50) // 기본 50%
+const isResizing = ref(false)
+
+const startResize = (e) => {
+  isResizing.value = true
+  document.addEventListener('mousemove', handleResize)
+  document.addEventListener('mouseup', stopResize)
+  e.preventDefault()
+}
+
+const handleResize = (e) => {
+  if (!isResizing.value) return
+  
+  const container = document.querySelector('.ide-layout')
+  if (!container) return
+  
+  const containerRect = container.getBoundingClientRect()
+  const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
+  
+  // 최소/최대 너비 제한 (20% ~ 80%)
+  if (newLeftWidth >= 20 && newLeftWidth <= 80) {
+    leftPanelWidth.value = newLeftWidth
+  }
+}
+
+const stopResize = () => {
+  isResizing.value = false
+  document.removeEventListener('mousemove', handleResize)
+  document.removeEventListener('mouseup', stopResize)
+}
+
+onUnmounted(() => {
+  document.removeEventListener('mousemove', handleResize)
+  document.removeEventListener('mouseup', stopResize)
+})
 
 const handleBack = () => {
   if (confirm('진짜 이 페이지를 벗어나시겠습니까?')) {
@@ -200,12 +243,10 @@ const handleEscape = () => {
   flex-direction: column;
 }
 
-/* 데스크톱: 왼쪽 패널 너비 - 정확히 50% */
+/* 데스크톱: 왼쪽 패널 너비 - 동적으로 조절 가능 */
 @media (min-width: 768px) {
   .ide-panel-left {
-    width: 50%;
     height: 100%;
-    flex: 0 0 50%;
     flex-shrink: 0;
   }
 }
@@ -225,13 +266,45 @@ const handleEscape = () => {
   flex-direction: column;
 }
 
-/* 데스크톱: 오른쪽 패널 너비 - 정확히 50% */
+/* 리사이저 바 */
+.ide-resizer {
+  width: 4px;
+  background-color: var(--color-farm-cream);
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background-color 0.2s;
+  position: relative;
+}
+
+.ide-resizer:hover {
+  background-color: var(--color-farm-green-light);
+}
+
+.ide-resizer::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  cursor: col-resize;
+}
+
+/* 데스크톱: 오른쪽 패널 너비 - 동적으로 조절 가능 */
 @media (min-width: 768px) {
   .ide-panel-right {
-    width: 50%;
     height: 100%;
-    flex: 0 0 50%;
     flex-shrink: 0;
+  }
+  
+  .ide-resizer {
+    display: block;
+  }
+}
+
+@media (max-width: 767px) {
+  .ide-resizer {
+    display: none;
   }
 }
 

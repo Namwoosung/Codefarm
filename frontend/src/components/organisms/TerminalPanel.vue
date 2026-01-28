@@ -14,6 +14,14 @@ import '@xterm/xterm/css/xterm.css'
 let term = null
 let fitAddon = null
 
+const resizeHandler = () => {
+  if (fitAddon) {
+    setTimeout(() => {
+      fitAddon.fit()
+    }, 100)
+  }
+}
+
 onMounted(async () => {
   await nextTick()
   
@@ -22,7 +30,7 @@ onMounted(async () => {
     cursorBlink: true,
     fontSize: 14,
     fontFamily: '"D2Coding", "Courier New", monospace',
-    fontWeight: 'bold', /* 굵은 글씨로 변경 */
+    fontWeight: 'bold',
     letterSpacing: 0,
     lineHeight: 1.2,
     theme: {
@@ -42,28 +50,43 @@ onMounted(async () => {
   if (container) {
     term.open(container)
     
-    // 4. 터미널 크기 조정
-    fitAddon.fit()
-    
-    // 5. 잘 떴는지 확인용 글자 한 줄 써보기
-    term.write('Hello World!\r\n')
-    term.write('Loading...\r\n')
+    // 4. 터미널 크기 조정 (약간의 지연을 두어 DOM이 완전히 렌더링된 후)
+    setTimeout(() => {
+      try {
+        fitAddon.fit()
+        
+        // 5. 잘 떴는지 확인용 글자 한 줄 써보기
+        term.write('Hello World!\r\n')
+        term.write('Loading...\r\n')
+      } catch (error) {
+        console.error('Terminal fit error:', error)
+      }
+    }, 200)
     
     // 6. 윈도우 리사이즈 시 크기 조정
-    window.addEventListener('resize', () => {
+    window.addEventListener('resize', resizeHandler)
+    
+    // 7. ResizeObserver로 컨테이너 크기 변경 감지
+    const resizeObserver = new ResizeObserver(() => {
       if (fitAddon) {
-        fitAddon.fit()
+        setTimeout(() => {
+          fitAddon.fit()
+        }, 50)
       }
     })
+    resizeObserver.observe(container)
+    
+    // cleanup을 위해 저장
+    container._resizeObserver = resizeObserver
   }
 })
 
 onUnmounted(() => {
-  window.removeEventListener('resize', () => {
-    if (fitAddon) {
-      fitAddon.fit()
-    }
-  })
+  window.removeEventListener('resize', resizeHandler)
+  const container = document.getElementById('xterm-container')
+  if (container && container._resizeObserver) {
+    container._resizeObserver.disconnect()
+  }
   if (term) {
     term.dispose()
   }
@@ -88,35 +111,47 @@ defineExpose({
 <style scoped>
 .terminal-panel {
   width: 100%;
-  height: 200px;
+  height: 250px;
   min-height: 200px;
-  max-height: 300px;
   background-color: var(--color-farm-paper);
   border-top: 1px solid var(--color-farm-cream);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
+  position: relative;
 }
 
 #xterm-container {
   width: 100%;
   height: 100%;
   padding: 1rem;
+  box-sizing: border-box;
+  overflow: hidden;
+  position: relative;
+  display: block;
 }
 
 /* xterm.js 스타일 오버라이드 */
 :deep(.xterm) {
-  height: 100%;
+  width: 100% !important;
+  height: 100% !important;
   font-family: "D2Coding", "Courier New", monospace !important;
   font-weight: bold !important;
+  padding: 0 !important;
 }
 
 :deep(.xterm-viewport) {
   background-color: var(--color-farm-paper) !important;
+  overflow-y: auto !important;
 }
 
 :deep(.xterm-screen) {
   background-color: var(--color-farm-paper) !important;
+  width: 100% !important;
+}
+
+:deep(.xterm-scroll-area) {
+  overflow: hidden !important;
 }
 
 :deep(.xterm .xterm-viewport) {
@@ -131,5 +166,9 @@ defineExpose({
 
 :deep(.xterm .xterm-rows > div) {
   font-weight: bold !important;
+}
+
+:deep(.xterm-cursor-layer) {
+  z-index: 2;
 }
 </style>
