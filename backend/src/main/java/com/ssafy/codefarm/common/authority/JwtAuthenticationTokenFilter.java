@@ -65,11 +65,8 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             SecurityContextHolder.clearContext();
             log.warn("JWT authentication failed: {}", e.getMessage());
 
-            authenticationEntryPoint.commence(
-                    request,
-                    response,
-                    new InsufficientAuthenticationException(e.getMessage())
-            );
+            // 여기서 즉시 401을 확정하지 말고 그냥 통과
+            filterChain.doFilter(request, response);
             return;
         }
 
