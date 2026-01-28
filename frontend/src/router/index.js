@@ -54,7 +54,7 @@ const router = createRouter({
       component: () => import('@/views/SignupView.vue')
     },
     {
-      path: '/ide/:problemId?',
+      path: '/ide/:id',
       name: 'ide',
       component: () => import('@/views/IdeView.vue')
     },

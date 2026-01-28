@@ -1,5 +1,5 @@
 <template>
-  <div style="height: 400px;">
+  <div class="h-full">
     <CodeEditor
       v-model:value="code"
       language="python"
@@ -26,7 +26,9 @@ const code = ref(ideStore.code || `function hello() {
 const editorOptions = {
   fontSize: 14,
   minimap: { enabled: false },
-  automaticLayout: true
+  automaticLayout: true,
+  wordWrap: 'on', // 가로 스크롤 방지 - 긴 줄은 자동으로 다음 줄로
+  wrappingIndent: 'indent' // 줄바꿈 시 들여쓰기 유지
 };
 
 // 코드 변경 시 store에 실시간 업데이트
