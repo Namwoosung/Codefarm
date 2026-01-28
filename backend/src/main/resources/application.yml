@@ -96,4 +96,4 @@ execution:
   server:
     base-url: ${EXEC_SERVER_BASE_URL}
     connect-timeout-ms: 1000
-    read-timeout-ms: 10000
+    read-timeout-ms: 20000

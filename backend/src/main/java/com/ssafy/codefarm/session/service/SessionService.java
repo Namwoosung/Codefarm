@@ -10,6 +10,7 @@ import com.ssafy.codefarm.result.entity.Result;
 import com.ssafy.codefarm.result.entity.ResultType;
 import com.ssafy.codefarm.result.repository.ResultRepository;
 import com.ssafy.codefarm.session.dto.execution.ExecuteServerRequest;
+import com.ssafy.codefarm.session.dto.execution.SubmitContext;
 import com.ssafy.codefarm.session.dto.execution.SubmitOutcome;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
@@ -352,12 +353,5 @@ public class SessionService {
                 (int) Duration.between(session.getStartedAt(), LocalDateTime.now()).toSeconds();
 
         return new SubmitContext(session, problem, solveTime);
-    }
-
-    private record SubmitContext(
-            Session session,
-            Problem problem,
-            Integer solveTime
-    ) {
     }
 }
