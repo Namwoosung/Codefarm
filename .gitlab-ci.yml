@@ -32,7 +32,7 @@ build-backend:
     - docker push "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      cheanges:
+      # changes:
 
 # web (Vue build + Nginx serve dist) - root Dockerfile
 build-web:
