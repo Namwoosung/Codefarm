@@ -6,9 +6,12 @@ import com.ssafy.codefarm.problem.entity.Problem;
 import com.ssafy.codefarm.problem.repository.ProblemRepository;
 import com.ssafy.codefarm.result.dto.requset.SaveCodeSnapshotRequestDto;
 import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
+import com.ssafy.codefarm.session.dto.execution.ExecuteServerRequest;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
+import com.ssafy.codefarm.session.dto.request.RunSessionRequestDto;
 import com.ssafy.codefarm.session.dto.response.LatestCodeResponseDto;
+import com.ssafy.codefarm.session.dto.response.RunSessionResponseDto;
 import com.ssafy.codefarm.session.dto.response.SessionResponseDto;
 import com.ssafy.codefarm.session.entity.Session;
 import com.ssafy.codefarm.session.entity.SessionStatus;
@@ -20,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 
@@ -28,6 +32,8 @@ import java.time.LocalDateTime;
 @Transactional
 @RequiredArgsConstructor
 public class SessionService {
+
+    private final ExecutionServerClient executionServerClient;
 
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
@@ -156,5 +162,40 @@ public class SessionService {
         }
 
         return LatestCodeResponseDto.from(snapshot.getCode(), snapshot.getLanguage(), snapshot.getSavedAt());
+    }
+
+    public Mono<RunSessionResponseDto> runSession(Long sessionId, Long userId, RunSessionRequestDto requestDto) {
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() ->
+                        new CustomException("세션이 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND)
+                );
+
+        if (!session.getUser().getId().equals(userId)) {
+            throw new CustomException("세션 접근 권한이 없습니다.", ErrorCode.FORBIDDEN);
+        }
+
+        // Execution 서버 호출 DTO 생성
+        ExecuteServerRequest executionRequestDto =
+                new ExecuteServerRequest(
+                        requestDto.getLanguage(),
+                        requestDto.getCode(),
+                        requestDto.getInput(),
+                        2000,
+                        128,
+                        0.5
+                );
+
+        // 외부 서버 호출
+        return executionServerClient.execute(executionRequestDto)
+                .map(result ->
+                        RunSessionResponseDto.from(
+                                result.stdout(),
+                                result.stderr(),
+                                result.execTime(),
+                                result.isTimeout()
+                        )
+                );
+
     }
 }
