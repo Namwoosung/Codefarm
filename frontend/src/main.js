@@ -10,6 +10,9 @@ import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
 import Button from 'primevue/button'
 
+// Iconify Web Component (<iconify-icon />)
+import 'iconify-icon'
+
 const app = createApp(App)
 app.use(PrimeVue, {
   theme: {

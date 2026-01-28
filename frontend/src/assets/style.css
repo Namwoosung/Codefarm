@@ -5,6 +5,8 @@
 @import url('https://static.toss.im/toss-fonts/font.css');
 @import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_three@1.0/D2Coding.css');
 
+/* Tailwind v4에서 config(플러그인 포함) 적용 */
+@config "../../tailwind.config.js";
 @import "tailwindcss";
 
 @theme {
