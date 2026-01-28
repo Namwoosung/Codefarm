@@ -12,9 +12,9 @@ import Button from 'primevue/button'
 
 const app = createApp(App)
 app.use(PrimeVue, {
-    theme: {
-        preset: Aura
-    }
+  theme: {
+    preset: Aura
+  }
 })
 app.component('Button', Button)
 
