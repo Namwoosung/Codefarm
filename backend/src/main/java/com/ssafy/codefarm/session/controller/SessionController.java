@@ -6,9 +6,11 @@ import com.ssafy.codefarm.result.dto.requset.SaveCodeSnapshotRequestDto;
 import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
 import com.ssafy.codefarm.session.dto.request.RunSessionRequestDto;
+import com.ssafy.codefarm.session.dto.request.SubmitSessionRequestDto;
 import com.ssafy.codefarm.session.dto.response.LatestCodeResponseDto;
 import com.ssafy.codefarm.session.dto.response.RunSessionResponseDto;
 import com.ssafy.codefarm.session.dto.response.SessionResponseDto;
+import com.ssafy.codefarm.session.dto.response.SubmitSessionResponseDto;
 import com.ssafy.codefarm.session.service.SessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -132,4 +134,38 @@ public class SessionController {
         return deferredResult;
     }
 
+
+    @PostMapping("/{sessionId}/submit")
+    @ResponseStatus(HttpStatus.OK)
+    public DeferredResult<SuccessResponse> submitSession(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long sessionId,
+            @RequestBody @Valid SubmitSessionRequestDto submitSessionRequestDto
+    ) {
+
+        DeferredResult<SuccessResponse> deferredResult =
+                new DeferredResult<>(20000L);
+
+        Mono<SubmitSessionResponseDto> resultMono =
+                sessionService.submitSession(
+                        userDetails.getUserId(),
+                        sessionId,
+                        submitSessionRequestDto
+                );
+
+        resultMono.subscribe(
+                result -> {
+                    String message = result.resultType() == com.ssafy.codefarm.result.entity.ResultType.SUCCESS
+                            ? "제출에 성공했습니다."
+                            : "제출에 실패했습니다.";
+
+                    deferredResult.setResult(
+                            SuccessResponse.success(message, result)
+                    );
+                },
+                deferredResult::setErrorResult
+        );
+
+        return deferredResult;
+    }
 }
