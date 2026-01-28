@@ -5,6 +5,7 @@ public record ExecuteServerResult(
         String stderr,
         Long memoryUsage,
         Integer execTime,
-        Boolean isTimeout
+        Boolean isTimeout,
+        Boolean isOom
 ) {
 }

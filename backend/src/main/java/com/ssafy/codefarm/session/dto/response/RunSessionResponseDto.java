@@ -5,15 +5,17 @@ public record RunSessionResponseDto(
         String stderr,
         Long memoryUsage,
         Integer execTime,
-        Boolean isTimeout
+        Boolean isTimeout,
+        Boolean isOom
 ) {
     public static RunSessionResponseDto from(
             String stdout,
             String stderr,
             Long memoryUsage,
             Integer execTime,
-            Boolean isTimeout
+            Boolean isTimeout,
+            Boolean isOom
     ) {
-        return new RunSessionResponseDto(stdout, stderr, memoryUsage, execTime, isTimeout);
+        return new RunSessionResponseDto(stdout, stderr, memoryUsage, execTime, isTimeout, isOom);
     }
 }

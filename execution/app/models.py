@@ -17,3 +17,4 @@ class ExecuteResult(BaseModel):
     execTime: int          # ms
     memoryUsage: int       # KB
     isTimeout: bool
+    isOom: bool

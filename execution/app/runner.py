@@ -22,9 +22,14 @@ def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int,
         # --- Auto-generated execution logic ---
         if __name__ == "__main__":
             import resource
+            import time
             if "solution" in globals() and callable(globals()["solution"]):
                 try:
+                    _start = time.perf_counter()
                     solution()
+                    _end = time.perf_counter()
+                    _exec_ms = int((_end - _start) * 1000)
+                    print(f"\\nEXEC_TIME: {_exec_ms}")
                 except Exception as e:
                     import traceback
                     traceback.print_exc()
@@ -86,6 +91,16 @@ def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int,
             stderr = p.stderr
             
             logger.info(f"Docker execution completed. Return code: {p.returncode}")
+            
+            # Check for OOM (Exit Code 137)
+            is_oom = False
+            if p.returncode == 137:
+                is_oom = True
+                stderr = "Memory Limit Exceeded"
+                logger.warning("Container killed by OOM (Exit Code 137)")
+            elif p.returncode != 0 and not stderr:
+                stderr = f"Process exited with code {p.returncode}"
+                
             logger.info(f"Stdout length: {len(stdout)}, Stderr length: {len(stderr)}")
             if stdout:
                 logger.info(f"Stdout: {stdout}")
@@ -100,14 +115,17 @@ def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int,
             # timeout 발생 시 컨테이너 kill (혹시 남아있을 수 있으니)
             subprocess.run(["docker", "kill", container_name], capture_output=True, text=True)
             is_timeout = True
+            is_oom = False
             stdout = ""
             stderr = "Time Limit Exceeded"
             logger.warning(f"Execution timed out after {timeout_sec}s")
 
         exec_time_ms = int((time.time() - start) * 1000)
         
-        # Parse memory usage from stdout if present
+        # Parse output fields (MEM_USAGE, EXEC_TIME)
         memory_usage = 0
+        internal_exec_time = None
+        
         if stdout:
             lines = stdout.splitlines()
             new_lines = []
@@ -117,13 +135,23 @@ def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int,
                         memory_usage = int(line.split(":")[1].strip())
                     except:
                         pass
+                elif line.startswith("EXEC_TIME:"):
+                    try:
+                        internal_exec_time = int(line.split(":")[1].strip())
+                    except:
+                        pass
                 else:
                     new_lines.append(line)
             stdout = "\n".join(new_lines) + ("\n" if lines and not stdout.endswith("\n") else "")
+        
+        # Prefer internal execution time if available (excludes docker overhead)
+        if internal_exec_time is not None:
+            exec_time_ms = internal_exec_time
             
         logger.info(f"Total execution time: {exec_time_ms}ms")
         logger.info(f"Max memory usage: {memory_usage}KB")
-        return stdout, stderr, exec_time_ms, memory_usage, is_timeout
+        logger.info(f"Is OOM: {is_oom}")
+        return stdout, stderr, exec_time_ms, memory_usage, is_timeout, is_oom
     finally:
         # 임시 디렉토리 정리
         try:
