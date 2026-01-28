@@ -38,8 +38,7 @@ public class Problem {
     private String outputDescription;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    private ProblemDifficulty difficulty;
+    private Integer difficulty;
 
     @NotNull
     @Enumerated(EnumType.STRING)

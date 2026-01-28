@@ -90,3 +90,10 @@ jwt:
   secret-key: ${JWT_SECRET_KEY}
   access-expiration: ${JWT_ACCESS_EXPIRATION}
   refresh-expiration: ${JWT_REFRESH_EXPIRATION}
+
+
+execution:
+  server:
+    base-url: ${EXEC_SERVER_BASE_URL}
+    connect-timeout-ms: 1000
+    read-timeout-ms: 10000

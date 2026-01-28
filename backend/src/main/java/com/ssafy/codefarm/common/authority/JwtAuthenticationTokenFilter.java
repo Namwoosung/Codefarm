@@ -1,5 +1,6 @@
 package com.ssafy.codefarm.common.authority;
 
+import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.exception.CustomException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -57,7 +58,7 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
                 log.debug("JWT authentication success. userId={}",
-                        authentication.getName());
+                        ((CustomUserDetails)authentication.getPrincipal()).getUserId());
             }
 
         } catch (CustomException e) {
@@ -87,5 +88,15 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
         }
 
         return null;
+    }
+
+    @Override
+    protected boolean shouldNotFilterAsyncDispatch() {
+        return false; // ASYNC dispatch에서도 필터 실행
+    }
+
+    @Override
+    protected boolean shouldNotFilterErrorDispatch() {
+        return false; // ERROR dispatch에서도 필터 실행
     }
 }
