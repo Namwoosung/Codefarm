@@ -52,26 +52,6 @@
 
         <!-- 우측 영역 -->
         <div class="flex items-center space-x-4">
-          <!-- 당근 아이콘 -->
-          <button
-            v-if="isLoggedIn"
-            class="p-2 text-farm-brown-dark hover:text-farm-green transition-colors rounded-full hover:bg-farm-cream"
-            aria-label="당근"
-          >
-            <iconify-icon icon="streamline-flex:carrot-remix" class="text-xl"></iconify-icon>
-          </button>
-
-          <!-- 알림 아이콘 -->
-          <button
-            v-if="isLoggedIn"
-            class="p-2 text-farm-brown-dark hover:text-farm-green transition-colors rounded-full hover:bg-farm-cream relative"
-            aria-label="알림"
-          >
-            <iconify-icon icon="flowbite:bell-solid" class="text-xl"></iconify-icon>
-            <!-- 알림 배지 (선택사항) -->
-            <!-- <span class="absolute top-1 right-1 w-2 h-2 bg-farm-point rounded-full"></span> -->
-          </button>
-
           <!-- 사용자 정보 -->
           <div v-if="isLoggedIn && user && user.userId" class="flex items-center space-x-3">
             <!-- 로그아웃 버튼 -->
