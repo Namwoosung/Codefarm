@@ -15,7 +15,7 @@ def execute(req: ExecuteRequest):
     if req.language != "PYTHON":
         raise HTTPException(status_code=400, detail="Unsupported language")
 
-    stdout, stderr, exec_time, is_timeout = run_python_in_docker(
+    stdout, stderr, exec_time, memory_usage, is_timeout, is_oom = run_python_in_docker(
         code=req.code,
         stdin=req.stdin,
         time_limit_ms=req.timeLimitMs,
@@ -27,7 +27,9 @@ def execute(req: ExecuteRequest):
         stdout=stdout,
         stderr=stderr,
         execTime=exec_time,
+        memoryUsage=memory_usage,
         isTimeout=is_timeout,
+        isOom=is_oom,
     )
     
     logger.info(f"Returning result: stdout_len={len(stdout)}, stderr_len={len(stderr)}, execTime={exec_time}ms, isTimeout={is_timeout}")

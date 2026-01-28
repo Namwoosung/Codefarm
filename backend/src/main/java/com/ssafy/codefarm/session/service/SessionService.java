@@ -172,7 +172,11 @@ public class SessionService {
                 );
 
         if (!session.getUser().getId().equals(userId)) {
-            throw new CustomException("세션 접근 권한이 없습니다.", ErrorCode.FORBIDDEN);
+            throw new CustomException("해당 세션에 접근할 수 없습니다.", ErrorCode.FORBIDDEN);
+        }
+
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new CustomException("종료된 세션에는 코드를 실행할 수 없습니다.", ErrorCode.BAD_REQUEST);
         }
 
         // Execution 서버 호출 DTO 생성
@@ -192,8 +196,10 @@ public class SessionService {
                         RunSessionResponseDto.from(
                                 result.stdout(),
                                 result.stderr(),
+                                result.memoryUsage(),
                                 result.execTime(),
-                                result.isTimeout()
+                                result.isTimeout(),
+                                result.isOom()
                         )
                 );
 
