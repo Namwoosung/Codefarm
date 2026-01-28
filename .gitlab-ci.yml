@@ -32,6 +32,7 @@ build-backend:
     - docker push "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      cheanges:
 
 # web (Vue build + Nginx serve dist) - root Dockerfile
 build-web:
@@ -48,6 +49,15 @@ build-execution:
   script:
     - docker build -t "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA" -f execution/Dockerfile execution
     - docker push "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
+# feedback server image (feedback 서버)
+build-feedback:
+  extends: .build-template
+  script:
+    - docker build -t "$DOCKERHUB_USERNAME/feedback:$CI_COMMIT_SHA" -f feedback/Dockerfile feedback
+    - docker push "$DOCKERHUB_USERNAME/feedback:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
@@ -83,7 +93,7 @@ test-full:
 
 # (선택) foundation은 infra가 자주 바뀌지 않으면 manual로 두는 걸 추천
 deploy-foundation:
-  needs: ["build-execution"]   # db는 공식 이미지라 빌드 불필요, execution만 필요
+  needs: ["build-execution", "build-feedback"]   # db는 공식 이미지라 빌드 불필요, execution & feedback만 필요
   extends: .deploy-template
   script:
     - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
@@ -96,7 +106,7 @@ deploy-foundation:
       allow_failure: true
 
 deploy-dev:
-  needs: ["build-backend", "build-web", "build-execution"]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
   extends: .deploy-template
   script:
     - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
@@ -106,7 +116,7 @@ deploy-dev:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
 
 deploy-prod:
-  needs: ["build-backend", "build-web", "build-execution"]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
