@@ -5,17 +5,22 @@
       language="python"
       theme="vs-custom"
       :options="editorOptions"
+      @change="handleCodeChange"
     />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, watch } from 'vue';
 import { CodeEditor } from 'monaco-editor-vue3';
 import * as monaco from 'monaco-editor';
+import { useIdeStore } from '@/stores/ide';
 
-const code = ref(`function hello() {
-  console.log('Hello, Monaco Editor Vue3!');
+const ideStore = useIdeStore();
+
+// store에서 초기 코드 가져오기 (저장된 코드가 있으면 사용, 없으면 기본값)
+const code = ref(ideStore.code || `function hello() {
+  console.log('Welcome to CodeFarm!');
 }`);
 
 const editorOptions = {
@@ -23,6 +28,16 @@ const editorOptions = {
   minimap: { enabled: false },
   automaticLayout: true
 };
+
+// 코드 변경 시 store에 실시간 업데이트
+const handleCodeChange = (value) => {
+  ideStore.updateCode(value);
+};
+
+// code ref 변경 시에도 store 업데이트 (v-model과 동기화)
+watch(code, (newValue) => {
+  ideStore.updateCode(newValue);
+}, { immediate: true });
 
 onMounted(() => {
   // vs 테마를 기반으로 배경색만 변경
