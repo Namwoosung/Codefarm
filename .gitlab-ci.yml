@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - security
   - deploy
 
 workflow:
@@ -81,6 +82,49 @@ test-full:
     - echo "Full tests for develop/main/hotfix"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
+########################
+# SECURITY SCAN
+########################
+cache:
+  key: trivy-cache
+  paths:
+    - .trivycache/
+
+trivy_scan_images:
+  tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  stage: security
+  variables:
+    TRIVY_EXIT_CODE: "1"
+    TRIVY_SEVERITY: "CRITICAL,HIGH"
+    TRIVY_USERNAME: "$DOCKERHUB_USERNAME"
+    TRIVY_PASSWORD: "$DOCKERHUB_TOKEN"
+  script:
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/execution:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/feedback:${CI_COMMIT_SHA}
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
+trivy_fs:
+  tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  stage: security
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+  script:
+    - trivy fs --severity HIGH,CRITICAL .
+
+trivy_config:
+  tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  stage: security
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+  script:
+    - trivy config .
 
 ########################
 # DEPLOY (EC2에서 docker pull & compose up)
