@@ -31,3 +31,14 @@
   background-color: var(--color-farm-cream);
   color: var(--color-farm-brown-dark);
 }
+
+@layer utilities {
+  /* Hide horizontal scrollbar (optional) */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

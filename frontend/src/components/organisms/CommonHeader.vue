@@ -185,7 +185,3 @@ const handleLogout = () => {
   router.push('/login')
 }
 </script>
-
-<style scoped>
-/* 스타일은 PrimeIcons CSS가 전역으로 import되어 있으므로 추가 스타일 불필요 */
-</style>

@@ -30,203 +30,29 @@
 
         <!-- 우측 메인 (3) -->
         <main class="w-full md:w-auto md:flex-[3] md:min-w-0 h-full min-h-0">
-          <div class="mb-4 h-[calc(100vh-200px)] border border-base-200 bg-base-100 p-6 h-full overflow-y-auto rounded-2xl relative">
-            
+          <div class="mb-4 h-[calc(100vh-200px)] border border-base-200 bg-base-100 p-6 overflow-y-auto rounded-2xl relative">
           </div>
         </main>
       </div>
     </div>
   </div>
-
-  <!-- 카드 확대 팝업 -->
-  <Transition
-    enter-active-class="transition-opacity duration-150 ease-out"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition-opacity duration-100 ease-in"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="selectedCard"
-      class="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 backdrop-blur-[1px] p-4"
-      @click.self="closeCardModal"
-    >
-      <Transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="opacity-0 scale-95 translate-y-2"
-        enter-to-class="opacity-100 scale-100 translate-y-0"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="opacity-100 scale-100 translate-y-0"
-        leave-to-class="opacity-0 scale-95 translate-y-2"
-      >
-        <div v-if="selectedCard" :class="popupCardContainerClass">
-          <img
-            :src="selectedCard.image"
-            :alt="selectedCard.name"
-            class="w-full h-full object-contain block"
-            loading="lazy"
-          />
-        </div>
-      </Transition>
-    </div>
-  </Transition>
 </template>
 
 <script setup>
 import { useProfileStore } from '@/stores/profile'
 import { storeToRefs } from 'pinia'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { onMounted } from 'vue'
 import PageTitle from '@/components/atoms/PageTitle.vue'
 
 const profile = useProfileStore()
-const { user, cards } = storeToRefs(profile)
-
-const selectedCard = ref(null)
-const scrollLockPrev = {
-  htmlOverflow: '',
-  htmlPaddingRight: '',
-  bodyOverflow: '',
-}
-
-const lockScroll = () => {
-  const html = document.documentElement
-  const body = document.body
-
-  scrollLockPrev.htmlOverflow = html.style.overflow
-  scrollLockPrev.htmlPaddingRight = html.style.paddingRight
-  scrollLockPrev.bodyOverflow = body.style.overflow
-
-  const scrollbarWidth = window.innerWidth - html.clientWidth
-  html.style.overflow = 'hidden'
-  if (scrollbarWidth > 0) html.style.paddingRight = `${scrollbarWidth}px`
-  body.style.overflow = 'hidden'
-}
-
-const unlockScroll = () => {
-  const html = document.documentElement
-  const body = document.body
-  html.style.overflow = scrollLockPrev.htmlOverflow
-  html.style.paddingRight = scrollLockPrev.htmlPaddingRight
-  body.style.overflow = scrollLockPrev.bodyOverflow
-}
-
-const openCardModal = (card) => {
-  selectedCard.value = card
-  lockScroll()
-}
-
-const closeCardModal = () => {
-  selectedCard.value = null
-  unlockScroll()
-}
-
-const GRADES = ['MEGA', 'GOLD', 'SILVER', 'BRONZE']
-const gradeMeta = {
-  MEGA: { color: 'bg-purple-500', slots: 1 },
-  GOLD: { color: 'bg-yellow-400', slots: 7 },
-  SILVER: { color: 'bg-slate-400', slots: 10 },
-  BRONZE: { color: 'bg-orange-400', slots: 12 },
-}
-
-// API 응답이 `[{ card: { cardId, grade, image, name, ... } }, ...]` 형태일 수 있어 이를 흡수
-const normalizeCard = (item) => (item?.card && typeof item.card === 'object' ? item.card : item)
-
-const normalizedCards = computed(() => {
-  const raw = cards.value ?? []
-  const arr = Array.isArray(raw) ? raw : Object.values(raw)
-  return arr.map(normalizeCard).filter(Boolean)
-})
-
-const cardsByGrade = computed(() => {
-  const grouped = Object.fromEntries(GRADES.map((g) => [g, []]))
-  for (const c of normalizedCards.value) {
-    if (c?.grade && grouped[c.grade]) grouped[c.grade].push(c)
-  }
-  return grouped
-})
-
-// 카드ID 기준 슬롯 배치를 위해, 등급별 "내가 가진 카드 중" 최소 ID를 기준점으로 사용
-const minCardIdByGrade = computed(() => {
-  const mins = Object.fromEntries(GRADES.map((g) => [g, Number.POSITIVE_INFINITY]))
-  for (const c of normalizedCards.value) {
-    if (!c?.grade || mins[c.grade] === undefined) continue
-    const id = Number(c.cardId)
-    if (Number.isFinite(id)) mins[c.grade] = Math.min(mins[c.grade], id)
-  }
-  for (const g of GRADES) {
-    if (!Number.isFinite(mins[g])) mins[g] = 1
-  }
-  return mins
-})
-
-// 등급별 고정 슬롯 배열(빈 슬롯 포함)
-const slotsByGrade = computed(() => {
-  const result = Object.fromEntries(GRADES.map((g) => [g, Array.from({ length: gradeMeta[g].slots }, () => null)]))
-
-  for (const grade of GRADES) {
-    const slots = result[grade]
-    const baseId = minCardIdByGrade.value[grade]
-
-    const gradeCards = [...(cardsByGrade.value[grade] ?? [])].sort((a, b) => Number(a.cardId) - Number(b.cardId))
-
-    for (const c of gradeCards) {
-      const id = Number(c?.cardId)
-      if (!Number.isFinite(id)) continue
-
-      const idx = id - baseId
-      if (idx >= 0 && idx < slots.length && slots[idx] == null) {
-        slots[idx] = c
-        continue
-      }
-
-      // 범위 밖/중복이면 남는 빈 슬롯에 순서대로 채움 (유실 방지)
-      const fallback = slots.findIndex((v) => v == null)
-      if (fallback !== -1) slots[fallback] = c
-    }
-  }
-
-  return result
-})
-
-// 등급별 스크롤 컨테이너 refs
-const scrollElByGrade = new Map()
-const setScrollEl = (grade, el) => {
-  if (!el) return
-  scrollElByGrade.set(grade, el)
-}
-
-const scroll = (grade, direction) => {
-  const container = scrollElByGrade.get(grade)
-  if (!container) return
-  const scrollAmount = 300
-  container.scrollBy({
-    left: direction === 'left' ? -scrollAmount : scrollAmount,
-    behavior: 'smooth',
-  })
-}
+const { user } = storeToRefs(profile)
 
 onMounted(async () => {
   try {
     await profile.userinfo()
-    await profile.cardList()
   } catch (err) {
     console.warn('[ProfileView] mounted fetch failed:', err)
   }
-})
-
-onBeforeUnmount(() => {
-  unlockScroll()
-})
-
-const popupCardContainerClass = computed(() => {
-  const base =
-    'bg-transparent rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/20 shadow-[0_0_60px_rgba(255,255,255,0.35)]'
-  const grade = selectedCard.value?.grade
-  // 슬롯의 약 2.5배 크기 (MEGA: 320 -> 800, 그 외: 140 -> 350)
-  return grade === 'MEGA'
-    ? `${base} w-[min(92vw,800px)] aspect-[1024/723]`
-    : `${base} w-[min(92vw,350px)] aspect-[1872/2613]`
 })
 </script>
 <style scoped>
