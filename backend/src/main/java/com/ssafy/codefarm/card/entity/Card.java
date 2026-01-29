@@ -35,4 +35,7 @@ public class Card {
     @NotNull
     @Column(length = 255)
     private String image;
+
+    @NotNull
+    private Integer no;
 }
