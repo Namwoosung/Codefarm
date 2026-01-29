@@ -41,8 +41,7 @@ public class Problem {
     private Integer difficulty;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    private AlgorithmType algorithm;
+    private String algorithm;
 
     @NotNull
     private Integer timeLimit;
