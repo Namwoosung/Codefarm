@@ -1,17 +1,16 @@
 <template>
-  <header class="bg-farm-paper border-b border-farm-cream shadow-sm sticky top-0 z-50">
+  <header class="bg-farm-paper border-b border-farm-cream shadow-sm sticky top-0 z-50 overflow-visible">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
         <!-- 로고 영역 -->
         <div class="flex-shrink-0">
-          <router-link to="/" class="flex items-center space-x-1">
-            <span
-              v-for="(char, index) in 'CODE FARM'.split('')"
-              :key="index"
-              class="w-8 h-8 bg-farm-yellow rounded-full flex items-center justify-center text-farm-brown-dark font-bold text-sm shadow-sm"
-            >
-              {{ char === ' ' ? '' : char }}
-            </span>
+          <router-link to="/" class="block">
+            <img
+              :src="logoUrl"
+              alt="CODE FARM"
+              class="h-[92px] md:h-[105px] w-auto max-w-[85vw] object-contain -translate-y-1 drop-shadow-sm select-none"
+              draggable="false"
+            />
           </router-link>
         </div>
 
@@ -35,6 +34,17 @@
             <span
               class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5E8D48] transition-opacity opacity-0"
               :class="{ 'opacity-100': isActiveRoute('/roadmap') }"
+            ></span>
+          </router-link>
+          <router-link
+            v-if="isLoggedIn"
+            to="/cards"
+            class="relative px-3 py-2 text-sm font-medium text-farm-brown-dark hover:text-farm-green transition-colors"
+          >
+            카드
+            <span
+              class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5E8D48] transition-opacity opacity-0"
+              :class="{ 'opacity-100': isActiveRoute('/cards') }"
             ></span>
           </router-link>
           <router-link
@@ -119,6 +129,15 @@
             커리큘럼
           </router-link>
           <router-link
+            v-if="isLoggedIn"
+            to="/cards"
+            class="px-3 py-2 text-base font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
+            active-class="text-farm-green bg-farm-cream"
+            @click="closeMobileMenu"
+          >
+            카드
+          </router-link>
+          <router-link
             v-if="isLoggedIn && user && user.userId"
             :to="`/profile/${user.userId}`"
             class="px-3 py-2 text-base font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
@@ -137,6 +156,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import logoUrl from '@/assets/logo.png'
 
 const router = useRouter()
 const route = useRoute()
@@ -165,7 +185,3 @@ const handleLogout = () => {
   router.push('/login')
 }
 </script>
-
-<style scoped>
-/* 스타일은 PrimeIcons CSS가 전역으로 import되어 있으므로 추가 스타일 불필요 */
-</style>
