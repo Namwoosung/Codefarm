@@ -1,7 +1,7 @@
 <template>
-  <div class="w-full">
+  <div class="w-full h-full">
     <!-- Diary wrapper -->
-    <div class="diary">
+    <div class="diary h-full">
       <div class="diary__cover">
         <div class="diary__spine" aria-hidden="true"></div>
 
@@ -51,23 +51,12 @@
         </div>
       </div>
     </div>
-
-    <!-- Controls (optional) -->
-    <div class="flex items-center gap-2 mt-4 justify-center">
-      <button class="px-3 py-2 rounded-lg bg-white border border-farm-brown text-sm" type="button" @click="flipPrev">
-        이전
-      </button>
-      <button class="px-3 py-2 rounded-lg bg-white border border-farm-brown text-sm" type="button" @click="flipNext">
-        다음
-      </button>
-    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { PageFlip } from 'page-flip'
-import DiaryStickerPack from '@/components/organisms/DiaryStickerPack.vue'
 
 const bookEl = ref(null)
 const flip = ref(null)
@@ -259,6 +248,9 @@ onBeforeUnmount(() => {
 .diary__cover {
   position: relative;
   width: min(980px, 100%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   border-radius: 28px;
   padding: 18px 20px 20px 20px;
   /* 가죽 커버 텍스처(그라데이션 레이어로 결/주름 느낌) */
@@ -336,19 +328,26 @@ onBeforeUnmount(() => {
   padding: 12px;
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.12);
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .book-shell {
   width: 100%;
   display: flex;
   justify-content: center;
+  flex: 1;
+  min-height: 0;
 }
 
 .pageflip {
   width: min(980px, 100%);
   border-radius: 16px;
   /* 리사이즈 순간 0 높이로 접히는 현상 방지 */
-  min-height: 400px;
+  min-height: 0;
+  height: 100%;
 }
 
 .page {

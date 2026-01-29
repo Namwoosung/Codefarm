@@ -30,8 +30,7 @@
 
         <!-- 우측 메인 (3) -->
         <main class="w-full md:w-auto md:flex-[3] md:min-w-0 h-full min-h-0">
-          <div class="mb-4 h-[calc(100vh-200px)] border border-base-200 bg-base-100 p-6 overflow-y-auto rounded-2xl relative">
-          </div>
+          <NotebookFlip class="h-[calc(100vh-200px)] w-full" />
         </main>
       </div>
     </div>
@@ -43,6 +42,7 @@ import { useProfileStore } from '@/stores/profile'
 import { storeToRefs } from 'pinia'
 import { onMounted } from 'vue'
 import PageTitle from '@/components/atoms/PageTitle.vue'
+import NotebookFlip from '@/components/organisms/NotebookFlip.vue'
 
 const profile = useProfileStore()
 const { user } = storeToRefs(profile)

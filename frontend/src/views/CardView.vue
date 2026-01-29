@@ -1,101 +1,93 @@
 <template>
-  <div class="min-h-screen p-10 flex flex-col">
+  <div class="h-screen p-10 flex flex-col overflow-hidden">
     <div class="max-w-7xl mx-auto w-full flex flex-col flex-1 min-h-0">
       <PageTitle title="카드" />
 
-      <div class="flex flex-col gap-6 md:flex-row flex-1 min-h-0">
-        <!-- 좌측 사이드바 (1) -->
-        <aside class="w-full md:w-auto md:flex-[1] md:min-w-0 md:sticky md:top-10 self-start">
-          <div class="card bg-base-100 border border-base-200 rounded-2xl p-5">
-            <p class="mb-4 text-sm font-semibold text-slate-600">Sidebar</p>
-            <p>{{ user?.nickname }}'s Farm</p>
-            <p>Lv.{{ user?.codingLevel }}</p>
-            <button
-              type="button"
-              class="btn w-full mt-2 rounded-xl border border-base-300 bg-gradient-to-b from-white to-base-200 text-base-content font-bold tracking-tight shadow-sm hover:-translate-y-0.5 active:translate-y-0"
-              @click="profile.reportList?.()"
-            >
-              내 카드
-            </button>
-            <button
-              type="button"
-              class="btn w-full mt-2 rounded-xl border border-base-300 bg-gradient-to-b from-white to-base-200 text-base-content font-bold tracking-tight shadow-sm hover:-translate-y-0.5 active:translate-y-0"
-              @click="profile.reportList?.()"
-            >
-              카드뽑기
-            </button>
-
-          </div>
-        </aside>
-
-        <!-- 우측 메인 (3) -->
-        <main class="w-full md:w-auto md:flex-[3] md:min-w-0 h-full min-h-0">
-          <div class="mb-4 h-[calc(100vh-200px)] border border-base-200 bg-base-100 p-6 h-full overflow-y-auto rounded-2xl relative">
+      <div class="flex flex-col flex-1 min-h-0">
+        <!-- 카드 리스트 -->
+        <main class="w-full flex-1 min-h-0">
+          <div class="mb-4 h-[calc(100vh-200px)] border-[15px] border-[color:var(--color-farm-brown-dark)] bg-base-100 p-8 rounded-[20px] relative flex flex-col min-h-0 overflow-hidden">
             <!-- 배경 이미지 -->
             <div
-              class="absolute inset-0 rounded-2xl bg-center bg-cover opacity-25 pointer-events-none"
+              class="absolute inset-0 rounded-[20px] bg-center bg-cover opacity-25 pointer-events-none"
               :style="{ backgroundImage: `url(${cardListBg})` }"
             />
 
-            <h2 class="text-xl font-bold mb-6 text-slate-800 relative z-10">{{ user?.nickname }}'s Farm Crew</h2>
-
-            <div v-for="grade in GRADES" :key="grade" class="mb-8 relative group z-10">
-              <div class="flex items-center justify-between mb-3 px-2">
-                <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
-                  <span :class="gradeMeta[grade].color" class="w-2 h-6 rounded-full"></span>
-                  {{ grade }}
-                </h3>
-                <span class="text-sm text-slate-400">
-                  {{ cardsByGrade[grade].length }} / {{ gradeMeta[grade].slots }}
-                </span>
-              </div>
-
-              <!-- 좌우 이동 버튼 -->
+            <div class="relative z-10 flex items-center justify-between gap-3 mb-6">
+              <h2 class="text-xl font-bold text-slate-800">{{ user?.nickname }}'s Farm Crew</h2>
               <button
-                v-if="grade !== 'MEGA'"
                 type="button"
-                @click="scroll(grade, 'left')"
-                class="absolute left-0 top-1/2 -translate-y-1/2 z-50 bg-white/90 border border-slate-200 rounded-full p-1.5 shadow-md hover:bg-white transition-opacity md:opacity-0 md:group-hover:opacity-100 flex items-center justify-center"
+                class="btn rounded-xl border border-base-300 bg-gradient-to-b from-white to-base-200 text-base-content font-bold tracking-tight shadow-sm hover:-translate-y-0.5 active:translate-y-0"
+                @click="profile.reportList?.()"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
+                카드뽑기
               </button>
+            </div>
 
-              <button
-                v-if="grade !== 'MEGA'"
-                type="button"
-                @click="scroll(grade, 'right')"
-                class="absolute right-0 top-1/2 -translate-y-1/2 z-50 bg-white/90 border border-slate-200 rounded-full p-1.5 shadow-md hover:bg-white transition-opacity md:opacity-0 md:group-hover:opacity-100 flex items-center justify-center"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
+            <!-- 등급별 페이지 스냅 (한 번에 한 등급만 노출) -->
+            <div class="relative z-10 flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-hide snap-y snap-mandatory scroll-smooth">
+              <section v-for="grade in GRADES" :key="grade" class="h-full snap-start relative group flex flex-col justify-center">
+                <div class="flex items-center justify-between mb-3 px-2">
+                  <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
+                    <span :class="gradeMeta[grade].color" class="w-2 h-6 rounded-full"></span>
+                    {{ grade }}
+                  </h3>
+                  <span class="text-sm text-slate-400">
+                    {{ cardsByGrade[grade].length }} / {{ gradeMeta[grade].slots }}
+                  </span>
+                </div>
 
-              <!-- 가로 스크롤 슬롯 -->
-              <div
-                :ref="(el) => setScrollEl(grade, el)"
-                class="flex gap-4 overflow-x-auto overflow-y-visible pt-2 pb-4 px-2 scroll-smooth scrollbar-hide snap-x"
-              >
-                <!-- 고정 슬롯(카드ID 기준으로 위치 배치) -->
-                <div
-                  v-for="(slotCard, idx) in slotsByGrade[grade]"
-                  :key="`${grade}-slot-${idx}`"
-                  class="flex-shrink-0 snap-start"
+                <!-- 좌우 이동 버튼 -->
+                <button
+                  v-if="grade !== 'MEGA'"
+                  type="button"
+                  @click="scroll(grade, 'left')"
+                  class="absolute left-0 top-1/2 -translate-y-1/2 z-50 bg-white/90 border border-slate-200 rounded-full p-1.5 shadow-md hover:bg-white transition-opacity md:opacity-0 md:group-hover:opacity-100 flex items-center justify-center"
                 >
-                  <CardDetail v-if="slotCard" :card="slotCard" @showcard="openCardModal" />
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                <button
+                  v-if="grade !== 'MEGA'"
+                  type="button"
+                  @click="scroll(grade, 'right')"
+                  class="absolute right-0 top-1/2 -translate-y-1/2 z-50 bg-white/90 border border-slate-200 rounded-full p-1.5 shadow-md hover:bg-white transition-opacity md:opacity-0 md:group-hover:opacity-100 flex items-center justify-center"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+
+                <!-- 가로 스크롤 슬롯 -->
+                <div
+                  :ref="(el) => setScrollEl(grade, el)"
+                  class="flex gap-5 overflow-x-auto overflow-y-visible pt-2 pb-4 px-2 scroll-smooth scrollbar-hide snap-x"
+                >
+                  <!-- 고정 슬롯(카드ID 기준으로 위치 배치) -->
                   <div
-                    v-else
+                    v-for="(slotCard, idx) in slotsByGrade[grade]"
+                    :key="`${grade}-slot-${idx}`"
                     :class="[
-                      'bg-transparent border-2 border-dashed border-base-content/35 rounded-xl shadow-md flex items-center justify-center',
-                      grade === 'MEGA' ? 'w-[320px] aspect-[1024/723]' : 'w-[140px] aspect-[1872/2613]',
+                      'flex-shrink-0 snap-start',
+                      grade === 'MEGA' ? 'w-[340px]' : 'w-[155px]',
                     ]"
                   >
-                    <span class="text-4xl font-extrabold text-base-content/20">?</span>
+                    <CardDetail v-if="slotCard" class="w-full" :card="slotCard" @showcard="openCardModal" />
+                    <div
+                      v-else
+                      :class="[
+                        'bg-transparent border-2 border-dashed border-base-content/35 rounded-xl shadow-md flex items-center justify-center',
+                        'w-full',
+                        grade === 'MEGA' ? 'aspect-[1024/723]' : 'aspect-[1872/2613]',
+                      ]"
+                    >
+                      <span class="text-4xl font-extrabold text-base-content/20">?</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              </section>
             </div>
           </div>
         </main>
