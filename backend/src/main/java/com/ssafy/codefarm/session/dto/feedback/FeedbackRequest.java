@@ -43,7 +43,7 @@ public record FeedbackRequest(
                 problem.getInputDescription(),
                 problem.getOutputDescription(),
                 problem.getDifficulty(),
-                problem.getAlgorithm().name(),
+                problem.getAlgorithm(),
                 (double) problem.getTimeLimit(),
                 problem.getMemoryLimit()
             );

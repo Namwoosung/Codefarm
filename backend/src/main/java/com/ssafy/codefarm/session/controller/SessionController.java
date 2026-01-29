@@ -18,8 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.context.request.async.DeferredResult;
-import reactor.core.publisher.Mono;
 
 @Slf4j
 @RestController
@@ -104,68 +102,44 @@ public class SessionController {
     }
 
 
-     // Spring MVC의 비동기 처리 객체 활용
+    // 동기 처리로 변경
     @PostMapping("/{sessionId}/run")
     @ResponseStatus(HttpStatus.OK)
-    public DeferredResult<SuccessResponse> runSession(
+    public SuccessResponse runSession(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long sessionId,
             @RequestBody @Valid RunSessionRequestDto requestDto
     ) {
 
-        DeferredResult<SuccessResponse> deferredResult =
-                new DeferredResult<>(10000L);
+        RunSessionResponseDto result = sessionService.runSession(sessionId, userDetails.getUserId(), requestDto);
 
-        Mono<RunSessionResponseDto> resultMono = sessionService.runSession(sessionId, userDetails.getUserId(), requestDto);
+        String message = (result.stderr() == null || result.stderr().isBlank())
+                ? "실행 완료"
+                : "실행 실패";
 
-        resultMono.subscribe(
-                result -> {
-                    String message = (result.stderr() == null || result.stderr().isBlank())
-                            ? "실행 완료"
-                            : "실행 실패";
-
-                    deferredResult.setResult(
-                            SuccessResponse.success(message, result)
-                    );
-                },
-                deferredResult::setErrorResult
-        );
-
-        return deferredResult;
+        return SuccessResponse.success(message, result);
     }
 
 
     @PostMapping("/{sessionId}/submit")
     @ResponseStatus(HttpStatus.OK)
-    public DeferredResult<SuccessResponse> submitSession(
+    public SuccessResponse submitSession(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long sessionId,
             @RequestBody @Valid SubmitSessionRequestDto submitSessionRequestDto
     ) {
 
-        DeferredResult<SuccessResponse> deferredResult =
-                new DeferredResult<>(10000L);
-
-        Mono<SubmitSessionResponseDto> resultMono =
+        SubmitSessionResponseDto result =
                 sessionService.submitSession(
                         userDetails.getUserId(),
                         sessionId,
                         submitSessionRequestDto
                 );
 
-        resultMono.subscribe(
-                result -> {
-                    String message = result.resultType() == com.ssafy.codefarm.result.entity.ResultType.SUCCESS
-                            ? "제출에 성공했습니다."
-                            : "제출에 실패했습니다.";
+        String message = result.resultType() == com.ssafy.codefarm.result.entity.ResultType.SUCCESS
+                ? "제출에 성공했습니다."
+                : "제출에 실패했습니다.";
 
-                    deferredResult.setResult(
-                            SuccessResponse.success(message, result)
-                    );
-                },
-                deferredResult::setErrorResult
-        );
-
-        return deferredResult;
+        return SuccessResponse.success(message, result);
     }
 }

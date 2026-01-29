@@ -9,12 +9,7 @@ import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
 import com.ssafy.codefarm.result.entity.Result;
 import com.ssafy.codefarm.result.entity.ResultType;
 import com.ssafy.codefarm.result.repository.ResultRepository;
-import com.ssafy.codefarm.session.dto.execution.EvaluationContext;
-import com.ssafy.codefarm.session.dto.execution.ExecuteServerRequest;
-import com.ssafy.codefarm.session.dto.execution.ExecuteServerResult;
-import com.ssafy.codefarm.session.dto.execution.SubmissionContext;
-import com.ssafy.codefarm.session.dto.execution.SubmitContext;
-import com.ssafy.codefarm.session.dto.execution.SubmitOutcome;
+import com.ssafy.codefarm.session.dto.execution.*;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
 import com.ssafy.codefarm.session.dto.request.RunSessionRequestDto;
@@ -33,8 +28,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -54,6 +50,7 @@ public class SessionService {
     private final ProblemRepository problemRepository;
     private final ResultRepository resultRepository;
 
+    private final TransactionTemplate transactionTemplate;
 
     public SessionResponseDto createSession(Long userId, CreateSessionRequestDto createSessionRequestDto) {
 
@@ -179,7 +176,7 @@ public class SessionService {
         return LatestCodeResponseDto.from(snapshot.getCode(), snapshot.getLanguage(), snapshot.getSavedAt());
     }
 
-    public Mono<RunSessionResponseDto> runSession(Long sessionId, Long userId, RunSessionRequestDto requestDto) {
+    public RunSessionResponseDto runSession(Long sessionId, Long userId, RunSessionRequestDto requestDto) {
 
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() ->
@@ -205,47 +202,40 @@ public class SessionService {
                         0.5
                 );
 
-        // 외부 서버 호출
-        return executionServerClient.execute(executionRequestDto)
-                .map(result ->
-                        RunSessionResponseDto.from(
-                                result.stdout(),
-                                result.stderr(),
-                                result.memoryUsage(),
-                                result.execTime(),
-                                result.isTimeout(),
-                                result.isOom()
-                        )
-                );
+        // 외부 서버 호출 (동기)
+        ExecuteServerResult result = executionServerClient.execute(executionRequestDto);
 
+        return RunSessionResponseDto.from(
+                result.stdout(),
+                result.stderr(),
+                result.memoryUsage(),
+                result.execTime(),
+                result.isTimeout(),
+                result.isOom()
+        );
     }
 
-    public Mono<SubmitSessionResponseDto> submitSession(
+    public SubmitSessionResponseDto submitSession(
             Long userId,
             Long sessionId,
             SubmitSessionRequestDto submitSessionRequestDto
     ) {
 
-        return Mono.fromCallable(() -> loadSubmitContext(userId, sessionId))
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMap(ctx -> {
+        SubmitContext ctx = loadSubmitContext(userId, sessionId);
 
-                    ExecuteServerRequest executionRequest =
-                            new ExecuteServerRequest(
-                                    submitSessionRequestDto.getLanguage(),
-                                    submitSessionRequestDto.getCode(),
-                                    ctx.problem().getTestcasesInput(),
-                                    ctx.problem().getTimeLimit() * 1000,
-                                    ctx.problem().getMemoryLimit(),
-                                    0.5
-                            );
+        ExecuteServerRequest executionRequest =
+                new ExecuteServerRequest(
+                        submitSessionRequestDto.getLanguage(),
+                        submitSessionRequestDto.getCode(),
+                        ctx.problem().getTestcasesInput(),
+                        ctx.problem().getTimeLimit() * 1000,
+                        ctx.problem().getMemoryLimit(),
+                        0.5
+                );
 
-                    return executionServerClient.execute(executionRequest)
-                            .flatMap(exec ->
-                                    Mono.fromCallable(() -> saveSubmitResult(ctx, submitSessionRequestDto, exec))
-                                            .subscribeOn(Schedulers.boundedElastic())
-                            );
-                });
+        ExecuteServerResult exec = executionServerClient.execute(executionRequest);
+
+        return saveSubmitResult(ctx, submitSessionRequestDto, exec);
     }
 
     private SubmitSessionResponseDto saveSubmitResult(
@@ -253,54 +243,67 @@ public class SessionService {
             SubmitSessionRequestDto submitSessionRequestDto,
             ExecuteServerResult executeServerResult
     ) {
+        return transactionTemplate.execute(status -> {
 
-        SubmitOutcome submitOutcome =
-            SubmitOutcome.from(submitContext, executeServerResult);
+            SubmitOutcome submitOutcome =
+                    SubmitOutcome.from(submitContext, executeServerResult);
 
-        ResultType resultType = decideResultType(submitOutcome);
+            ResultType resultType = decideResultType(submitOutcome);
 
-        Integer memory = toIntegerSafely(executeServerResult.memoryUsage());
+            Integer memory = toIntegerSafely(executeServerResult.memoryUsage());
 
-        Result result = Result.builder()
-            .session(submitContext.session())
-            .resultType(resultType)
-            .language(submitSessionRequestDto.getLanguage())
-            .code(submitSessionRequestDto.getCode())
-            .solveTime(submitContext.solveTime())
-            .execTime(executeServerResult.execTime())
-            .memory(memory)
-            .feedback(null) // 기본은 null
-            .build();
+            Result result = Result.builder()
+                    .session(submitContext.session())
+                    .resultType(resultType)
+                    .language(submitSessionRequestDto.getLanguage())
+                    .code(submitSessionRequestDto.getCode())
+                    .solveTime(submitContext.solveTime())
+                    .execTime(executeServerResult.execTime())
+                    .memory(memory)
+                    .feedback(null)
+                    .build();
 
-        resultRepository.save(result);
+            resultRepository.save(result);
 
-        if (resultType == ResultType.FAIL) { // 실패면 result 결과만 저장
-            return SubmitSessionResponseDto.fail(
-                EvaluationContext.from(submitOutcome)
+            if (resultType == ResultType.FAIL) {
+                return SubmitSessionResponseDto.fail(
+                        EvaluationContext.from(submitOutcome)
+                );
+            }
+
+            String feedback;
+            try {
+                feedback = feedbackServerClient.requestFeedback(submitContext, submitSessionRequestDto);
+            } catch (Exception e) {
+                feedback = "정답입니다! 수고했어요.";
+            }
+
+            result.updateFeedback(feedback);
+
+            submitContext.session().close();
+
+            Long sessionId = submitContext.session().getId();
+
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(
+                        new TransactionSynchronization() {
+                            @Override
+                            public void afterCommit() {
+                                sessionCodeRedisService.delete(sessionId);
+                                log.info("Redis deleted after DB commit. sessionId={}", sessionId);
+                            }
+                        }
+                );
+            } else {
+                // 혹시 동기화가 활성화되지 않은 경우(거의 없음)
+                sessionCodeRedisService.delete(sessionId);
+            }
+            return SubmitSessionResponseDto.success(
+                    SubmissionContext.from(result),
+                    EvaluationContext.from(submitOutcome),
+                    feedback
             );
-        }
-
-        // 성공 여부가 성공이라면 result 저장 + feedback 서버 호출 + 현재 세션 종료 + redis 데이터 삭제
-        String feedback;
-        try {
-            feedback = feedbackServerClient.requestFeedback(submitContext, submitSessionRequestDto);
-        } catch (Exception e) {
-            feedback = "정답입니다! 수고했어요."; // 일단 피드백 추출 실패 시 임의 값 저장. 추후 복구 처리로 개선
-        }
-
-        result.updateFeedback(feedback);
-
-        // 세션 종료
-        submitContext.session().close();
-
-        // Redis 삭제
-        sessionCodeRedisService.delete(submitContext.session().getId());
-
-        return SubmitSessionResponseDto.success(
-            SubmissionContext.from(result),
-            EvaluationContext.from(submitOutcome),
-            feedback
-        );
+        });
     }
 
     private ResultType decideResultType(SubmitOutcome outcome) {
