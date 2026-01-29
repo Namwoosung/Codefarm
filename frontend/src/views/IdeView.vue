@@ -1,5 +1,12 @@
 <template>
   <div class="ide-container">
+    <!-- 메인→IDE 진입 시 로딩 모달 -->
+    <div v-if="isInitializing" class="ide-loading-overlay">
+      <div class="ide-loading-card">
+        <p class="ide-loading-text">로딩중...</p>
+      </div>
+    </div>
+
     <!-- 기능 바: Navbar 밑 -->
     <div class="ide-toolbar">
       <!-- 왼쪽: 뒤로가기 -->
@@ -109,7 +116,6 @@ import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
 import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
-import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
 import * as sessionApi from '@/api/session'
@@ -119,7 +125,8 @@ const route = useRoute()
 const terminalPanel = ref(null)
 const authStore = useAuthStore()
 const ideStore = useIdeStore()
-const { isLoggedIn } = storeToRefs(authStore)
+// 스토어 로그인 상태를 computed로 참조해 로그아웃 시에도 블러/오버레이 즉시 반영
+const isLoggedIn = computed(() => !!authStore.token)
 
 // 백엔드 언어 코드 (에디터는 python, API는 PYTHON)
 const API_LANGUAGE = 'PYTHON'
@@ -128,6 +135,7 @@ const API_LANGUAGE = 'PYTHON'
 const leftPanelWidth = ref(50) // 기본 50%
 const isResizing = ref(false)
 const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
+const isInitializing = ref(true) // 메인→IDE 진입 시 세션/문제 로드 중
 // FR-CODE-002-1: 저장 상태 표시
 const lastSavedAt = ref(null)
 const isSaveInProgress = ref(false)
@@ -197,7 +205,7 @@ const recentlySentText = computed(() => {
 
 /** 세션 초기화: 활성 세션 조회 또는 세션 생성 후 최신 코드 로드 (라우트 id = 백엔드 problemId) */
 async function initSession() {
-  if (!isLoggedIn) return
+  if (!isLoggedIn.value) return
   const problemId = Number(route.params.id)
   if (!problemId) return
 
@@ -340,7 +348,12 @@ async function closeSessionOnLeave() {
 }
 
 onMounted(async () => {
-  await initSession()
+  isInitializing.value = true
+  try {
+    await initSession()
+  } finally {
+    isInitializing.value = false
+  }
   // 10초 저장은 첫 입력 후에만 시작 (startSnapshotInterval은 lastCodeInputAt 변경 시 watch에서 호출)
   // "N초 전" 1초마다 갱신
   statusTickIntervalId = setInterval(() => {
@@ -357,7 +370,14 @@ watch(() => ideStore.lastCodeInputAt, () => {
 
 // 같은 IDE 페이지에서 문제 ID만 바뀐 경우 세션 재초기화 (interval은 입력 시 다시 시작)
 watch(() => route.params.id, async (newId, oldId) => {
-  if (newId && newId !== oldId) await initSession()
+  if (newId && newId !== oldId) {
+    isInitializing.value = true
+    try {
+      await initSession()
+    } finally {
+      isInitializing.value = false
+    }
+  }
 })
 
 onBeforeRouteLeave(async (to, from, next) => {
@@ -394,7 +414,7 @@ const handleBack = async () => {
 }
 
 const handleSubmit = async () => {
-  if (!isLoggedIn) return
+  if (!isLoggedIn.value) return
   const sid = ideStore.sessionId
   if (!sid) {
     if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
@@ -430,7 +450,7 @@ const handleSubmit = async () => {
 }
 
 const handleRun = async () => {
-  if (!isLoggedIn) return
+  if (!isLoggedIn.value) return
   const sid = ideStore.sessionId
   if (!sid) {
     if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
@@ -483,7 +503,7 @@ const handleRun = async () => {
 const handleEscape = async () => {
   if (!confirm('정말 탈주하시겠습니까?')) return
   const sid = ideStore.sessionId
-  if (sid && isLoggedIn) {
+  if (sid && isLoggedIn.value) {
     try {
       await sessionApi.giveUp(sid)
     } catch (_) {}
@@ -809,6 +829,28 @@ const handleEscape = async () => {
 /* 탈주 아이콘 크기 조정 */
 .ide-escape-button .escape-icon {
   font-size: 1.1rem;
+}
+
+/* 메인→IDE 진입 시 로딩 모달 */
+.ide-loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 242, 232, 0.9);
+  z-index: 100;
+}
+.ide-loading-card {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+.ide-loading-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-farm-brown-dark);
 }
 
 /* 로그인 필요 오버레이 */

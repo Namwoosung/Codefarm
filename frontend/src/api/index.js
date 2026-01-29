@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { useAuthStore } from '@/stores/auth'
 
 const api = axios.create({
   // Vite Proxy(/api)를 사용하므로 기본 경로를 /api로 설정
@@ -20,6 +21,19 @@ api.interceptors.request.use(
     return config
   },
   (error) => Promise.reject(error)
+)
+
+// 401 시 토큰 제거 → 로그아웃 상태로 맞춤 (블러 등 UI 반영)
+api.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    if (err.response?.status === 401) {
+      try {
+        useAuthStore().logout()
+      } catch (_) {}
+    }
+    return Promise.reject(err)
+  }
 )
 
 export default api
