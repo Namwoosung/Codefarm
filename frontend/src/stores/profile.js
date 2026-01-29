@@ -25,9 +25,9 @@ export const useProfileStore = defineStore('profile', () => {
     const cardList = async () => {
         try {
             const res = await api.get('/cards/me')
-            cards.value = res.data.data
+            cards.value = res.data.data['cards']
             console.log(res.data.message)
-            console.log(res.data.data)
+            console.log(res.data.data['cards'])
         } catch (err) {
             console.warn('[profile.cardList] failed:', err?.response?.status, err?.response?.data ?? err)
         }
