@@ -77,6 +77,10 @@ public class SecurityConfig {
                                 "/api/v1/users/check/nicknames"
                         ).permitAll()
 
+                        // 문제관련 api
+                        .requestMatchers("/api/v1/problems/*").permitAll()
+                        .requestMatchers("/api/v1/problems/me").authenticated()
+
                         // 개발 단계 테스트
                         .requestMatchers("/test/**").permitAll()
 

@@ -24,6 +24,7 @@ public class CardQueryRepositoryImpl implements CardQueryRepository{
                         com.querydsl.core.types.Projections.constructor(
                                 MyCardQueryDto.class,
                                 card.id,
+                                card.no,
                                 card.name,
                                 card.grade,
                                 card.image,

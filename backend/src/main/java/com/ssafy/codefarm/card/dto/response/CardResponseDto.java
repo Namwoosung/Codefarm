@@ -5,6 +5,7 @@ import com.ssafy.codefarm.card.entity.CardGrade;
 
 public record CardResponseDto(
         Long cardId,
+        Integer no,
         String name,
         CardGrade grade,
         String image
@@ -12,6 +13,7 @@ public record CardResponseDto(
     public static CardResponseDto from(Card card) {
         return new CardResponseDto(
             card.getId(),
+            card.getNo(),
             card.getName(),
             card.getGrade(),
             card.getImage()

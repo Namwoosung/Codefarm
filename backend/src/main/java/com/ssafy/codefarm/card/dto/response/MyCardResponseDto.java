@@ -8,7 +8,7 @@ public record MyCardResponseDto(
 ) {
     public static MyCardResponseDto from(MyCardQueryDto myCardQueryDto) {
         return new MyCardResponseDto(
-                new CardResponseDto(myCardQueryDto.cardId(), myCardQueryDto.name(), myCardQueryDto.grade(), myCardQueryDto.image()),
+                new CardResponseDto(myCardQueryDto.cardId(), myCardQueryDto.no(), myCardQueryDto.name(), myCardQueryDto.grade(), myCardQueryDto.image()),
                 myCardQueryDto.count()
         );
     }
