@@ -57,4 +57,8 @@ public class Result {
     @JoinColumn(name = "session_id")
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Session session;
+
+    public void updateFeedback(String feedback) {
+        this.feedback = feedback;
+    }
 }
