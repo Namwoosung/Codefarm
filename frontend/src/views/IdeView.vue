@@ -54,9 +54,14 @@
               <span class="play-icon">▷</span>
               <span>제출하기</span>
             </button>
-            <button class="ide-run-button" @click="handleRun">
-              <span class="play-icon">▷</span>
-              <span>실행하기</span>
+            <button
+              class="ide-run-button"
+              :disabled="isRunLoading"
+              @click="handleRun"
+            >
+              <span v-if="isRunLoading" class="play-icon">⏱️</span>
+              <span v-else class="play-icon">▷</span>
+              <span>{{ isRunLoading ? '실행 중...' : '실행하기' }}</span>
             </button>
             <button class="ide-escape-button" @click="handleEscape">
               <EscapeIcon :size="20" />
@@ -116,6 +121,7 @@ const API_LANGUAGE = 'PYTHON'
 // 패널 리사이저 관련
 const leftPanelWidth = ref(50) // 기본 50%
 const isResizing = ref(false)
+const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
 let snapshotIntervalId = null
 
 const startResize = (e) => {
@@ -317,24 +323,36 @@ const handleRun = async () => {
     if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
     return
   }
+  isRunLoading.value = true
   const code = ideStore.getCode(route.params.id)
   if (terminalPanel.value) terminalPanel.value.clear()
   if (terminalPanel.value) terminalPanel.value.write('실행 중...\r\n')
   try {
     const { data: res } = await sessionApi.runCode(sid, { language: API_LANGUAGE, code, input: '\n' })
     const d = res?.data
+    const execTimeMs = d?.execTime ?? 0
+    const execTimeSec = (execTimeMs / 1000).toFixed(2)
     if (terminalPanel.value) {
       if (d?.stdout) terminalPanel.value.write(d.stdout)
       if (d?.stderr) terminalPanel.value.write(d.stderr)
-      const msg = res?.message || ''
       if (d?.isTimeout) terminalPanel.value.write('Time Limit Exceeded\r\n')
       if (d?.isOom) terminalPanel.value.write('Memory Limit Exceeded\r\n')
-      if (msg && !d?.stdout && !d?.stderr) terminalPanel.value.write(msg + '\r\n')
+      // FR-CODE-005-2, 005-3: 실행 결과 요약
+      if (d?.isTimeout) {
+        terminalPanel.value.write(`\r\n⏱️ 실행 시간 초과 (제한: 10초)\r\n`)
+      } else if (res?.message === '실행 완료') {
+        terminalPanel.value.write(`\r\n✅ 실행 성공 (${execTimeSec}초)\r\n`)
+      } else {
+        terminalPanel.value.write(`\r\n❌ 실행 실패 (${execTimeSec}초)\r\n`)
+      }
     }
   } catch (err) {
     if (terminalPanel.value) {
       terminalPanel.value.write(`실행 실패: ${err.response?.data?.message || err.message}\r\n`)
+      terminalPanel.value.write('❌ 실행 실패\r\n')
     }
+  } finally {
+    isRunLoading.value = false
   }
 }
 
@@ -601,9 +619,14 @@ const handleEscape = async () => {
   flex-shrink: 0;
 }
 
-.ide-run-button:hover {
+.ide-run-button:hover:not(:disabled) {
   background-color: #FAFAFA;
   border-color: var(--color-farm-green);
+}
+
+.ide-run-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .ide-run-button .play-icon {
