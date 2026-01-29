@@ -38,9 +38,10 @@
 <script setup>
 import rawProblems from '@/mocks/sampled_30_clean.json'
 
-// JSON에는 id가 없으므로, 프론트에서 임의로 1부터 부여해서 사용
+// 라우트/백엔드와 맞추기 위해 실제 DB ID 사용 (1번 문제 = 21, 2번 = 22, ...)
+const PROBLEM_ID_OFFSET = 21
 const problems = rawProblems.map((problem, index) => ({
-  id: index + 1,
+  id: PROBLEM_ID_OFFSET + index,
   ...problem,
 }))
 </script>

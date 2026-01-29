@@ -54,10 +54,6 @@ onMounted(async () => {
     setTimeout(() => {
       try {
         fitAddon.fit()
-        
-        // 5. 잘 떴는지 확인용 글자 한 줄 써보기
-        term.write('Hello World!\r\n')
-        term.write('Loading...\r\n')
       } catch (error) {
         console.error('Terminal fit error:', error)
       }

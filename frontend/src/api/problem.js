@@ -1,62 +1,80 @@
-// TODO: 백엔드 API 연동이 완료되면 이 파일을 실제 호출로 교체합니다.
-// import api from './index'
+import api from './index'
 import mockProblems from '@/mocks/sampled_30_clean.json'
 
+const MOCK_ID_OFFSET = 21 // 백엔드 ID 21 = mock index 0
+
 /**
- * 문제 상세 조회 (임시: 로컬 mock 데이터 사용)
- * @param {number|string} problemId - 문제 ID
- * @returns {Promise<{
- *   isLogined: boolean,
- *   problem: object,
- *   userStatus: object|null,
- *   statistics: { submissionCount: number, successCount: number }
- * }>}
+ * mock 데이터로 문제 상세 반환 (API 404 시 폴백)
  */
-export const getProblemDetail = async (problemId) => {
+function getProblemDetailFromMock(problemId) {
   const id = Number(problemId)
+  const mockIndex = id - MOCK_ID_OFFSET
+  const raw = mockProblems[mockIndex]
+  if (!raw) return null
 
-  // sampled_30_clean.json 은 0-based 배열이므로, 임시로 (id - 1) 인덱스를 사용
-  const raw = mockProblems[id - 1]
-
-  if (!raw) {
-    throw new Error(`Mock problem not found for id: ${id}`)
-  }
-
-  // difficulty 숫자를 LEVEL 문자열로 매핑
-  const difficultyMap = {
-    1: 'LEVEL1',
-    2: 'LEVEL2',
-    3: 'LEVEL3',
-    4: 'LEVEL4',
-    5: 'LEVEL5',
-  }
-
+  const difficultyMap = { 1: 'LEVEL1', 2: 'LEVEL2', 3: 'LEVEL3', 4: 'LEVEL4', 5: 'LEVEL5' }
   const problem = {
     problemId: id,
-    title: raw.title,
-    description: raw.description,
-    difficulty: difficultyMap[raw.difficulty] || 'LEVEL1',
-    algorithm: raw.algorithm,
+    title: raw.title ?? '',
+    description: raw.description ?? '',
+    difficulty: difficultyMap[raw.difficulty] ?? 'LEVEL1',
+    algorithm: raw.algorithm ?? [],
     timeLimit: raw.time_limit ?? raw.timeLimit ?? 1,
     memoryLimit: raw.memory_limit ?? raw.memoryLimit ?? 256,
-    exampleInput:
-      raw.example_input ?? raw.exampleInput ?? (raw.exampleInput || ''),
-    exampleOutput:
-      raw.example_output ?? raw.exampleOutput ?? (raw.exampleOutput || ''),
+    exampleInput: raw.example_input ?? raw.exampleInput ?? '',
+    exampleOutput: raw.example_output ?? raw.exampleOutput ?? '',
     problemType: raw.problem_type ?? raw.problemType ?? 'NORMAL',
-    createdAt: raw.createdAt ?? new Date().toISOString(),
+    createdAt: raw.createdAt ?? null
   }
-
-  // 실제 API 명세와 최대한 비슷한 형태로 반환
   return {
     isLogined: true,
     problem,
-    // isLogined 가 false 인 경우 userStatus는 내려오지 않는 명세이므로,
-    // 임시 mock에서는 로그인 된 상태로만 가정하고 userStatus는 null 로 둡니다.
     userStatus: null,
-    statistics: {
-      submissionCount: 0,
-      successCount: 0,
-    },
+    statistics: { submissionCount: 0, successCount: 0 }
+  }
+}
+
+/**
+ * 문제 상세 조회 (백엔드 API 연동, 404 시 mock 폴백)
+ * - 라우트 id = 백엔드 problemId (21, 22, 23...)
+ * @param {number|string} problemId - 백엔드 DB 문제 ID (21, 22, 23...)
+ * @returns {Promise<{ isLogined: boolean, problem: object, userStatus: object|null, statistics: object }>}
+ */
+export const getProblemDetail = async (problemId) => {
+  const id = Number(problemId)
+  if (!id) {
+    throw new Error(`유효하지 않은 문제 ID입니다: ${problemId}`)
+  }
+
+  try {
+    const { data: res } = await api.get(`/problems/${id}`)
+    const raw = res?.data ?? res
+    if (!raw) throw new Error('문제를 찾을 수 없습니다.')
+
+    const problem = {
+      problemId: raw.problemId ?? id,
+      title: raw.title ?? '',
+      description: raw.description ?? '',
+      difficulty: raw.difficulty ?? 'LEVEL1',
+      algorithm: raw.algorithm ?? [],
+      timeLimit: raw.timeLimit ?? raw.time_limit ?? 1,
+      memoryLimit: raw.memoryLimit ?? raw.memory_limit ?? 256,
+      exampleInput: raw.exampleInput ?? raw.example_input ?? '',
+      exampleOutput: raw.exampleOutput ?? raw.example_output ?? '',
+      problemType: raw.problemType ?? raw.problem_type ?? 'NORMAL',
+      createdAt: raw.createdAt ?? raw.created_at ?? null
+    }
+    return {
+      isLogined: res?.isLogined ?? true,
+      problem,
+      userStatus: res?.userStatus ?? raw.userStatus ?? null,
+      statistics: res?.statistics ?? raw.statistics ?? { submissionCount: 0, successCount: 0 }
+    }
+  } catch (err) {
+    if (err.response?.status === 404) {
+      const fallback = getProblemDetailFromMock(id)
+      if (fallback) return fallback
+    }
+    throw err
   }
 }
