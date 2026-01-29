@@ -140,6 +140,17 @@ let statusTickIntervalId = null
 const onOnline = () => { isOnline.value = true }
 const onOffline = () => { isOnline.value = false }
 
+// 제출 성공 여부 판별 유틸 (백엔드 스키마 확정 전, 대표 필드들만 체크)
+const isSubmitSuccess = (res) => {
+  const d = res?.data
+  if (!d) return false
+  if (typeof d.isSuccess === 'boolean') return d.isSuccess
+  if (typeof d.allPassed === 'boolean') return d.allPassed
+  if (typeof d.isAllSuccess === 'boolean') return d.isAllSuccess
+  if (d.resultType === 'SUCCESS') return true
+  return false
+}
+
 const startResize = (e) => {
   isResizing.value = true
   document.addEventListener('mousemove', handleResize)
@@ -258,6 +269,26 @@ async function loadLatestCode(problemId) {
   }
 }
 
+/** 페이지 이탈 전 한 번 더 코드 스냅샷 저장 (가능한 경우만) */
+async function saveLatestSnapshotOnce() {
+  const sid = ideStore.sessionId
+  if (!sid || !isLoggedIn.value) return
+  const code = ideStore.getCode(route.params.id)
+  if (!code) return
+  isSaveInProgress.value = true
+  saveFailed.value = false
+  try {
+    await sessionApi.saveCodeSnapshot(sid, { language: API_LANGUAGE, code })
+    lastSavedAt.value = Date.now()
+    saveFailed.value = false
+  } catch (_) {
+    // 이탈 중이므로 실패해도 추가 처리는 하지 않음
+    saveFailed.value = true
+  } finally {
+    isSaveInProgress.value = false
+  }
+}
+
 const IDLE_STOP_MS = 10_000   // 10초 무입력 시 스냅샷 전송 중단
 const SNAPSHOT_INTERVAL_MS = 10_000 // 10초마다 저장
 
@@ -330,6 +361,11 @@ watch(() => route.params.id, async (newId, oldId) => {
 })
 
 onBeforeRouteLeave(async (to, from, next) => {
+  const ok = window.confirm('진행 상황은 저장되지 않습니다. 정말 페이지를 벗어나시겠습니까?')
+  if (!ok) {
+    next(false)
+    return
+  }
   await closeSessionOnLeave()
   if (snapshotIntervalId) {
     clearInterval(snapshotIntervalId)
@@ -354,12 +390,6 @@ onUnmounted(() => {
 })
 
 const handleBack = async () => {
-  if (!confirm('진짜 이 페이지를 벗어나시겠습니까?')) return
-  await closeSessionOnLeave()
-  if (snapshotIntervalId) {
-    clearInterval(snapshotIntervalId)
-    snapshotIntervalId = null
-  }
   router.push('/')
 }
 
@@ -374,9 +404,23 @@ const handleSubmit = async () => {
   if (terminalPanel.value) terminalPanel.value.write('제출 중...\r\n')
   try {
     const { data: res } = await sessionApi.submitCode(sid, { language: API_LANGUAGE, code })
+    const success = isSubmitSuccess(res)
     if (terminalPanel.value) {
       terminalPanel.value.write(res?.message || '제출 완료\r\n')
       if (res?.data) terminalPanel.value.write(JSON.stringify(res.data, null, 2) + '\r\n')
+      if (success) {
+        terminalPanel.value.write('\r\n✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
+      } else {
+        terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
+      }
+    }
+    // 1) 제출 성공 시: 세션 닫기 (리포트 화면은 추후 구현 시 라우팅 추가)
+    if (success) {
+      await closeSessionOnLeave()
+      if (snapshotIntervalId) {
+        clearInterval(snapshotIntervalId)
+        snapshotIntervalId = null
+      }
     }
   } catch (err) {
     if (terminalPanel.value) {
@@ -397,7 +441,7 @@ const handleRun = async () => {
   if (terminalPanel.value) terminalPanel.value.clear()
   if (terminalPanel.value) terminalPanel.value.write('실행 중...\r\n')
   try {
-    const { data: res } = await sessionApi.runCode(sid, { language: API_LANGUAGE, code, input: '\n' })
+    const { data: res } = await sessionApi.runCode(sid, { language: API_LANGUAGE, code })
     const d = res?.data
     const execTimeMs = d?.execTime ?? 0
     const execTimeSec = (execTimeMs / 1000).toFixed(2)

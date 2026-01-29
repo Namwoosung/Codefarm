@@ -51,12 +51,13 @@ export const getLatestCode = (sessionId) => {
 }
 
 /**
- * 실행하기 (백엔드에서 input 필수)
+ * 실행하기 (백엔드 @NotBlank: 공백만 있으면 400이므로 비공백 1글자 이상 필요)
  * @param {number} sessionId
  * @param {{ language: string, code: string, input?: string }} body
  */
-export const runCode = (sessionId, { language, code, input = '\n' }) => {
-  const body = { language, code, input: input ?? '\n' }
+const RUN_DEFAULT_INPUT = '.' // @NotBlank 통과용 최소 비공백
+export const runCode = (sessionId, { language, code, input }) => {
+  const body = { language, code, input: (input != null && input.trim()) ? input : RUN_DEFAULT_INPUT }
   return api.post(`/sessions/${sessionId}/run`, body)
 }
 
@@ -71,10 +72,12 @@ export const submitCode = (sessionId, { language, code }) => {
 
 /**
  * 포기하기
+ * 현재 백엔드에 별도 give-up 엔드포인트가 없어,
+ * 일단 일반 세션 종료(close)와 동일하게 처리한다.
  * @param {number} sessionId
  */
 export const giveUp = (sessionId) => {
-  return api.post(`/sessions/${sessionId}/give-up`)
+  return api.patch(`/sessions/${sessionId}/close`)
 }
 
 /**
