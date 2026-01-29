@@ -11,13 +11,16 @@ public record SubmitOutcome(
         String expectedLine,
         String actualLine
 ) {
-    public static SubmitOutcome from(
-            String expectedOutputRaw,
-            String actualOutputRaw,
-            String stderr,
-            Boolean isTimeout,
-            Boolean isOom
+    public static SubmitOutcome from( // 실행 결과를 기반으로 제출결과 record를 생성
+        SubmitContext context,
+        ExecuteServerResult result
     ) {
+
+        String expectedOutputRaw = context.problem().getTestcasesOutput();
+        String actualOutputRaw = result.stdout();
+        String stderr = result.stderr();
+        Boolean isTimeout = result.isTimeout();
+        Boolean isOom = result.isOom();
 
         String expected = normalize(expectedOutputRaw);
         String actual = normalize(actualOutputRaw);
@@ -93,39 +96,54 @@ public record SubmitOutcome(
         );
     }
 
-    private static String normalize(String value) {
+    private static String normalize(String value) { // 데이터 전처리(window <-> linux 호환)
         if (value == null) {
             return "";
         }
         return value.replace("\r\n", "\n").trim();
     }
 
-    private static LineStats compareLines(String expected, String actual) {
+    private static LineStats compareLines(String expected, String actual) { // 채점 로직, 기대값과 출력값을 라인단위로 비교하면서 정답 개수를 count
         String[] e = expected.isBlank() ? new String[0] : expected.split("\n", -1);
         String[] a = actual.isBlank() ? new String[0] : actual.split("\n", -1);
 
         int total = e.length;
+        int maxLength = Math.max(e.length, a.length);
+
         int passed = 0;
+        int failedLineNo = -1;
+        String expectedLine = null;
+        String actualLine = null;
 
-        int maxCompare = Math.min(e.length, a.length);
+        for (int i = 0; i < maxLength; i++) {
 
-        for (int i = 0; i < maxCompare; i++) {
-            if (e[i].equals(a[i])) {
-                passed++;
+            String ev = i < e.length ? e[i] : "";
+            String av = i < a.length ? a[i] : "";
+
+            if (ev.equals(av)) {
+                if (i < total) {
+                    passed++;
+                }
             } else {
-                return LineStats.diff(total, passed, i + 1, e[i], a[i]);
+                if (failedLineNo == -1) {
+                    failedLineNo = i + 1;
+                    expectedLine = ev;
+                    actualLine = av;
+                }
             }
         }
 
-        if (a.length < e.length && total > 0) {
-            return LineStats.diff(total, passed, passed + 1, e[passed], "");
+        if (failedLineNo == -1) {
+            return LineStats.same(total);
         }
 
-        if (a.length > e.length) {
-            return LineStats.diff(total, passed, total + 1, "", a[total]);
-        }
-
-        return LineStats.same(total);
+        return LineStats.diff(
+            total,
+            passed,
+            failedLineNo,
+            expectedLine,
+            actualLine
+        );
     }
 
     private record LineStats(

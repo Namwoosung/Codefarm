@@ -10,6 +10,7 @@ import com.ssafy.codefarm.result.entity.Result;
 import com.ssafy.codefarm.result.entity.ResultType;
 import com.ssafy.codefarm.result.repository.ResultRepository;
 import com.ssafy.codefarm.session.dto.execution.ExecuteServerRequest;
+import com.ssafy.codefarm.session.dto.execution.ExecuteServerResult;
 import com.ssafy.codefarm.session.dto.execution.SubmitContext;
 import com.ssafy.codefarm.session.dto.execution.SubmitOutcome;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
@@ -245,36 +246,33 @@ public class SessionService {
     }
 
     private SubmitSessionResponseDto saveSubmitResult(
-            SubmitContext ctx,
+            SubmitContext submitContext,
             SubmitSessionRequestDto submitSessionRequestDto,
-            com.ssafy.codefarm.session.dto.execution.ExecuteServerResult exec
+            ExecuteServerResult executeServerResult
     ) {
 
         SubmitOutcome outcome =
-                SubmitOutcome.from(
-                        ctx.problem().getTestcasesOutput(),
-                        exec.stdout(),
-                        exec.stderr(),
-                        exec.isTimeout(),
-                        exec.isOom()
-                );
+            SubmitOutcome.from(submitContext, executeServerResult);
 
         ResultType resultType =
                 decideResultType(outcome);
 
+        // 이 부분에서 성공 여부가 실패하면 result 저장 x, 아래 부분 필요 없음
+        // 성공 여부가 성공이라면 result 저장 + feedback 서버 호출 + 현재 세션 종료 + redis 데이터 삭제
+
         String feedback =
-                decideFeedback(resultType, outcome);
+            decideFeedback(resultType, outcome); // 이 부분은 추후 feedback 서버 연동으로 처리
 
         Integer memory =
-                toIntegerSafely(exec.memoryUsage());
+            toIntegerSafely(executeServerResult.memoryUsage());
 
         Result result = Result.builder()
-                .session(ctx.session())
+                .session(submitContext.session())
                 .resultType(resultType)
                 .language(submitSessionRequestDto.getLanguage())
                 .code(submitSessionRequestDto.getCode())
-                .solveTime(ctx.solveTime())
-                .execTime(exec.execTime())
+                .solveTime(submitContext.solveTime())
+                .execTime(executeServerResult.execTime())
                 .memory(memory)
                 .feedback(feedback)
                 .build();
@@ -282,8 +280,8 @@ public class SessionService {
         resultRepository.save(result);
 
         if (resultType == ResultType.SUCCESS) {
-            ctx.session().close();
-            sessionCodeRedisService.delete(ctx.session().getId());
+            submitContext.session().close();
+            sessionCodeRedisService.delete(submitContext.session().getId());
         }
 
         return SubmitSessionResponseDto.from(result, outcome);
@@ -309,7 +307,7 @@ public class SessionService {
         return outcome.failReason();
     }
 
-    private Integer toIntegerSafely(Long value) {
+    private Integer toIntegerSafely(Long value) { // 굳이 필요 없는데 그냥 안전장치
         if (value == null) {
             return null;
         }
