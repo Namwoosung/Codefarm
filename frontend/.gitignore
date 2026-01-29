@@ -38,6 +38,3 @@ coverage
 
 # Vitest
 __screenshots__/
-
-# Mock data (local only)
-src/mocks/sampled_30_clean.json

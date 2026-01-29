@@ -41,50 +41,115 @@
         @mousedown="startResize"
       ></div>
 
-      <!-- 오른쪽 패널: 에디터 영역 -->
+      <!-- 오른쪽 패널: 에디터 + 터미널 영역 -->
       <main class="ide-panel-right" :style="{ width: (100 - leftPanelWidth) + '%' }">
-        <div class="ide-editor-container">
-          <MonacoEditor />
+        <div class="ide-right-wrapper" :class="{ 'is-locked': !isLoggedIn }">
+          <div class="ide-editor-container">
+            <MonacoEditor />
+            <!-- FR-CODE-002-1: 에디터 우측 하단 저장 상태 -->
+            <div v-if="isLoggedIn" class="ide-save-status">
+              <div>{{ saveStatusText }}</div>
+              <div v-if="recentlySentText" class="ide-save-status-sub">{{ recentlySentText }}</div>
+              <div v-if="snapshotStoppedByIdle" class="ide-save-status-sub ide-save-status-stopped">코드 전송이 멈춘 상태입니다</div>
+            </div>
+          </div>
+          
+          <!-- 실행/제출 버튼 영역 -->
+          <div class="ide-action-buttons">
+            <button class="ide-submit-button" @click="handleSubmit">
+              <span class="play-icon">▷</span>
+              <span>제출하기</span>
+            </button>
+            <button
+              class="ide-run-button"
+              :disabled="isRunLoading"
+              @click="handleRun"
+            >
+              <span v-if="isRunLoading" class="play-icon">⏱️</span>
+              <span v-else class="play-icon">▷</span>
+              <span>{{ isRunLoading ? '실행 중...' : '실행하기' }}</span>
+            </button>
+            <button class="ide-escape-button" @click="handleEscape">
+              <EscapeIcon :size="20" />
+              <span>탈주하기</span>
+            </button>
+          </div>
+          
+          <TerminalPanel ref="terminalPanel" />
+
+          <!-- 로그인 필요 안내 오버레이 -->
+          <div v-if="!isLoggedIn" class="ide-lock-overlay">
+            <div class="ide-lock-card">
+              <p class="ide-lock-title">로그인이 필요해요</p>
+              <p class="ide-lock-desc">
+                문제를 풀고 제출 결과를 확인하려면 먼저 로그인해주세요.
+              </p>
+              <div class="ide-lock-actions">
+                <router-link to="/login" class="ide-lock-primary">
+                  로그인하러 가기
+                </router-link>
+                <router-link to="/signup" class="ide-lock-secondary">
+                  회원가입
+                </router-link>
+              </div>
+            </div>
+          </div>
         </div>
-        
-        <!-- 실행/제출 버튼 영역 -->
-        <div class="ide-action-buttons">
-          <button class="ide-submit-button" @click="handleSubmit">
-            <span class="play-icon">▷</span>
-            <span>제출하기</span>
-          </button>
-          <button class="ide-run-button" @click="handleRun">
-            <span class="play-icon">▷</span>
-            <span>실행하기</span>
-          </button>
-          <button class="ide-escape-button" @click="handleEscape">
-            <EscapeIcon :size="20" />
-            <span>탈주하기</span>
-          </button>
-        </div>
-        
-        <TerminalPanel ref="terminalPanel" />
       </main>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
 import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
+import { storeToRefs } from 'pinia'
+import { useAuthStore } from '@/stores/auth'
+import { useIdeStore } from '@/stores/ide'
+import * as sessionApi from '@/api/session'
 
 const router = useRouter()
+const route = useRoute()
 const terminalPanel = ref(null)
+const authStore = useAuthStore()
+const ideStore = useIdeStore()
+const { isLoggedIn } = storeToRefs(authStore)
+
+// 백엔드 언어 코드 (에디터는 python, API는 PYTHON)
+const API_LANGUAGE = 'PYTHON'
 
 // 패널 리사이저 관련
 const leftPanelWidth = ref(50) // 기본 50%
 const isResizing = ref(false)
+const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
+// FR-CODE-002-1: 저장 상태 표시
+const lastSavedAt = ref(null)
+const isSaveInProgress = ref(false)
+const saveFailed = ref(false)
+const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
+const lastStatusTick = ref(Date.now()) // "N초 전" 갱신용
+const snapshotStoppedByIdle = ref(false) // 10초 무입력으로 전송 중단 시 true (테스트 확인용)
+let snapshotIntervalId = null
+let statusTickIntervalId = null
+const onOnline = () => { isOnline.value = true }
+const onOffline = () => { isOnline.value = false }
+
+// 제출 성공 여부 판별 유틸 (백엔드 스키마 확정 전, 대표 필드들만 체크)
+const isSubmitSuccess = (res) => {
+  const d = res?.data
+  if (!d) return false
+  if (typeof d.isSuccess === 'boolean') return d.isSuccess
+  if (typeof d.allPassed === 'boolean') return d.allPassed
+  if (typeof d.isAllSuccess === 'boolean') return d.isAllSuccess
+  if (d.resultType === 'SUCCESS') return true
+  return false
+}
 
 const startResize = (e) => {
   isResizing.value = true
@@ -95,14 +160,10 @@ const startResize = (e) => {
 
 const handleResize = (e) => {
   if (!isResizing.value) return
-  
   const container = document.querySelector('.ide-layout')
   if (!container) return
-  
   const containerRect = container.getBoundingClientRect()
   const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
-  
-  // 최소/최대 너비 제한 (20% ~ 80%)
   if (newLeftWidth >= 20 && newLeftWidth <= 80) {
     leftPanelWidth.value = newLeftWidth
   }
@@ -114,35 +175,325 @@ const stopResize = () => {
   document.removeEventListener('mouseup', stopResize)
 }
 
+// FR-CODE-002-1: "💾 저장됨 (3초 전)", "💾 저장 중...", "⚠️ 연결 끊김"
+const saveStatusText = computed(() => {
+  if (!isOnline.value) return '⚠️ 연결 끊김'
+  if (isSaveInProgress.value) return '💾 저장 중...'
+  if (saveFailed.value) return '⚠️ 연결 끊김'
+  if (!lastSavedAt.value) return '💾 대기 중'
+  const sec = Math.floor((lastStatusTick.value - lastSavedAt.value) / 1000)
+  if (sec < 60) return `💾 저장됨 (${sec}초 전)`
+  const min = Math.floor(sec / 60)
+  return `💾 저장됨 (${min}분 전)`
+})
+
+// 테스트용: 방금 전송 완료 시 "코드가 전송되었습니다" (5초간 표시)
+const recentlySentText = computed(() => {
+  if (!lastSavedAt.value) return ''
+  const elapsed = lastStatusTick.value - lastSavedAt.value
+  if (elapsed < 5000) return '코드가 전송되었습니다'
+  return ''
+})
+
+/** 세션 초기화: 활성 세션 조회 또는 세션 생성 후 최신 코드 로드 (라우트 id = 백엔드 problemId) */
+async function initSession() {
+  if (!isLoggedIn) return
+  const problemId = Number(route.params.id)
+  if (!problemId) return
+
+  try {
+    const { data: res } = await sessionApi.getActiveSession()
+    const session = res?.data
+    if (session) {
+      if (session.problemId !== problemId) {
+        await router.replace(`/ide/${session.problemId}`)
+        return
+      }
+      ideStore.setSessionId(session.sessionId)
+      await loadLatestCode(problemId)
+      return
+    }
+  } catch (err) {
+    // 404 = 활성 세션 없음 → 정상 흐름, 아래에서 createSession 호출
+    if (err.response?.status !== 404) {
+      if (terminalPanel.value) {
+        terminalPanel.value.write(`활성 세션 조회 실패: ${err.response?.data?.message || err.message}\r\n`)
+      }
+      return
+    }
+  }
+
+  try {
+    const { data: res } = await sessionApi.createSession(problemId)
+    ideStore.setSessionId(res?.data?.sessionId ?? null)
+    if (res?.data?.sessionId) {
+      ideStore.setCodeToDefault(problemId)
+      if (terminalPanel.value) terminalPanel.value.write('세션이 생성되었습니다.\r\n')
+    }
+  } catch (err) {
+    if (err.response?.status === 409) {
+      const { data: activeRes } = await sessionApi.getActiveSession().catch(() => ({}))
+      const active = activeRes?.data
+      if (active?.problemId != null) {
+        await router.replace(`/ide/${active.problemId}`)
+      }
+      return
+    }
+    if (terminalPanel.value) {
+      const msg = err.response?.data?.message || err.message
+      if (err.response?.status === 404 && msg?.includes('문제')) {
+        terminalPanel.value.write('해당 문제를 백엔드에서 찾을 수 없습니다. 문제 ID가 서버에 등록되어 있는지 확인해 주세요.\r\n')
+      } else {
+        terminalPanel.value.write(`세션 생성 실패: ${msg}\r\n`)
+      }
+    }
+  }
+}
+
+/** 최신 코드 조회 후 에디터에 반영 (해당 문제 ID에 저장) */
+async function loadLatestCode(problemId) {
+  const sid = ideStore.sessionId
+  if (!sid) return
+  try {
+    const { data: res } = await sessionApi.getLatestCode(sid)
+    if (res?.data?.code != null) {
+      ideStore.updateCode(problemId, res.data.code)
+    }
+  } catch (err) {
+    if (err.response?.status === 404) {
+      // 저장된 코드 없음 → 기본 코드로 표시
+      ideStore.setCodeToDefault(problemId)
+    } else if (terminalPanel.value) {
+      terminalPanel.value.write(`최신 코드 로드 실패: ${err.response?.data?.message || err.message}\r\n`)
+    }
+  }
+}
+
+/** 페이지 이탈 전 한 번 더 코드 스냅샷 저장 (가능한 경우만) */
+async function saveLatestSnapshotOnce() {
+  const sid = ideStore.sessionId
+  if (!sid || !isLoggedIn.value) return
+  const code = ideStore.getCode(route.params.id)
+  if (!code) return
+  isSaveInProgress.value = true
+  saveFailed.value = false
+  try {
+    await sessionApi.saveCodeSnapshot(sid, { language: API_LANGUAGE, code })
+    lastSavedAt.value = Date.now()
+    saveFailed.value = false
+  } catch (_) {
+    // 이탈 중이므로 실패해도 추가 처리는 하지 않음
+    saveFailed.value = true
+  } finally {
+    isSaveInProgress.value = false
+  }
+}
+
+const IDLE_STOP_MS = 10_000   // 10초 무입력 시 스냅샷 전송 중단
+const SNAPSHOT_INTERVAL_MS = 10_000 // 10초마다 저장
+
+/** FR-CODE-002: 첫 입력 후 10초마다 저장, 10초 무입력 시 중단 → 재입력 시 다시 시작 */
+function startSnapshotInterval() {
+  if (snapshotIntervalId) return
+  snapshotStoppedByIdle.value = false
+  snapshotIntervalId = setInterval(async () => {
+    const sid = ideStore.sessionId
+    if (!sid || !isLoggedIn.value) return
+    const lastAt = ideStore.lastCodeInputAt
+    if (!lastAt) return
+    if (Date.now() - lastAt > IDLE_STOP_MS) {
+      clearInterval(snapshotIntervalId)
+      snapshotIntervalId = null
+      snapshotStoppedByIdle.value = true
+      return
+    }
+    const code = ideStore.getCode(route.params.id)
+    if (code == null || code === '') return
+    isSaveInProgress.value = true
+    saveFailed.value = false
+    try {
+      await sessionApi.saveCodeSnapshot(sid, { language: API_LANGUAGE, code })
+      lastSavedAt.value = Date.now()
+      saveFailed.value = false
+    } catch (err) {
+      saveFailed.value = true
+      if (err.response?.status === 400 || err.response?.status === 403 || err.response?.status === 404) {
+        clearInterval(snapshotIntervalId)
+        snapshotIntervalId = null
+      }
+    } finally {
+      isSaveInProgress.value = false
+    }
+  }, SNAPSHOT_INTERVAL_MS)
+}
+
+/** 페이지 이탈 시 세션 종료 */
+async function closeSessionOnLeave() {
+  const sid = ideStore.sessionId
+  if (!sid) return
+  try {
+    await sessionApi.closeSession(sid)
+  } catch (_) {
+    // 이탈 중이므로 무시
+  }
+  ideStore.clearSession()
+}
+
+onMounted(async () => {
+  await initSession()
+  // 10초 저장은 첫 입력 후에만 시작 (startSnapshotInterval은 lastCodeInputAt 변경 시 watch에서 호출)
+  // "N초 전" 1초마다 갱신
+  statusTickIntervalId = setInterval(() => {
+    lastStatusTick.value = Date.now()
+  }, 1000)
+  window.addEventListener('online', onOnline)
+  window.addEventListener('offline', onOffline)
+})
+
+// 첫 입력(또는 30초 idle 후 재입력) 시 10초 스냅샷 interval 시작
+watch(() => ideStore.lastCodeInputAt, () => {
+  if (ideStore.lastCodeInputAt && !snapshotIntervalId) startSnapshotInterval()
+}, { deep: true })
+
+// 같은 IDE 페이지에서 문제 ID만 바뀐 경우 세션 재초기화 (interval은 입력 시 다시 시작)
+watch(() => route.params.id, async (newId, oldId) => {
+  if (newId && newId !== oldId) await initSession()
+})
+
+onBeforeRouteLeave(async (to, from, next) => {
+  const ok = window.confirm('진행 상황은 저장되지 않습니다. 정말 페이지를 벗어나시겠습니까?')
+  if (!ok) {
+    next(false)
+    return
+  }
+  await closeSessionOnLeave()
+  if (snapshotIntervalId) {
+    clearInterval(snapshotIntervalId)
+    snapshotIntervalId = null
+  }
+  next()
+})
+
 onUnmounted(() => {
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
+  if (snapshotIntervalId) {
+    clearInterval(snapshotIntervalId)
+    snapshotIntervalId = null
+  }
+  if (statusTickIntervalId) {
+    clearInterval(statusTickIntervalId)
+    statusTickIntervalId = null
+  }
+  window.removeEventListener('online', onOnline)
+  window.removeEventListener('offline', onOffline)
 })
 
-const handleBack = () => {
-  if (confirm('진짜 이 페이지를 벗어나시겠습니까?')) {
-    router.push('/')
+const handleBack = async () => {
+  router.push('/')
+}
+
+const handleSubmit = async () => {
+  if (!isLoggedIn) return
+  const sid = ideStore.sessionId
+  if (!sid) {
+    if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
+    return
+  }
+  const code = ideStore.getCode(route.params.id)
+  if (terminalPanel.value) terminalPanel.value.write('제출 중...\r\n')
+  try {
+    const { data: res } = await sessionApi.submitCode(sid, { language: API_LANGUAGE, code })
+    const success = isSubmitSuccess(res)
+    if (terminalPanel.value) {
+      terminalPanel.value.write(res?.message || '제출 완료\r\n')
+      if (res?.data) terminalPanel.value.write(JSON.stringify(res.data, null, 2) + '\r\n')
+      if (success) {
+        terminalPanel.value.write('\r\n✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
+      } else {
+        terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
+      }
+    }
+    // 1) 제출 성공 시: 세션 닫기 (리포트 화면은 추후 구현 시 라우팅 추가)
+    if (success) {
+      await closeSessionOnLeave()
+      if (snapshotIntervalId) {
+        clearInterval(snapshotIntervalId)
+        snapshotIntervalId = null
+      }
+    }
+  } catch (err) {
+    if (terminalPanel.value) {
+      terminalPanel.value.write(`제출 실패: ${err.response?.data?.message || err.message}\r\n`)
+    }
   }
 }
 
-const handleSubmit = () => {
-  // TODO: 제출 기능 구현
-  console.log('제출하기')
+const handleRun = async () => {
+  if (!isLoggedIn) return
+  const sid = ideStore.sessionId
+  if (!sid) {
+    if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
+    return
+  }
+  isRunLoading.value = true
+  const code = ideStore.getCode(route.params.id)
+  if (terminalPanel.value) terminalPanel.value.clear()
+  if (terminalPanel.value) terminalPanel.value.write('실행 중...\r\n')
+  try {
+    const { data: res } = await sessionApi.runCode(sid, { language: API_LANGUAGE, code })
+    const d = res?.data
+    const execTimeMs = d?.execTime ?? 0
+    const execTimeSec = (execTimeMs / 1000).toFixed(2)
+    if (terminalPanel.value) {
+      // FR-CODE-005-1: stdout 기본색, stderr 빨간색 / FR-CODE-005-4: 1000줄 초과 시 생략
+      const stdout = d?.stdout ?? ''
+      const stderr = d?.stderr ?? ''
+      const combined = stdout + (stderr ? (stdout ? '\n' : '') + stderr : '')
+      const lines = combined.split(/\r?\n/)
+      const MAX_LINES = 1000
+      if (lines.length > MAX_LINES) {
+        const truncated = lines.slice(0, MAX_LINES).join('\r\n') + '\r\n... (출력 생략)\r\n'
+        terminalPanel.value.write(truncated)
+      } else {
+        if (stdout) terminalPanel.value.write(stdout)
+        if (stderr) terminalPanel.value.writeStderr(stderr)
+      }
+      if (d?.isTimeout) terminalPanel.value.writeStderr('Time Limit Exceeded\r\n')
+      if (d?.isOom) terminalPanel.value.writeStderr('Memory Limit Exceeded\r\n')
+      // FR-CODE-005-2, 005-3: 실행 결과 요약
+      if (d?.isTimeout) {
+        terminalPanel.value.write(`\r\n⏱️ 실행 시간 초과 (제한: 10초)\r\n`)
+      } else if (res?.message === '실행 완료') {
+        terminalPanel.value.write(`\r\n✅ 실행 성공 (${execTimeSec}초)\r\n`)
+      } else {
+        terminalPanel.value.write(`\r\n❌ 실행 실패 (${execTimeSec}초)\r\n`)
+      }
+    }
+  } catch (err) {
+    if (terminalPanel.value) {
+      terminalPanel.value.write(`실행 실패: ${err.response?.data?.message || err.message}\r\n`)
+      terminalPanel.value.write('❌ 실행 실패\r\n')
+    }
+  } finally {
+    isRunLoading.value = false
+  }
 }
 
-const handleRun = () => {
-  // TODO: 실행 기능 구현
-  if (terminalPanel.value) {
-    terminalPanel.value.write('코드를 실행합니다...\r\n')
+const handleEscape = async () => {
+  if (!confirm('정말 탈주하시겠습니까?')) return
+  const sid = ideStore.sessionId
+  if (sid && isLoggedIn) {
+    try {
+      await sessionApi.giveUp(sid)
+    } catch (_) {}
+    ideStore.clearSession()
   }
-  console.log('실행하기')
-}
-
-const handleEscape = () => {
-  // TODO: 탈주 기능 구현
-  if (confirm('정말 탈주하시겠습니까?')) {
-    router.push('/')
+  if (snapshotIntervalId) {
+    clearInterval(snapshotIntervalId)
+    snapshotIntervalId = null
   }
+  router.push('/')
 }
 </script>
 
@@ -266,6 +617,20 @@ const handleEscape = () => {
   flex-direction: column;
 }
 
+.ide-right-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ide-right-wrapper.is-locked .ide-editor-container,
+.ide-right-wrapper.is-locked .ide-action-buttons,
+.ide-right-wrapper.is-locked .terminal-panel {
+  filter: blur(4px);
+  pointer-events: none;
+}
+
 /* 리사이저 바 */
 .ide-resizer {
   width: 4px;
@@ -313,6 +678,26 @@ const handleEscape = () => {
   flex: 1;
   position: relative;
   min-height: 0; /* flexbox에서 overflow를 위해 필요 */
+}
+
+/* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */
+.ide-save-status {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 0.75rem;
+  color: var(--color-farm-brown);
+  pointer-events: none;
+  white-space: nowrap;
+  text-align: right;
+}
+.ide-save-status-sub {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--color-farm-brown);
+}
+.ide-save-status-stopped {
+  color: var(--color-farm-point, #e07c4a);
 }
 
 /* 실행/제출 버튼 영역 */
@@ -378,9 +763,14 @@ const handleEscape = () => {
   flex-shrink: 0;
 }
 
-.ide-run-button:hover {
+.ide-run-button:hover:not(:disabled) {
   background-color: #FAFAFA;
   border-color: var(--color-farm-green);
+}
+
+.ide-run-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .ide-run-button .play-icon {
@@ -414,6 +804,81 @@ const handleEscape = () => {
   background-color: #FAFAFA;
   border-color: var(--color-farm-point);
   color: var(--color-farm-point);
+}
+
+/* 탈주 아이콘 크기 조정 */
+.ide-escape-button .escape-icon {
+  font-size: 1.1rem;
+}
+
+/* 로그인 필요 오버레이 */
+.ide-lock-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 242, 232, 0.8);
+  z-index: 10;
+}
+
+.ide-lock-card {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+  max-width: 360px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  text-align: center;
+}
+
+.ide-lock-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-farm-brown-dark);
+  margin-bottom: 0.5rem;
+}
+
+.ide-lock-desc {
+  font-size: 0.9rem;
+  color: #7a6a4a;
+  margin-bottom: 1.25rem;
+}
+
+.ide-lock-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.ide-lock-primary,
+.ide-lock-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ide-lock-primary {
+  background-color: var(--color-farm-green);
+  color: #fff;
+}
+
+.ide-lock-primary:hover {
+  background-color: var(--color-farm-green-dark);
+}
+
+.ide-lock-secondary {
+  background-color: #fff;
+  color: var(--color-farm-brown-dark);
+  border: 1px solid #e0e0e0;
+}
+
+.ide-lock-secondary:hover {
+  background-color: #fafafa;
 }
 
 

@@ -11,35 +11,33 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import { CodeEditor } from 'monaco-editor-vue3';
-import * as monaco from 'monaco-editor';
-import { useIdeStore } from '@/stores/ide';
+import { computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { CodeEditor } from 'monaco-editor-vue3'
+import * as monaco from 'monaco-editor'
+import { useIdeStore } from '@/stores/ide'
 
-const ideStore = useIdeStore();
+const route = useRoute()
+const ideStore = useIdeStore()
 
-// store에서 초기 코드 가져오기 (저장된 코드가 있으면 사용, 없으면 기본값)
-const code = ref(ideStore.code || `function hello() {
-  console.log('Welcome to CodeFarm!');
-}`);
+// 현재 문제 ID 기준으로 코드 표시/저장 (문제마다 다른 코드 유지)
+const code = computed({
+  get: () => ideStore.getCode(route.params.id),
+  set: (v) => ideStore.updateCode(route.params.id, v)
+})
 
 const editorOptions = {
   fontSize: 14,
   minimap: { enabled: false },
   automaticLayout: true,
-  wordWrap: 'on', // 가로 스크롤 방지 - 긴 줄은 자동으로 다음 줄로
-  wrappingIndent: 'indent' // 줄바꿈 시 들여쓰기 유지
-};
+  wordWrap: 'on',
+  wrappingIndent: 'indent'
+}
 
-// 코드 변경 시 store에 실시간 업데이트
 const handleCodeChange = (value) => {
-  ideStore.updateCode(value);
-};
-
-// code ref 변경 시에도 store 업데이트 (v-model과 동기화)
-watch(code, (newValue) => {
-  ideStore.updateCode(newValue);
-}, { immediate: true });
+  ideStore.updateCode(route.params.id, value)
+  ideStore.touchCodeInput() // 첫 입력 후 10초 저장, 30초 무입력 시 중단용
+}
 
 onMounted(() => {
   // vs 테마를 기반으로 배경색만 변경
