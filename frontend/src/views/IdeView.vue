@@ -46,6 +46,12 @@
         <div class="ide-right-wrapper" :class="{ 'is-locked': !isLoggedIn }">
           <div class="ide-editor-container">
             <MonacoEditor />
+            <!-- FR-CODE-002-1: 에디터 우측 하단 저장 상태 -->
+            <div v-if="isLoggedIn" class="ide-save-status">
+              <div>{{ saveStatusText }}</div>
+              <div v-if="recentlySentText" class="ide-save-status-sub">{{ recentlySentText }}</div>
+              <div v-if="snapshotStoppedByIdle" class="ide-save-status-sub ide-save-status-stopped">코드 전송이 멈춘 상태입니다</div>
+            </div>
           </div>
           
           <!-- 실행/제출 버튼 영역 -->
@@ -95,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
@@ -122,7 +128,17 @@ const API_LANGUAGE = 'PYTHON'
 const leftPanelWidth = ref(50) // 기본 50%
 const isResizing = ref(false)
 const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
+// FR-CODE-002-1: 저장 상태 표시
+const lastSavedAt = ref(null)
+const isSaveInProgress = ref(false)
+const saveFailed = ref(false)
+const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
+const lastStatusTick = ref(Date.now()) // "N초 전" 갱신용
+const snapshotStoppedByIdle = ref(false) // 10초 무입력으로 전송 중단 시 true (테스트 확인용)
 let snapshotIntervalId = null
+let statusTickIntervalId = null
+const onOnline = () => { isOnline.value = true }
+const onOffline = () => { isOnline.value = false }
 
 const startResize = (e) => {
   isResizing.value = true
@@ -147,6 +163,26 @@ const stopResize = () => {
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
 }
+
+// FR-CODE-002-1: "💾 저장됨 (3초 전)", "💾 저장 중...", "⚠️ 연결 끊김"
+const saveStatusText = computed(() => {
+  if (!isOnline.value) return '⚠️ 연결 끊김'
+  if (isSaveInProgress.value) return '💾 저장 중...'
+  if (saveFailed.value) return '⚠️ 연결 끊김'
+  if (!lastSavedAt.value) return '💾 대기 중'
+  const sec = Math.floor((lastStatusTick.value - lastSavedAt.value) / 1000)
+  if (sec < 60) return `💾 저장됨 (${sec}초 전)`
+  const min = Math.floor(sec / 60)
+  return `💾 저장됨 (${min}분 전)`
+})
+
+// 테스트용: 방금 전송 완료 시 "코드가 전송되었습니다" (5초간 표시)
+const recentlySentText = computed(() => {
+  if (!lastSavedAt.value) return ''
+  const elapsed = lastStatusTick.value - lastSavedAt.value
+  if (elapsed < 5000) return '코드가 전송되었습니다'
+  return ''
+})
 
 /** 세션 초기화: 활성 세션 조회 또는 세션 생성 후 최신 코드 로드 (라우트 id = 백엔드 problemId) */
 async function initSession() {
@@ -222,23 +258,42 @@ async function loadLatestCode(problemId) {
   }
 }
 
-/** 10초마다 코드 스냅샷 저장 (현재는 비활성화 - 테스트용으로 주석 처리 상태) */
+const IDLE_STOP_MS = 10_000   // 10초 무입력 시 스냅샷 전송 중단
+const SNAPSHOT_INTERVAL_MS = 10_000 // 10초마다 저장
+
+/** FR-CODE-002: 첫 입력 후 10초마다 저장, 10초 무입력 시 중단 → 재입력 시 다시 시작 */
 function startSnapshotInterval() {
-  // if (snapshotIntervalId) return
-  // snapshotIntervalId = setInterval(async () => {
-  //   const sid = ideStore.sessionId
-  //   if (!sid || !isLoggedIn) return
-  //   const code = ideStore.getCode(route.params.id)
-  //   if (code == null || code === '') return
-  //   try {
-  //     await sessionApi.saveCodeSnapshot(sid, { language: API_LANGUAGE, code })
-  //   } catch (err) {
-  //     if (err.response?.status === 400 || err.response?.status === 403 || err.response?.status === 404) {
-  //       clearInterval(snapshotIntervalId)
-  //       snapshotIntervalId = null
-  //     }
-  //   }
-  // }, 10_000)
+  if (snapshotIntervalId) return
+  snapshotStoppedByIdle.value = false
+  snapshotIntervalId = setInterval(async () => {
+    const sid = ideStore.sessionId
+    if (!sid || !isLoggedIn.value) return
+    const lastAt = ideStore.lastCodeInputAt
+    if (!lastAt) return
+    if (Date.now() - lastAt > IDLE_STOP_MS) {
+      clearInterval(snapshotIntervalId)
+      snapshotIntervalId = null
+      snapshotStoppedByIdle.value = true
+      return
+    }
+    const code = ideStore.getCode(route.params.id)
+    if (code == null || code === '') return
+    isSaveInProgress.value = true
+    saveFailed.value = false
+    try {
+      await sessionApi.saveCodeSnapshot(sid, { language: API_LANGUAGE, code })
+      lastSavedAt.value = Date.now()
+      saveFailed.value = false
+    } catch (err) {
+      saveFailed.value = true
+      if (err.response?.status === 400 || err.response?.status === 403 || err.response?.status === 404) {
+        clearInterval(snapshotIntervalId)
+        snapshotIntervalId = null
+      }
+    } finally {
+      isSaveInProgress.value = false
+    }
+  }, SNAPSHOT_INTERVAL_MS)
 }
 
 /** 페이지 이탈 시 세션 종료 */
@@ -255,15 +310,23 @@ async function closeSessionOnLeave() {
 
 onMounted(async () => {
   await initSession()
-  startSnapshotInterval()
+  // 10초 저장은 첫 입력 후에만 시작 (startSnapshotInterval은 lastCodeInputAt 변경 시 watch에서 호출)
+  // "N초 전" 1초마다 갱신
+  statusTickIntervalId = setInterval(() => {
+    lastStatusTick.value = Date.now()
+  }, 1000)
+  window.addEventListener('online', onOnline)
+  window.addEventListener('offline', onOffline)
 })
 
-// 같은 IDE 페이지에서 문제 ID만 바뀐 경우(예: 활성 세션이 다른 문제일 때 리다이렉트) 세션 재초기화
+// 첫 입력(또는 30초 idle 후 재입력) 시 10초 스냅샷 interval 시작
+watch(() => ideStore.lastCodeInputAt, () => {
+  if (ideStore.lastCodeInputAt && !snapshotIntervalId) startSnapshotInterval()
+}, { deep: true })
+
+// 같은 IDE 페이지에서 문제 ID만 바뀐 경우 세션 재초기화 (interval은 입력 시 다시 시작)
 watch(() => route.params.id, async (newId, oldId) => {
-  if (newId && newId !== oldId) {
-    await initSession()
-    if (!snapshotIntervalId) startSnapshotInterval()
-  }
+  if (newId && newId !== oldId) await initSession()
 })
 
 onBeforeRouteLeave(async (to, from, next) => {
@@ -282,6 +345,12 @@ onUnmounted(() => {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
   }
+  if (statusTickIntervalId) {
+    clearInterval(statusTickIntervalId)
+    statusTickIntervalId = null
+  }
+  window.removeEventListener('online', onOnline)
+  window.removeEventListener('offline', onOffline)
 })
 
 const handleBack = async () => {
@@ -565,6 +634,26 @@ const handleEscape = async () => {
   flex: 1;
   position: relative;
   min-height: 0; /* flexbox에서 overflow를 위해 필요 */
+}
+
+/* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */
+.ide-save-status {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 0.75rem;
+  color: var(--color-farm-brown);
+  pointer-events: none;
+  white-space: nowrap;
+  text-align: right;
+}
+.ide-save-status-sub {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--color-farm-brown);
+}
+.ide-save-status-stopped {
+  color: var(--color-farm-point, #e07c4a);
 }
 
 /* 실행/제출 버튼 영역 */

@@ -11,6 +11,14 @@ export const useIdeStore = defineStore('ide', () => {
   // 현재 세션 ID (로그인 후 IDE 진입 시 생성/조회된 세션)
   const sessionId = ref(null)
 
+  // 마지막 키보드 입력 시각 (10초 저장: 첫 입력 후 10초마다 저장, 30초 무입력 시 중단)
+  const lastCodeInputAt = ref(null)
+
+  /** 코드 입력 시 호출 (스냅샷 저장 타이밍용) */
+  const touchCodeInput = () => {
+    lastCodeInputAt.value = Date.now()
+  }
+
   /** 해당 문제의 코드 반환 (없으면 기본 코드) */
   const getCode = (problemId) => {
     const key = problemId != null ? String(problemId) : ''
@@ -41,6 +49,8 @@ export const useIdeStore = defineStore('ide', () => {
   return {
     codeByProblemId,
     sessionId,
+    lastCodeInputAt,
+    touchCodeInput,
     getCode,
     updateCode,
     setCodeToDefault,

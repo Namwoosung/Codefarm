@@ -36,6 +36,7 @@ const editorOptions = {
 
 const handleCodeChange = (value) => {
   ideStore.updateCode(route.params.id, value)
+  ideStore.touchCodeInput() // 첫 입력 후 10초 저장, 30초 무입력 시 중단용
 }
 
 onMounted(() => {
