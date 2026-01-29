@@ -1,6 +1,8 @@
 package com.ssafy.codefarm.card.service;
 
+import com.ssafy.codefarm.card.dto.query.MyCardQueryDto;
 import com.ssafy.codefarm.card.dto.response.CardDetailResponseDto;
+import com.ssafy.codefarm.card.dto.response.CardSummaryResponseDto;
 import com.ssafy.codefarm.card.dto.response.DrawCardResponseDto;
 import com.ssafy.codefarm.card.dto.response.MyCardListResponseDto;
 import com.ssafy.codefarm.card.entity.Card;
@@ -19,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -64,10 +68,24 @@ public class CardService {
 
     @Transactional(readOnly = true)
     public MyCardListResponseDto getMyCards(Long userId) {
-        return MyCardListResponseDto.from(
-                cardRepository.findMyCards(userId)
+        List<MyCardQueryDto> myCards = cardRepository.findMyCards(userId);
+
+        long totalMyCard = myCards.size();
+        long totalServiceCard = cardRepository.count();
+
+        Map<String, Long> gradeCounts = myCards.stream()
+                .collect(Collectors.groupingBy(
+                        dto -> dto.grade().name(),
+                        Collectors.counting()
+                ));
+
+        CardSummaryResponseDto summary = new CardSummaryResponseDto(
+                totalMyCard,
+                totalServiceCard,
+                gradeCounts
         );
 
+        return MyCardListResponseDto.from(summary, myCards);
     }
 
     @Transactional(readOnly = true)
