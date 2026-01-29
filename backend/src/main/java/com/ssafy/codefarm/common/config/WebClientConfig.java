@@ -16,34 +16,66 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Configuration
 public class WebClientConfig {
+
+    // execution
     @Value("${execution.server.base-url}")
-    private String baseUrl;
+    private String executionBaseUrl;
 
     @Value("${execution.server.connect-timeout-ms}")
-    private int connectTimeoutMs;
+    private int executionConnectTimeoutMs;
 
     @Value("${execution.server.read-timeout-ms}")
-    private int readTimeoutMs;
+    private int executionReadTimeoutMs;
+
+    // feedback
+    @Value("${feedback.server.base-url}")
+    private String feedbackBaseUrl;
+
+    @Value("${feedback.server.connect-timeout-ms}")
+    private int feedbackConnectTimeoutMs;
+
+    @Value("${feedback.server.read-timeout-ms}")
+    private int feedbackReadTimeoutMs;
+
+
+    private HttpClient createHttpClient(int connectTimeout, int readTimeout) {
+        return HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeout)
+            .responseTimeout(Duration.ofMillis(readTimeout))
+            .doOnConnected(conn ->
+                conn.addHandlerLast(
+                    new ReadTimeoutHandler(readTimeout, TimeUnit.MILLISECONDS)
+                )
+            );
+    }
 
     @Bean
     public WebClient executionWebClient() {
-
-        HttpClient httpClient = HttpClient.create()
-                // TCP 연결 제한 시간
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMs)
-                // 응답 전체 타임아웃
-                .responseTimeout(Duration.ofMillis(readTimeoutMs))
-                // 실제 읽기 타임아웃 (소켓 레벨)
-                .doOnConnected(conn ->
-                        conn.addHandlerLast(
-                                new ReadTimeoutHandler(readTimeoutMs, TimeUnit.MILLISECONDS)
-                        )
-                );
-
         return WebClient.builder()
-                .baseUrl(baseUrl)
-                .clientConnector(new ReactorClientHttpConnector(httpClient))
-                .build();
+            .baseUrl(executionBaseUrl)
+            .clientConnector(
+                new ReactorClientHttpConnector(
+                    createHttpClient(
+                        executionConnectTimeoutMs,
+                        executionReadTimeoutMs
+                    )
+                )
+            )
+            .build();
     }
 
+    @Bean
+    public WebClient feedbackWebClient() {
+        return WebClient.builder()
+            .baseUrl(feedbackBaseUrl)
+            .clientConnector(
+                new ReactorClientHttpConnector(
+                    createHttpClient(
+                        feedbackConnectTimeoutMs,
+                        feedbackReadTimeoutMs
+                    )
+                )
+            )
+            .build();
+    }
 }

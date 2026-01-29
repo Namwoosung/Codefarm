@@ -9,8 +9,10 @@ import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
 import com.ssafy.codefarm.result.entity.Result;
 import com.ssafy.codefarm.result.entity.ResultType;
 import com.ssafy.codefarm.result.repository.ResultRepository;
+import com.ssafy.codefarm.session.dto.execution.EvaluationContext;
 import com.ssafy.codefarm.session.dto.execution.ExecuteServerRequest;
 import com.ssafy.codefarm.session.dto.execution.ExecuteServerResult;
+import com.ssafy.codefarm.session.dto.execution.SubmissionContext;
 import com.ssafy.codefarm.session.dto.execution.SubmitContext;
 import com.ssafy.codefarm.session.dto.execution.SubmitOutcome;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
@@ -45,6 +47,7 @@ public class SessionService {
 
     private final ExecutionServerClient executionServerClient;
     private final SessionCodeRedisService sessionCodeRedisService;
+    private final FeedbackServerClient feedbackServerClient;
 
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
@@ -251,40 +254,53 @@ public class SessionService {
             ExecuteServerResult executeServerResult
     ) {
 
-        SubmitOutcome outcome =
+        SubmitOutcome submitOutcome =
             SubmitOutcome.from(submitContext, executeServerResult);
 
-        ResultType resultType =
-                decideResultType(outcome);
+        ResultType resultType = decideResultType(submitOutcome);
 
-        // 이 부분에서 성공 여부가 실패하면 result 저장 x, 아래 부분 필요 없음
-        // 성공 여부가 성공이라면 result 저장 + feedback 서버 호출 + 현재 세션 종료 + redis 데이터 삭제
-
-        String feedback =
-            decideFeedback(resultType, outcome); // 이 부분은 추후 feedback 서버 연동으로 처리
-
-        Integer memory =
-            toIntegerSafely(executeServerResult.memoryUsage());
+        Integer memory = toIntegerSafely(executeServerResult.memoryUsage());
 
         Result result = Result.builder()
-                .session(submitContext.session())
-                .resultType(resultType)
-                .language(submitSessionRequestDto.getLanguage())
-                .code(submitSessionRequestDto.getCode())
-                .solveTime(submitContext.solveTime())
-                .execTime(executeServerResult.execTime())
-                .memory(memory)
-                .feedback(feedback)
-                .build();
+            .session(submitContext.session())
+            .resultType(resultType)
+            .language(submitSessionRequestDto.getLanguage())
+            .code(submitSessionRequestDto.getCode())
+            .solveTime(submitContext.solveTime())
+            .execTime(executeServerResult.execTime())
+            .memory(memory)
+            .feedback(null) // 기본은 null
+            .build();
 
         resultRepository.save(result);
 
-        if (resultType == ResultType.SUCCESS) {
-            submitContext.session().close();
-            sessionCodeRedisService.delete(submitContext.session().getId());
+        if (resultType == ResultType.FAIL) { // 실패면 result 결과만 저장
+            return SubmitSessionResponseDto.fail(
+                EvaluationContext.from(submitOutcome)
+            );
         }
 
-        return SubmitSessionResponseDto.from(result, outcome);
+        // 성공 여부가 성공이라면 result 저장 + feedback 서버 호출 + 현재 세션 종료 + redis 데이터 삭제
+        String feedback;
+        try {
+            feedback = feedbackServerClient.requestFeedback(submitContext, submitSessionRequestDto);
+        } catch (Exception e) {
+            feedback = "정답입니다! 수고했어요."; // 일단 피드백 추출 실패 시 임의 값 저장. 추후 복구 처리로 개선
+        }
+
+        result.updateFeedback(feedback);
+
+        // 세션 종료
+        submitContext.session().close();
+
+        // Redis 삭제
+        sessionCodeRedisService.delete(submitContext.session().getId());
+
+        return SubmitSessionResponseDto.success(
+            SubmissionContext.from(result),
+            EvaluationContext.from(submitOutcome),
+            feedback
+        );
     }
 
     private ResultType decideResultType(SubmitOutcome outcome) {

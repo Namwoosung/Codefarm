@@ -1,129 +1,140 @@
 package com.ssafy.codefarm.session.dto.execution;
 
 public record SubmitOutcome(
-        Integer passedCount,
-        Integer totalCount,
-        String failReason,
-        String stderr,
-        Boolean isTimeout,
-        Boolean isOom,
-        Integer failedLineNo,
-        String expectedLine,
-        String actualLine
+    Integer passedCount,
+    Integer totalCount,
+    String failReason,
+    String stderr,
+    Boolean isTimeout,
+    Boolean isOom,
+    Integer failedLineNo,
+    String expectedLine,
+    String actualLine
 ) {
-    public static SubmitOutcome from( // 실행 결과를 기반으로 제출결과 record를 생성
+
+    public static SubmitOutcome from(
         SubmitContext context,
         ExecuteServerResult result
     ) {
 
-        String expectedOutputRaw = context.problem().getTestcasesOutput();
-        String actualOutputRaw = result.stdout();
-        String stderr = result.stderr();
-        Boolean isTimeout = result.isTimeout();
-        Boolean isOom = result.isOom();
-
-        String expected = normalize(expectedOutputRaw);
-        String actual = normalize(actualOutputRaw);
+        String expected = normalize(context.problem().getTestcasesOutput());
+        String actual = normalize(result.stdout());
 
         LineStats stats = compareLines(expected, actual);
 
-        if (Boolean.TRUE.equals(isTimeout)) {
-            return new SubmitOutcome(
-                    stats.passedCount(),
-                    stats.totalCount(),
-                    "시간 제한을 초과했습니다.",
-                    stderr,
-                    true,
-                    isOom,
-                    stats.failedLineNo(),
-                    stats.expectedLine(),
-                    stats.actualLine()
-            );
+        if (Boolean.TRUE.equals(result.isTimeout())) {
+            return timeout(stats, result.stderr());
         }
 
-        if (Boolean.TRUE.equals(isOom)) {
-            return new SubmitOutcome(
-                    stats.passedCount(),
-                    stats.totalCount(),
-                    "메모리 제한을 초과했습니다.",
-                    stderr,
-                    false,
-                    true,
-                    stats.failedLineNo(),
-                    stats.expectedLine(),
-                    stats.actualLine()
-            );
+        if (Boolean.TRUE.equals(result.isOom())) {
+            return oom(stats, result.stderr());
         }
 
-        if (stderr != null && !stderr.isBlank()) {
-            return new SubmitOutcome(
-                    stats.passedCount(),
-                    stats.totalCount(),
-                    "런타임 오류가 발생했습니다.",
-                    stderr,
-                    false,
-                    false,
-                    stats.failedLineNo(),
-                    stats.expectedLine(),
-                    stats.actualLine()
-            );
+        if (result.stderr() != null && !result.stderr().isBlank()) {
+            return runtimeError(stats, result.stderr());
         }
 
-        if (stats.totalCount() > 0 && stats.passedCount().equals(stats.totalCount())) {
-            return new SubmitOutcome(
-                    stats.totalCount(),
-                    stats.totalCount(),
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null,
-                    null
-            );
+        if (stats.passedCount().equals(stats.totalCount())) {
+            return success(stats);
         }
 
+        return wrongAnswer(stats);
+    }
+
+    private static SubmitOutcome success(LineStats stats) {
         return new SubmitOutcome(
-                stats.passedCount(),
-                stats.totalCount(),
-                "출력 결과가 일치하지 않습니다.",
-                null,
-                false,
-                false,
-                stats.failedLineNo(),
-                stats.expectedLine(),
-                stats.actualLine()
+            stats.totalCount(),
+            stats.totalCount(),
+            null,
+            null,
+            false,
+            false,
+            null,
+            null,
+            null
         );
     }
 
-    private static String normalize(String value) { // 데이터 전처리(window <-> linux 호환)
-        if (value == null) {
-            return "";
-        }
-        return value.replace("\r\n", "\n").trim();
+    private static SubmitOutcome timeout(LineStats stats, String stderr) {
+        return new SubmitOutcome(
+            stats.passedCount(),
+            stats.totalCount(),
+            "시간 제한을 초과했습니다.",
+            stderr,
+            true,
+            false,
+            stats.failedLineNo(),
+            stats.expectedLine(),
+            stats.actualLine()
+        );
     }
 
-    private static LineStats compareLines(String expected, String actual) { // 채점 로직, 기대값과 출력값을 라인단위로 비교하면서 정답 개수를 count
+    private static SubmitOutcome oom(LineStats stats, String stderr) {
+        return new SubmitOutcome(
+            stats.passedCount(),
+            stats.totalCount(),
+            "메모리 제한을 초과했습니다.",
+            stderr,
+            false,
+            true,
+            stats.failedLineNo(),
+            stats.expectedLine(),
+            stats.actualLine()
+        );
+    }
+
+    private static SubmitOutcome runtimeError(LineStats stats, String stderr) {
+        return new SubmitOutcome(
+            stats.passedCount(),
+            stats.totalCount(),
+            "런타임 오류가 발생했습니다.",
+            stderr,
+            false,
+            false,
+            stats.failedLineNo(),
+            stats.expectedLine(),
+            stats.actualLine()
+        );
+    }
+
+    private static SubmitOutcome wrongAnswer(LineStats stats) {
+        return new SubmitOutcome(
+            stats.passedCount(),
+            stats.totalCount(),
+            "출력 결과가 일치하지 않습니다.",
+            null,
+            false,
+            false,
+            stats.failedLineNo(),
+            stats.expectedLine(),
+            stats.actualLine()
+        );
+    }
+
+    private static String normalize(String value) {
+        if (value == null) return "";
+        return value.replace("\r\n", "\n").replace("\r", "\n");
+    }
+
+    private static LineStats compareLines(String expected, String actual) {
         String[] e = expected.isBlank() ? new String[0] : expected.split("\n", -1);
         String[] a = actual.isBlank() ? new String[0] : actual.split("\n", -1);
 
         int total = e.length;
-        int maxLength = Math.max(e.length, a.length);
+        int max = Math.max(e.length, a.length);
 
         int passed = 0;
         int failedLineNo = -1;
         String expectedLine = null;
         String actualLine = null;
 
-        for (int i = 0; i < maxLength; i++) {
+        for (int i = 0; i < max; i++) {
 
             String ev = i < e.length ? e[i] : "";
             String av = i < a.length ? a[i] : "";
 
             if (ev.equals(av)) {
-                if (i < total) {
-                    passed++;
-                }
+                if (i < total) passed++;
             } else {
                 if (failedLineNo == -1) {
                     failedLineNo = i + 1;
@@ -137,34 +148,29 @@ public record SubmitOutcome(
             return LineStats.same(total);
         }
 
-        return LineStats.diff(
-            total,
-            passed,
-            failedLineNo,
-            expectedLine,
-            actualLine
-        );
+        return LineStats.diff(total, passed, failedLineNo, expectedLine, actualLine);
     }
 
     private record LineStats(
-            Integer totalCount,
-            Integer passedCount,
-            Integer failedLineNo,
-            String expectedLine,
-            String actualLine
+        Integer totalCount,
+        Integer passedCount,
+        Integer failedLineNo,
+        String expectedLine,
+        String actualLine
     ) {
-        public static LineStats diff(
-                int total,
-                int passed,
-                int failedLineNo,
-                String expectedLine,
-                String actualLine
-        ) {
-            return new LineStats(total, passed, failedLineNo, expectedLine, actualLine);
+
+        static LineStats same(int total) {
+            return new LineStats(total, total, null, null, null);
         }
 
-        public static LineStats same(int total) {
-            return new LineStats(total, total, null, null, null);
+        static LineStats diff(
+            int total,
+            int passed,
+            int failedLineNo,
+            String expectedLine,
+            String actualLine
+        ) {
+            return new LineStats(total, passed, failedLineNo, expectedLine, actualLine);
         }
     }
 }

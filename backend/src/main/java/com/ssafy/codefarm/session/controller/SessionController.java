@@ -114,7 +114,7 @@ public class SessionController {
     ) {
 
         DeferredResult<SuccessResponse> deferredResult =
-                new DeferredResult<>(6000L);
+                new DeferredResult<>(10000L);
 
         Mono<RunSessionResponseDto> resultMono = sessionService.runSession(sessionId, userDetails.getUserId(), requestDto);
 
@@ -144,7 +144,7 @@ public class SessionController {
     ) {
 
         DeferredResult<SuccessResponse> deferredResult =
-                new DeferredResult<>(20000L);
+                new DeferredResult<>(10000L);
 
         Mono<SubmitSessionResponseDto> resultMono =
                 sessionService.submitSession(
