@@ -190,7 +190,7 @@ async def health():
     return {"status": "ok"}
 
 
-@app.post("/feedback", response_model=FeedbackResponse)
+@app.post("api/v1/reports/feedback", response_model=FeedbackResponse)
 async def feedback(
     req: FeedbackRequest,
     x_report_server_token: Optional[str] = Header(None, alias="X-REPORT-SERVER-TOKEN"),

@@ -28,6 +28,3 @@ onMounted(() => {
     <CommonFooter v-if="showFooter" />
   </div>
 </template>
-
-<style scoped>
-</style>

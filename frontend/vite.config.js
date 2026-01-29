@@ -10,9 +10,10 @@ export default defineConfig({
     vue({
       template: {
         compilerOptions: {
-          isCustomElement: (tag) => tag === 'iconify-icon'
-        }
-      }
+          // Iconify Web Component tag
+          isCustomElement: (tag) => tag === 'iconify-icon',
+        },
+      },
     }),
     vueDevTools(),
     tailwindcss(),
@@ -21,6 +22,9 @@ export default defineConfig({
       languages: ['python'] // 필요한 언어만 설정
     }),
   ],
+  optimizeDeps: {
+    include: ['iconify-icon'],
+  },
   server: {
     proxy: {
       '/api/v1/': {

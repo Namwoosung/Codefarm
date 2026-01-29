@@ -38,6 +38,15 @@ export const useAuthStore = defineStore('auth', () => {
   const token = ref(getValidTokenFromStorage())
   const user = ref(null)
 
+  // 새로고침 시에도 로그인 상태 유지를 위해 user 복원
+  try {
+    const savedUser = localStorage.getItem('user')
+    user.value = savedUser ? JSON.parse(savedUser) : null
+  } catch {
+    user.value = null
+    localStorage.removeItem('user')
+  }
+
   // LoginView는 loading, SignupForm은 isLoading을 사용 중이라 둘 다 제공
   const loading = ref(false)
   const isLoading = computed(() => loading.value)
@@ -56,6 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = res.data?.data?.user ?? null
       token.value = res.data?.data?.token?.accessToken ?? null
       if (token.value) localStorage.setItem('token', token.value)
+      if (user.value) localStorage.setItem('user', JSON.stringify(user.value))
       return res.data
     } catch (err) {
       errCode.value = err?.response?.data?.errorCode ?? null
@@ -70,6 +80,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = null
     user.value = null
     localStorage.removeItem('token')
+    localStorage.removeItem('user')
   }
 
   const signup = async (signupData) => {

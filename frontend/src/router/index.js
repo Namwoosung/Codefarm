@@ -44,6 +44,19 @@ const router = createRouter({
       component: () => import('@/views/RoadmapView.vue')
     },
     {
+      path: '/cards',
+      name: 'cards',
+      component: () => import('@/views/CardView.vue'),
+      beforeEnter: (to, from, next) => {
+        const authStore = useAuthStore()
+        if (!authStore.isLoggedIn || !authStore.user) {
+          next('/login')
+          return
+        }
+        next()
+      }
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('@/views/LoginView.vue')
