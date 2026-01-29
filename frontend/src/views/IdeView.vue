@@ -333,10 +333,21 @@ const handleRun = async () => {
     const execTimeMs = d?.execTime ?? 0
     const execTimeSec = (execTimeMs / 1000).toFixed(2)
     if (terminalPanel.value) {
-      if (d?.stdout) terminalPanel.value.write(d.stdout)
-      if (d?.stderr) terminalPanel.value.write(d.stderr)
-      if (d?.isTimeout) terminalPanel.value.write('Time Limit Exceeded\r\n')
-      if (d?.isOom) terminalPanel.value.write('Memory Limit Exceeded\r\n')
+      // FR-CODE-005-1: stdout 기본색, stderr 빨간색 / FR-CODE-005-4: 1000줄 초과 시 생략
+      const stdout = d?.stdout ?? ''
+      const stderr = d?.stderr ?? ''
+      const combined = stdout + (stderr ? (stdout ? '\n' : '') + stderr : '')
+      const lines = combined.split(/\r?\n/)
+      const MAX_LINES = 1000
+      if (lines.length > MAX_LINES) {
+        const truncated = lines.slice(0, MAX_LINES).join('\r\n') + '\r\n... (출력 생략)\r\n'
+        terminalPanel.value.write(truncated)
+      } else {
+        if (stdout) terminalPanel.value.write(stdout)
+        if (stderr) terminalPanel.value.writeStderr(stderr)
+      }
+      if (d?.isTimeout) terminalPanel.value.writeStderr('Time Limit Exceeded\r\n')
+      if (d?.isOom) terminalPanel.value.writeStderr('Memory Limit Exceeded\r\n')
       // FR-CODE-005-2, 005-3: 실행 결과 요약
       if (d?.isTimeout) {
         terminalPanel.value.write(`\r\n⏱️ 실행 시간 초과 (제한: 10초)\r\n`)

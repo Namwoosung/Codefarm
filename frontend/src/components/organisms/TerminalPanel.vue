@@ -88,17 +88,20 @@ onUnmounted(() => {
   }
 })
 
-// 외부에서 사용할 수 있도록 expose
+// FR-CODE-005-1: stderr는 빨간색으로 표시 (ANSI)
+const ANSI_RED = '\x1b[31m'
+const ANSI_RESET = '\x1b[0m'
+
 defineExpose({
   write: (text) => {
-    if (term) {
-      term.write(text)
-    }
+    if (term) term.write(text)
+  },
+  /** stderr 출력 (빨간색) */
+  writeStderr: (text) => {
+    if (term && text) term.write(ANSI_RED + text + ANSI_RESET)
   },
   clear: () => {
-    if (term) {
-      term.clear()
-    }
+    if (term) term.clear()
   },
   terminal: term
 })
