@@ -1,5 +1,5 @@
 <template>
-  <div class="h-screen p-10 flex flex-col overflow-hidden">
+  <div class="h-screen p-10 flex flex-col overflow-hidden" @dblclick.stop.prevent>
     <div class="max-w-7xl mx-auto w-full flex flex-col flex-1 min-h-0">
       <PageTitle title="카드" />
 
@@ -15,7 +15,7 @@
 
             <div class="relative z-10 flex items-center justify-between gap-3 mb-6">
               <h2 class="text-xl font-bold text-slate-800">{{ user?.nickname }}'s Farm Crew</h2>
-              <p class="ms-auto">내 포인트 : {{ user.point }}</p>
+              <p class="ms-auto">내 포인트 : {{ user?.point }}</p>
               <button
                 type="button"
                 class="btn rounded-xl border border-base-300 bg-gradient-to-b from-white to-base-200 text-base-content font-bold tracking-tight shadow-sm hover:-translate-y-0.5 active:translate-y-0"
@@ -31,10 +31,10 @@
                 <div class="flex items-center justify-between mb-3 px-2">
                   <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
                     <span :class="gradeMeta[grade].color" class="w-2 h-6 rounded-full"></span>
-                    {{ grade }}
+                    {{ gradeMeta[grade].name }}
                   </h3>
                   <span class="text-sm text-slate-400">
-                    {{ cardsByGrade[grade].length }} / {{ gradeMeta[grade].slots }}
+                    {{ cardCountByGrade[grade] }} / {{ gradeMeta[grade].slots }}
                   </span>
                 </div>
 
@@ -72,7 +72,7 @@
                     :key="`${grade}-slot-${idx}`"
                     :class="[
                       'flex-shrink-0 snap-start',
-                      grade === 'MEGA' ? 'w-[340px]' : 'w-[155px]',
+                      grade === 'SPECIAL' ? 'w-[320px]' : 'w-[155px]',
                     ]"
                   >
                     <CardDetail v-if="slotCard" class="w-full" :card="slotCard" @showcard="openCardModal" />
@@ -81,7 +81,7 @@
                       :class="[
                         'bg-transparent border-2 border-dashed border-base-content/35 rounded-xl shadow-md flex items-center justify-center',
                         'w-full',
-                        grade === 'MEGA' ? 'aspect-[1024/723]' : 'aspect-[1872/2613]',
+                        grade === 'SPECIAL' ? 'aspect-[1024/723]' : 'aspect-[1872/2613]',
                       ]"
                     >
                       <span class="text-4xl font-extrabold text-base-content/20">?</span>
@@ -170,8 +170,8 @@ const gachaCard = async () => {
     alert('포인트가 부족합니다.')
     return
   } else {
-    user.value.point -= 50
     await cardStore.cardDraw()
+    await profile.userinfo()
     selectedCard.value = cardStore.newcard?.card ?? cardStore.newcard
     console.log('남은 포인트:', user.value.point)
     isGachaModal.value = true
@@ -223,58 +223,35 @@ const unlockScroll = () => {
 }
 
 // 카드 등급별 카드 구분 
-const GRADES = ['MEGA', 'GOLD', 'SILVER', 'BRONZE']
+const GRADES = ['SPECIAL', 'GOLD', 'SILVER', 'BRONZE']
 const gradeMeta = {
-  MEGA: { color: 'bg-purple-500', slots: 1 },
-  GOLD: { color: 'bg-yellow-400', slots: 7 },
-  SILVER: { color: 'bg-slate-400', slots: 10 },
-  BRONZE: { color: 'bg-orange-400', slots: 12 },
+  SPECIAL: { name: 'MEGACREW', color: 'bg-purple-500', slots: 1 },
+  GOLD: { name: 'MEGA', color: 'bg-yellow-400', slots: 7 },
+  SILVER: { name: 'SUPER', color: 'bg-slate-400', slots: 10 },
+  BRONZE: { name: 'BASIC', color: 'bg-orange-400', slots: 12 },
 }
 
-const normalizeCard = (item) => (item?.card && typeof item.card === 'object' ? item.card : item)
-
-const normalizedCards = computed(() => {
-  const raw = cards.value ?? []
-  const arr = Array.isArray(raw) ? raw : Object.values(raw)
-  return arr.map(normalizeCard).filter(Boolean)
-})
-
-const cardsByGrade = computed(() => {
-  const grouped = Object.fromEntries(GRADES.map((g) => [g, []]))
-  for (const c of normalizedCards.value) {
-    if (c?.grade && grouped[c.grade]) grouped[c.grade].push(c)
+const cardCountByGrade = computed(() => {
+  const counts = Object.fromEntries(GRADES.map((g) => [g, 0]))
+  for (const c of cards.value ?? []) {
+    if (c?.grade && counts[c.grade] !== undefined) counts[c.grade] += 1
   }
-  return grouped
-})
-
-const minCardIdByGrade = computed(() => {
-  const mins = Object.fromEntries(GRADES.map((g) => [g, Number.POSITIVE_INFINITY]))
-  for (const c of normalizedCards.value) {
-    if (!c?.grade || mins[c.grade] === undefined) continue
-    const id = Number(c.cardId)
-    if (Number.isFinite(id)) mins[c.grade] = Math.min(mins[c.grade], id)
-  }
-  for (const g of GRADES) if (!Number.isFinite(mins[g])) mins[g] = 1
-  return mins
+  return counts
 })
 
 const slotsByGrade = computed(() => {
   const result = Object.fromEntries(GRADES.map((g) => [g, Array.from({ length: gradeMeta[g].slots }, () => null)]))
-  for (const grade of GRADES) {
+  // cards를 한 번만 순회하면서 등급/슬롯 위치에 바로 배치
+  // no(1-based) -> idx(0-based)
+  for (const c of cards.value ?? []) {
+    const grade = c?.grade
+    if (!grade || result[grade] === undefined) continue
     const slots = result[grade]
-    const baseId = minCardIdByGrade.value[grade]
-    const gradeCards = [...(cardsByGrade.value[grade] ?? [])].sort((a, b) => Number(a.cardId) - Number(b.cardId))
-    for (const c of gradeCards) {
-      const id = Number(c?.cardId)
-      if (!Number.isFinite(id)) continue
-      const idx = id - baseId
-      if (idx >= 0 && idx < slots.length && slots[idx] == null) {
-        slots[idx] = c
-        continue
-      }
-      const fallback = slots.findIndex((v) => v == null)
-      if (fallback !== -1) slots[fallback] = c
-    }
+    const no = Number(c?.no)
+    if (!Number.isFinite(no)) continue
+    const idx = no - 1
+    if (idx < 0 || idx >= slots.length) continue
+    slots[idx] = c
   }
   return result
 })
@@ -294,10 +271,10 @@ const scroll = (grade, direction) => {
 }
 const popupCardContainerClass = computed(() => {
   const base =
-    'relative bg-transparent rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/20 shadow-[0_0_60px_rgba(255,255,255,0.35)]'
+    'relative bg-transparent rounded-2xl overflow-hidden shadow-2xl shadow-[0_0_60px_rgba(255,255,255,0.35)]'
   const grade = selectedCard.value?.grade
-  // 슬롯의 약 2.5배 크기 (MEGA: 320 -> 800, 그 외: 140 -> 350)
-  return grade === 'MEGA'
+  // 슬롯의 약 2.5배 크기 (SPECIAL: 320 -> 800, 그 외: 140 -> 350)
+  return grade === 'SPECIAL'
     ? `${base} w-[min(92vw,800px)] aspect-[1024/723]`
     : `${base} w-[min(92vw,350px)] aspect-[1872/2613]`
 })
