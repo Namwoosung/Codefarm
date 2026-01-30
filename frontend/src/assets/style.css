@@ -38,6 +38,18 @@
   color: var(--color-farm-brown-dark);
 }
 
+@layer base {
+  /* Global: hide scrollbars but keep scroll */
+  * {
+    -ms-overflow-style: none; /* IE/old Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
 @layer utilities {
   /* Hide horizontal scrollbar (optional) */
   .scrollbar-hide::-webkit-scrollbar {
