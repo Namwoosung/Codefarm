@@ -4,12 +4,12 @@ import java.util.List;
 
 public record CurriculumDetailResponseDto(
         Boolean isLogined,
-        List<CurriculumResponseDto> curriculums
+        CurriculumResponseDto curriculum
 ) {
     public static CurriculumDetailResponseDto from(
             boolean isLogined,
             CurriculumResponseDto curriculum
     ) {
-        return new CurriculumDetailResponseDto(isLogined, List.of(curriculum));
+        return new CurriculumDetailResponseDto(isLogined, curriculum);
     }
 }
