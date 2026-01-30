@@ -15,10 +15,11 @@
 
             <div class="relative z-10 flex items-center justify-between gap-3 mb-6">
               <h2 class="text-xl font-bold text-slate-800">{{ user?.nickname }}'s Farm Crew</h2>
+              <p class="ms-auto">내 포인트 : {{ user.point }}</p>
               <button
                 type="button"
                 class="btn rounded-xl border border-base-300 bg-gradient-to-b from-white to-base-200 text-base-content font-bold tracking-tight shadow-sm hover:-translate-y-0.5 active:translate-y-0"
-                @click="profile.reportList?.()"
+                @click="gachaCard"
               >
                 카드뽑기
               </button>
@@ -118,6 +119,12 @@
         leave-to-class="opacity-0 scale-95 translate-y-2"
       >
         <div v-if="selectedCard" :class="popupCardContainerClass">
+          <div
+            v-if="isGachaModal && drawMessage"
+            class="absolute top-3 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-black/70 text-white text-sm font-bold shadow-lg backdrop-blur-sm"
+          >
+            {{ drawMessage }}
+          </div>
           <img
             :src="selectedCard.image"
             :alt="selectedCard.name"
@@ -132,6 +139,7 @@
 
 <script setup>
 import { useProfileStore } from '@/stores/profile'
+import { useCardStore } from '@/stores/card'
 import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import PageTitle from '@/components/atoms/PageTitle.vue'
@@ -139,15 +147,60 @@ import CardDetail from '@/components/organisms/CardDetail.vue'
 import cardListBg from '@/assets/cardlist.png'
 
 const profile = useProfileStore()
-const { user, cards } = storeToRefs(profile)
+const cardStore = useCardStore()
+const { user } = storeToRefs(profile)
+const { cards, drawMessage } = storeToRefs(cardStore)
 
+onMounted(async () => {
+  try {
+    await profile.userinfo()
+    await cardStore.cardList()
+  } catch (err) {
+    console.warn('[CardView] mounted fetch failed:', err)
+  }
+})
+
+onBeforeUnmount(() => {
+  unlockScroll()
+})
+
+// 카드 뽑기
+const gachaCard = async () => {
+  if ((user.value?.point ?? 0) < 50) {
+    alert('포인트가 부족합니다.')
+    return
+  } else {
+    user.value.point -= 50
+    await cardStore.cardDraw()
+    selectedCard.value = cardStore.newcard?.card ?? cardStore.newcard
+    console.log('남은 포인트:', user.value.point)
+    isGachaModal.value = true
+    lockScroll()
+  }
+}
+
+// 카드 상세 팝업
+const openCardModal = (card) => {
+  drawMessage.value = ''
+  isGachaModal.value = false
+  selectedCard.value = card
+  lockScroll()
+}
+const closeCardModal = () => {
+  drawMessage.value = ''
+  isGachaModal.value = false
+  selectedCard.value = null
+  unlockScroll()
+}
 const selectedCard = ref(null)
+const isGachaModal = ref(false)
 const scrollLockPrev = {
   htmlOverflow: '',
   htmlPaddingRight: '',
   bodyOverflow: '',
 }
 
+// 스크롤 잠금 및 해제
 const lockScroll = () => {
   const html = document.documentElement
   const body = document.body
@@ -161,7 +214,6 @@ const lockScroll = () => {
   if (scrollbarWidth > 0) html.style.paddingRight = `${scrollbarWidth}px`
   body.style.overflow = 'hidden'
 }
-
 const unlockScroll = () => {
   const html = document.documentElement
   const body = document.body
@@ -170,16 +222,7 @@ const unlockScroll = () => {
   body.style.overflow = scrollLockPrev.bodyOverflow
 }
 
-const openCardModal = (card) => {
-  selectedCard.value = card
-  lockScroll()
-}
-
-const closeCardModal = () => {
-  selectedCard.value = null
-  unlockScroll()
-}
-
+// 카드 등급별 카드 구분 
 const GRADES = ['MEGA', 'GOLD', 'SILVER', 'BRONZE']
 const gradeMeta = {
   MEGA: { color: 'bg-purple-500', slots: 1 },
@@ -241,7 +284,6 @@ const setScrollEl = (grade, el) => {
   if (!el) return
   scrollElByGrade.set(grade, el)
 }
-
 const scroll = (grade, direction) => {
   const container = scrollElByGrade.get(grade)
   if (!container) return
@@ -250,27 +292,13 @@ const scroll = (grade, direction) => {
     behavior: 'smooth',
   })
 }
-
 const popupCardContainerClass = computed(() => {
   const base =
-    'bg-transparent rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/20 shadow-[0_0_60px_rgba(255,255,255,0.35)]'
+    'relative bg-transparent rounded-2xl overflow-hidden shadow-2xl ring-1 ring-white/20 shadow-[0_0_60px_rgba(255,255,255,0.35)]'
   const grade = selectedCard.value?.grade
   // 슬롯의 약 2.5배 크기 (MEGA: 320 -> 800, 그 외: 140 -> 350)
   return grade === 'MEGA'
     ? `${base} w-[min(92vw,800px)] aspect-[1024/723]`
     : `${base} w-[min(92vw,350px)] aspect-[1872/2613]`
-})
-
-onMounted(async () => {
-  try {
-    await profile.userinfo()
-    await profile.cardList()
-  } catch (err) {
-    console.warn('[CardView] mounted fetch failed:', err)
-  }
-})
-
-onBeforeUnmount(() => {
-  unlockScroll()
 })
 </script>
