@@ -1,5 +1,5 @@
 <template>
-  <div class="signup-page">
+  <div class="max-w-[500px] mx-auto my-[50px] p-5">
     <h1>코드팜 회원가입 🌱</h1>
     <SignupForm />
   </div>
@@ -8,11 +8,3 @@
 <script setup>
 import SignupForm from '@/components/organisms/SignupForm.vue'
 </script>
-
-<style scoped>
-.signup-page {
-  max-width: 500px;
-  margin: 50px auto;
-  padding: 20px;
-}
-</style>

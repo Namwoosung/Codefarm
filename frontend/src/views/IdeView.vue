@@ -147,21 +147,41 @@
       @send="(q) => onHintSend(q)"
     />
 
+    <!-- 확인 모달 (탈주/페이지 이탈 등) -->
+    <ConfirmModal
+      :show="confirmState.show"
+      :title="confirmState.title"
+      :message="confirmState.message"
+      :variant="confirmState.variant"
+      :confirm-text="confirmState.confirmText"
+      :cancel-text="confirmState.cancelText"
+      @confirm="onConfirmModalConfirm"
+      @cancel="onConfirmModalCancel"
+    />
+
     <!-- 힌트 차감 토스트 -->
     <Transition name="toast">
-      <div v-if="toastMessage" class="ide-toast">{{ toastMessage }}</div>
+      <div v-if="toastMessage" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100] w-[min(520px,calc(100vw-2rem))]">
+        <div role="alert" class="alert alert-info alert-soft shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="text-sm font-semibold">{{ toastMessage }}</span>
+        </div>
+      </div>
     </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
 import ReportModal from '@/components/organisms/ReportModal.vue'
 import HintModal from '@/components/organisms/HintModal.vue'
+import ConfirmModal from '@/components/organisms/ConfirmModal.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
 import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
@@ -203,6 +223,43 @@ const hintRemaining = computed(() => Math.max(0, hintMax.value - hintUsed.value)
 /** 힌트 차감 토스트 (FR-CODE-010-1) */
 const toastMessage = ref('')
 let toastTimer = null
+/** confirm 대체 모달 (탈주/이탈) */
+const confirmState = reactive({
+  show: false,
+  title: '',
+  message: '',
+  variant: 'warning', // 'info' | 'success' | 'warning' | 'error'
+  confirmText: '확인',
+  cancelText: '취소',
+})
+let confirmResolver = null
+
+function requestConfirm({ title, message, variant = 'warning', confirmText = '확인', cancelText = '취소' } = {}) {
+  confirmState.title = title ?? ''
+  confirmState.message = message ?? ''
+  confirmState.variant = variant
+  confirmState.confirmText = confirmText
+  confirmState.cancelText = cancelText
+  confirmState.show = true
+
+  return new Promise((resolve) => {
+    confirmResolver = resolve
+  })
+}
+
+function closeConfirm(result) {
+  confirmState.show = false
+  const r = confirmResolver
+  confirmResolver = null
+  if (typeof r === 'function') r(!!result)
+}
+
+function onConfirmModalConfirm() {
+  closeConfirm(true)
+}
+function onConfirmModalCancel() {
+  closeConfirm(false)
+}
 // FR-CODE-002-1: 저장 상태 표시
 const lastSavedAt = ref(null)
 const isSaveInProgress = ref(false)
@@ -514,23 +571,26 @@ watch(() => route.params.id, async (newId, oldId) => {
 })
 
 /** FR-CODE-010: 코드 작성 중 나가기 시 확인 메시지 (뒤로가기/라우트 이탈) */
-onBeforeRouteLeave(async (to, from, next) => {
+onBeforeRouteLeave(async (to, from) => {
   const code = ideStore.getCode(route.params.id)
   const hasCode = code != null && String(code).trim() !== ''
   const message = hasCode
     ? '작성 중인 코드가 있습니다. 정말 나가시겠습니까?'
     : '진행 상황은 저장되지 않습니다. 정말 페이지를 벗어나시겠습니까?'
-  const ok = window.confirm(message)
-  if (!ok) {
-    next(false)
-    return
-  }
+  const ok = await requestConfirm({
+    title: '페이지 나가기',
+    message,
+    variant: hasCode ? 'warning' : 'info',
+    confirmText: '나가기',
+    cancelText: '취소',
+  })
+  if (!ok) return false
   await closeSessionOnLeave()
   if (snapshotIntervalId) {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
   }
-  next()
+  return true
 })
 
 onUnmounted(() => {
@@ -549,6 +609,9 @@ onUnmounted(() => {
   window.removeEventListener('online', onOnline)
   window.removeEventListener('offline', onOffline)
   window.removeEventListener('beforeunload', onBeforeUnload)
+
+  // confirm 대기 중이면 안전하게 취소 처리
+  if (confirmResolver) closeConfirm(false)
 })
 
 const handleBack = async () => {
@@ -686,7 +749,14 @@ const handleRun = async () => {
 }
 
 const handleEscape = async () => {
-  if (!confirm('정말 탈주하시겠습니까?')) return
+  const ok = await requestConfirm({
+    title: '탈주하기',
+    message: '정말 탈주하시겠습니까?',
+    variant: 'warning',
+    confirmText: '탈주',
+    cancelText: '취소',
+  })
+  if (!ok) return
   const sid = ideStore.sessionId
   if (sid && isLoggedIn.value) {
     try {
@@ -1179,20 +1249,6 @@ function showToast(msg) {
   color: var(--color-farm-brown-dark);
 }
 
-/* 힌트 차감 토스트 */
-.ide-toast {
-  position: fixed;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.6rem 1.25rem;
-  font-size: 0.9rem;
-  color: #fff;
-  background: var(--color-farm-brown-dark);
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1100;
-}
 .toast-enter-active,
 .toast-leave-active {
   transition: opacity 0.25s, transform 0.25s;
