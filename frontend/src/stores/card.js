@@ -10,14 +10,7 @@ export const useCardStore = defineStore('card', () => {
   const drawMessage = ref('')
 
   // API에서 { card: {...} } 형태로 올 수 있어서, 스토어에 저장할 때 1회 정제
-  // S3 등급별 동물 카드: .svg → .png 사용
-  const normalizeCard = (item) => {
-    const c = item?.card && typeof item.card === 'object' ? item.card : item
-    if (!c) return null
-    const rawImg = c.image ?? c.cardImage ?? c.img ?? ''
-    const img = typeof rawImg === 'string' && rawImg ? rawImg.replace(/\.svg$/i, '.png') : rawImg
-    return { ...c, image: img, cardImage: img, img: img }
-  }
+  const normalizeCard = (item) => (item?.card && typeof item.card === 'object' ? item.card : item)
 
   const cardList = async () => {
     try {
