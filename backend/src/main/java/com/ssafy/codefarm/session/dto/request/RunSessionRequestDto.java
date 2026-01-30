@@ -17,6 +17,5 @@ public class RunSessionRequestDto {
     @NotBlank(message = "code is required")
     private String code;
 
-    @NotBlank(message = "input is required")
     private String input;
 }
