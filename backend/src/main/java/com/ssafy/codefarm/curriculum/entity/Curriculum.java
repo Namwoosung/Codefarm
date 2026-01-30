@@ -36,8 +36,7 @@ public class Curriculum {
     private String description;
 
     @NotNull
-    @Enumerated(EnumType.STRING)
-    private CurriculumDifficulty curriculumDifficulty;
+    private Integer curriculumDifficulty;
 
     @CreationTimestamp
     @Column(updatable = false)
