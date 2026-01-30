@@ -95,30 +95,13 @@
                 v-if="idx === 3 || idx === 4"
                 class="cf-roadmap-recommend"
               >
-                <div class="cf-recommend-wrapper">
-                  <button
-                    type="button"
-                    class="cf-recommend-btn"
-                    @click="onClickRecommend(idx)"
-                  >
-                    추천 문제 보기
-                  </button>
-                  <div class="cf-recommend-tooltip">
-                    <p class="cf-recommend-title">
-                      {{ recommendedByLevel[idx]?.problem?.title || '추천 문제 요약' }}
-                    </p>
-                    <p v-if="recommendedByLevel[idx]" class="cf-recommend-desc">
-                      난이도 {{ recommendedByLevel[idx].problem.difficulty }}
-                      · 알고리즘 {{ recommendedByLevel[idx].problem.algorithm }}
-                      · 정답
-                      {{ recommendedByLevel[idx].statistics.successCount }} /
-                      {{ recommendedByLevel[idx].statistics.submissionCount }}
-                    </p>
-                    <p v-else class="cf-recommend-desc">
-                      추천 문제 정보를 불러오는 중입니다.
-                    </p>
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  class="cf-recommend-btn"
+                  @click="onClickRecommend(idx)"
+                >
+                  추천 문제 보기
+                </button>
               </div>
             </div>
           </div>
@@ -139,39 +122,42 @@
         @click.stop
       >
         <h2 id="cf-modal-title" class="cf-modal-title">
-          {{ modalStep?.problem?.title || '문제 상세' }}
+          {{ modalTitle }}
         </h2>
         <div class="cf-modal-body">
           <dl class="cf-modal-dl">
-            <template v-if="modalStep">
-              <div v-if="modalStep.problem?.difficulty" class="cf-modal-row">
+            <template v-if="modalContent">
+              <div v-if="modalContent.problem?.difficulty" class="cf-modal-row">
                 <dt>난이도</dt>
-                <dd>{{ modalStep.problem.difficulty }}</dd>
+                <dd>{{ modalContent.problem.difficulty }}</dd>
               </div>
-              <div v-if="modalStep.problem?.algorithm" class="cf-modal-row">
+              <div v-if="modalContent.problem?.algorithm" class="cf-modal-row">
                 <dt>알고리즘</dt>
-                <dd>{{ modalStep.problem.algorithm }}</dd>
+                <dd>{{ modalContent.problem.algorithm }}</dd>
               </div>
               <div
                 v-if="
-                  modalStep.statistics?.submissionCount != null &&
-                  modalStep.statistics?.successCount != null
+                  modalContent.statistics?.submissionCount != null &&
+                  modalContent.statistics?.successCount != null
                 "
                 class="cf-modal-row"
               >
                 <dt>정답</dt>
                 <dd>
-                  {{ modalStep.statistics.successCount }} /
-                  {{ modalStep.statistics.submissionCount }}
+                  {{ modalContent.statistics.successCount }} /
+                  {{ modalContent.statistics.submissionCount }}
                 </dd>
               </div>
-              <div class="cf-modal-row">
+              <div
+                v-if="modalContext?.type === 'step'"
+                class="cf-modal-row"
+              >
                 <dt>내 상태</dt>
                 <dd>
                   {{
-                    modalStep.userStatus?.isSolved
+                    modalContent.userStatus?.isSolved
                       ? '해결함'
-                      : modalStep.userStatus?.isTried
+                      : modalContent.userStatus?.isTried
                         ? '시도함'
                         : '미시도'
                   }}
@@ -188,10 +174,10 @@
           <button
             type="button"
             class="cf-modal-btn cf-modal-btn-ide"
-            :disabled="!modalStep?.problem?.problemId"
+            :disabled="!modalProblemId"
             @click="goToIdeFromModal"
           >
-            IDE로 이동
+            문제풀기
           </button>
         </div>
       </div>
@@ -209,14 +195,16 @@ import roadmapImage4 from '@/assets/forest.png'
 import roadmapImage5 from '@/assets/cowshed.png'
 import woodPanel1 from '@/assets/wood_panel_1.png'
 import api from '@/api'
-import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed, watch, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
+const route = useRoute()
 const hoveredRoadmap = ref(null)
 const hoveredLevel = ref(null)
 const curriculums = ref([])
 const modalContext = ref(null)
+const recommendedErrorByLevel = ref({})
 
 const roadmapImages = [
   roadmapImage1,
@@ -234,18 +222,169 @@ const levelTopics = [
   '완전탐색',
 ]
 
+function normalizeCurriculumList(raw) {
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(raw?.curriculums)
+      ? raw.curriculums
+      : []
+  return list.map((item) => {
+    const c = item.curriculum ?? item
+    const problems = Array.isArray(c?.problems) ? c.problems : []
+    const normalizedProblems = problems.map((p) => {
+      const order = p?.order ?? p?.orderNo ?? p?.order_no ?? 0
+      const problem = p?.problem ?? p
+      const problemId = problem?.problemId ?? problem?.id
+      const statistics = p?.statistics ?? {}
+      const userStatus = p?.userStatus ?? {}
+      return {
+        ...p,
+        order,
+        problem: problem ? { ...problem, problemId } : null,
+        statistics: {
+          successCount: statistics.successCount ?? statistics.success_count,
+          submissionCount: statistics.submissionCount ?? statistics.submission_count,
+        },
+        userStatus: {
+          isSolved: userStatus.isSolved ?? userStatus.is_solved,
+          isTried: userStatus.isTried ?? userStatus.is_tried,
+        },
+      }
+    })
+    const recommended =
+      item.recommendedProblem ??
+      item.recommended_problem ??
+      item.recommended ??
+      item.recommend_problem ??
+      c?.recommendedProblem ??
+      c?.recommended_problem ??
+      c?.recommended
+    const isFlatProblem =
+      recommended &&
+      (recommended.problemId != null || recommended.id != null) &&
+      !recommended.problem
+    const recProblem = recommended?.problem ?? (isFlatProblem ? recommended : null) ?? recommended
+    const recProblemId = recProblem?.problemId ?? recProblem?.id
+    const recStats = recommended?.statistics ?? {}
+    const normalizedRecommended = recommended
+      ? {
+          ...recommended,
+          problem: recProblem ? { ...recProblem, problemId: recProblemId } : null,
+          statistics: {
+            successCount:
+              recStats.successCount ?? recStats.success_count ?? 0,
+            submissionCount:
+              recStats.submissionCount ?? recStats.submission_count ?? 0,
+          },
+        }
+      : null
+    return {
+      ...c,
+      problems: normalizedProblems,
+      recommendedProblem: normalizedRecommended,
+    }
+  })
+}
+
 async function fetchCurriculums() {
   try {
-    const res = await api.get('/curriculums/lists')
-    curriculums.value = res.data?.data?.curriculums || []
+    const res = await api.get('/curriculums/lists', {
+      params: { _t: Date.now() },
+    })
+    const data = res.data?.data ?? res.data
+    const list = normalizeCurriculumList(data?.curriculums ?? data)
+    const extraRecommended =
+      data?.recommendedProblems ?? data?.recommended_problems
+    if (Array.isArray(extraRecommended) && extraRecommended.length >= 2) {
+      const norm = (rec) => {
+        if (!rec) return null
+        const problem = rec.problem ?? (rec.problemId != null || rec.id ? rec : null)
+        const pid = problem?.problemId ?? problem?.id
+        const stats = rec.statistics ?? {}
+        return {
+          problem: problem ? { ...problem, problemId: pid } : null,
+          statistics: {
+            successCount: stats.successCount ?? stats.success_count ?? 0,
+            submissionCount: stats.submissionCount ?? stats.submission_count ?? 0,
+          },
+        }
+      }
+      list[3] = { ...list[3], recommendedProblem: norm(extraRecommended[0]) ?? list[3].recommendedProblem }
+      list[4] = { ...list[4], recommendedProblem: norm(extraRecommended[1]) ?? list[4].recommendedProblem }
+    }
+    curriculums.value = list
+    recommendedErrorByLevel.value = {}
+    await Promise.all([
+      fetchRecommendedForCurriculum(3),
+      fetchRecommendedForCurriculum(4),
+    ])
   } catch (error) {
     console.error('Failed to fetch curriculums', error)
+    curriculums.value = []
+  }
+}
+
+function normalizeRecommendedResponse(raw) {
+  const data = raw?.data?.data ?? raw?.data ?? raw
+  if (!data) return null
+  const problem = data.problem ?? (data.problemId != null || data.id ? data : null)
+  const problemId = problem?.problemId ?? problem?.id
+  const stats = data.statistics ?? {}
+  return {
+    problem: problem ? { ...problem, problemId } : null,
+    statistics: {
+      successCount: stats.successCount ?? stats.success_count ?? 0,
+      submissionCount: stats.submissionCount ?? stats.submission_count ?? 0,
+    },
+  }
+}
+
+async function fetchRecommendedForCurriculum(curriculumIdx) {
+  const curriculum = curriculums.value[curriculumIdx]
+  const curriculumId =
+    curriculum?.curriculumId ?? curriculum?.curriculum_id ?? curriculum?.id
+  if (curriculumId == null) return
+  try {
+    const res = await api.get(`/curriculums/${curriculumId}/recomend`)
+    const normalized = normalizeRecommendedResponse(res)
+    const list = [...curriculums.value]
+    list[curriculumIdx] = {
+      ...list[curriculumIdx],
+      recommendedProblem: normalized ?? list[curriculumIdx].recommendedProblem,
+    }
+    curriculums.value = list
+    recommendedErrorByLevel.value = {
+      ...recommendedErrorByLevel.value,
+      [curriculumIdx]: null,
+    }
+  } catch (error) {
+    const code = error.response?.data?.errorCode
+    const isUnauthorized =
+      error.response?.status === 401 || code === 'UNAUTHORIZED'
+    if (isUnauthorized) {
+      recommendedErrorByLevel.value = {
+        ...recommendedErrorByLevel.value,
+        [curriculumIdx]: 'UNAUTHORIZED',
+      }
+    } else {
+      console.error(
+        `Failed to fetch recommend for curriculum ${curriculumId}`,
+        error
+      )
+    }
   }
 }
 
 onMounted(() => {
   fetchCurriculums()
 })
+
+watch(
+  () => route.query.refresh,
+  () => {
+    fetchCurriculums()
+  }
+)
 
 function getStepProblem(curriculumIdx, level) {
   const curriculum = curriculums.value[curriculumIdx]
@@ -286,9 +425,32 @@ const recommendedByLevel = computed(() =>
 
 const modalStep = computed(() => {
   const ctx = modalContext.value
-  if (!ctx) return null
+  if (!ctx || ctx.type !== 'step') return null
   return getStepProblem(ctx.curriculumIdx, ctx.level)
 })
+
+const modalRecommended = computed(() => {
+  const ctx = modalContext.value
+  if (!ctx || ctx.type !== 'recommend') return null
+  return getRecommendedForLevel(ctx.curriculumIdx)
+})
+
+const modalContent = computed(() => {
+  if (modalContext.value?.type === 'step') return modalStep.value
+  if (modalContext.value?.type === 'recommend') return modalRecommended.value
+  return null
+})
+
+const modalTitle = computed(() => {
+  const ctx = modalContext.value
+  const title = modalContent.value?.problem?.title
+  if (ctx?.type === 'recommend') {
+    return title ? `추천문제: ${title}` : '추천문제'
+  }
+  return title || '문제 상세'
+})
+
+const modalProblemId = computed(() => modalContent.value?.problem?.problemId ?? null)
 
 function onHoverLevel(roadmapIndex, level) {
   hoveredRoadmap.value = roadmapIndex
@@ -303,7 +465,11 @@ function onClickLevel(roadmapIndex, level) {
   const curriculumIdx = roadmapIndex - 1
   const step = getStepProblem(curriculumIdx, level)
   if (!step) return
-  modalContext.value = { curriculumIdx, level }
+  modalContext.value = { type: 'step', curriculumIdx, level }
+}
+
+function onClickRecommend(curriculumIdx) {
+  modalContext.value = { type: 'recommend', curriculumIdx }
 }
 
 function closeModal() {
@@ -311,19 +477,8 @@ function closeModal() {
 }
 
 function goToIdeFromModal() {
-  const ctx = modalContext.value
-  if (!ctx) return
-  const step = getStepProblem(ctx.curriculumIdx, ctx.level)
-  const problemId = step?.problem?.problemId
+  const problemId = modalProblemId.value
   closeModal()
-  if (problemId != null) {
-    router.push({ name: 'ide', params: { id: String(problemId) } })
-  }
-}
-
-function onClickRecommend(curriculumIdx) {
-  const rec = getRecommendedForLevel(curriculumIdx)
-  const problemId = rec?.problem?.problemId
   if (problemId != null) {
     router.push({ name: 'ide', params: { id: String(problemId) } })
   }

@@ -30,6 +30,7 @@
           <router-link
             to="/roadmap"
             class="relative px-3 py-2 text-sm font-medium text-farm-brown-dark hover:text-farm-green transition-colors"
+            @click="onCurriculumClick"
           >
             커리큘럼
             <span
@@ -114,7 +115,7 @@
             to="/roadmap"
             class="px-3 py-2 text-base font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
             active-class="text-farm-green bg-farm-cream"
-            @click="closeMobileMenu"
+            @click="onCurriculumClickMobile"
           >
             커리큘럼
           </router-link>
@@ -158,6 +159,18 @@ const toggleMobileMenu = () => {
 
 const closeMobileMenu = () => {
   showMobileMenu.value = false
+}
+
+const onCurriculumClick = (ev) => {
+  if (route.path === '/roadmap') {
+    ev.preventDefault()
+    router.push({ path: '/roadmap', query: { ...route.query, refresh: Date.now() } })
+  }
+}
+
+const onCurriculumClickMobile = (ev) => {
+  onCurriculumClick(ev)
+  closeMobileMenu()
 }
 
 const handleLogout = () => {
