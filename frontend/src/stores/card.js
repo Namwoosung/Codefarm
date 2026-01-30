@@ -10,7 +10,15 @@ export const useCardStore = defineStore('card', () => {
   const drawMessage = ref('')
 
   // API에서 { card: {...} } 형태로 올 수 있어서, 스토어에 저장할 때 1회 정제
-  const normalizeCard = (item) => (item?.card && typeof item.card === 'object' ? item.card : item)
+  // 백엔드가 카드 이미지를 .svg로 주는 경우 .png로 변환
+  const normalizeCard = (item) => {
+    const c = item?.card && typeof item.card === 'object' ? item.card : item
+    if (!c) return null
+    const rawImg = c.image ?? c.cardImage ?? c.img ?? ''
+    const img =
+      typeof rawImg === 'string' && rawImg ? rawImg.replace(/\.svg$/i, '.png') : rawImg
+    return { ...c, image: img, cardImage: img, img }
+  }
 
   const cardList = async () => {
     try {
