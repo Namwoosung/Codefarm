@@ -6,13 +6,18 @@ import com.ssafy.codefarm.problem.entity.Problem;
 import com.ssafy.codefarm.problem.repository.ProblemRepository;
 import com.ssafy.codefarm.result.dto.requset.SaveCodeSnapshotRequestDto;
 import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
-import com.ssafy.codefarm.session.dto.execution.ExecuteServerRequest;
+import com.ssafy.codefarm.result.entity.Result;
+import com.ssafy.codefarm.result.entity.ResultType;
+import com.ssafy.codefarm.result.repository.ResultRepository;
+import com.ssafy.codefarm.session.dto.execution.*;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
 import com.ssafy.codefarm.session.dto.request.RunSessionRequestDto;
+import com.ssafy.codefarm.session.dto.request.SubmitSessionRequestDto;
 import com.ssafy.codefarm.session.dto.response.LatestCodeResponseDto;
 import com.ssafy.codefarm.session.dto.response.RunSessionResponseDto;
 import com.ssafy.codefarm.session.dto.response.SessionResponseDto;
+import com.ssafy.codefarm.session.dto.response.SubmitSessionResponseDto;
 import com.ssafy.codefarm.session.entity.Session;
 import com.ssafy.codefarm.session.entity.SessionStatus;
 import com.ssafy.codefarm.session.repository.SessionRepository;
@@ -23,8 +28,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import reactor.core.publisher.Mono;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Slf4j
@@ -34,11 +42,15 @@ import java.time.LocalDateTime;
 public class SessionService {
 
     private final ExecutionServerClient executionServerClient;
+    private final SessionCodeRedisService sessionCodeRedisService;
+    private final FeedbackServerClient feedbackServerClient;
 
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
     private final ProblemRepository problemRepository;
-    private final SessionCodeRedisService sessionCodeRedisService;
+    private final ResultRepository resultRepository;
+
+    private final TransactionTemplate transactionTemplate;
 
     public SessionResponseDto createSession(Long userId, CreateSessionRequestDto createSessionRequestDto) {
 
@@ -164,7 +176,7 @@ public class SessionService {
         return LatestCodeResponseDto.from(snapshot.getCode(), snapshot.getLanguage(), snapshot.getSavedAt());
     }
 
-    public Mono<RunSessionResponseDto> runSession(Long sessionId, Long userId, RunSessionRequestDto requestDto) {
+    public RunSessionResponseDto runSession(Long sessionId, Long userId, RunSessionRequestDto requestDto) {
 
         Session session = sessionRepository.findById(sessionId)
                 .orElseThrow(() ->
@@ -190,18 +202,173 @@ public class SessionService {
                         0.5
                 );
 
-        // 외부 서버 호출
-        return executionServerClient.execute(executionRequestDto)
-                .map(result ->
-                        RunSessionResponseDto.from(
-                                result.stdout(),
-                                result.stderr(),
-                                result.memoryUsage(),
-                                result.execTime(),
-                                result.isTimeout(),
-                                result.isOom()
-                        )
+        // 외부 서버 호출 (동기)
+        ExecuteServerResult result = executionServerClient.execute(executionRequestDto);
+
+        return RunSessionResponseDto.from(
+                result.stdout(),
+                result.stderr(),
+                result.memoryUsage(),
+                result.execTime(),
+                result.isTimeout(),
+                result.isOom()
+        );
+    }
+
+    public SubmitSessionResponseDto submitSession(
+            Long userId,
+            Long sessionId,
+            SubmitSessionRequestDto submitSessionRequestDto
+    ) {
+
+        SubmitContext ctx = loadSubmitContext(userId, sessionId);
+
+        ExecuteServerRequest executionRequest =
+                new ExecuteServerRequest(
+                        submitSessionRequestDto.getLanguage(),
+                        submitSessionRequestDto.getCode(),
+                        ctx.problem().getTestcasesInput(),
+                        ctx.problem().getTimeLimit() * 1000,
+                        ctx.problem().getMemoryLimit(),
+                        0.5
                 );
 
+        ExecuteServerResult exec = executionServerClient.execute(executionRequest);
+
+        return saveSubmitResult(ctx, submitSessionRequestDto, exec);
+    }
+
+    private SubmitSessionResponseDto saveSubmitResult(
+            SubmitContext submitContext,
+            SubmitSessionRequestDto submitSessionRequestDto,
+            ExecuteServerResult executeServerResult
+    ) {
+        return transactionTemplate.execute(status -> {
+
+            SubmitOutcome submitOutcome =
+                    SubmitOutcome.from(submitContext, executeServerResult);
+
+            ResultType resultType = decideResultType(submitOutcome);
+
+            Integer memory = toIntegerSafely(executeServerResult.memoryUsage());
+
+            Result result = Result.builder()
+                    .session(submitContext.session())
+                    .resultType(resultType)
+                    .language(submitSessionRequestDto.getLanguage())
+                    .code(submitSessionRequestDto.getCode())
+                    .solveTime(submitContext.solveTime())
+                    .execTime(executeServerResult.execTime())
+                    .memory(memory)
+                    .feedback(null)
+                    .build();
+
+            resultRepository.save(result);
+
+            if (resultType == ResultType.FAIL) {
+                return SubmitSessionResponseDto.fail(
+                        EvaluationContext.from(submitOutcome)
+                );
+            }
+
+            String feedback;
+            try {
+                feedback = feedbackServerClient.requestFeedback(submitContext, submitSessionRequestDto);
+            } catch (Exception e) {
+                feedback = "정답입니다! 수고했어요.";
+            }
+
+            result.updateFeedback(feedback);
+
+            submitContext.session().close();
+
+            Long sessionId = submitContext.session().getId();
+
+            if (TransactionSynchronizationManager.isSynchronizationActive()) {
+                TransactionSynchronizationManager.registerSynchronization(
+                        new TransactionSynchronization() {
+                            @Override
+                            public void afterCommit() {
+                                sessionCodeRedisService.delete(sessionId);
+                                log.info("Redis deleted after DB commit. sessionId={}", sessionId);
+                            }
+                        }
+                );
+            } else {
+                // 혹시 동기화가 활성화되지 않은 경우(거의 없음)
+                sessionCodeRedisService.delete(sessionId);
+            }
+            return SubmitSessionResponseDto.success(
+                    SubmissionContext.from(result),
+                    EvaluationContext.from(submitOutcome),
+                    feedback
+            );
+        });
+    }
+
+    private ResultType decideResultType(SubmitOutcome outcome) {
+        boolean success =
+                outcome.totalCount() != null
+                        && outcome.passedCount() != null
+                        && outcome.totalCount().equals(outcome.passedCount())
+                        && !Boolean.TRUE.equals(outcome.isTimeout())
+                        && !Boolean.TRUE.equals(outcome.isOom())
+                        && (outcome.stderr() == null || outcome.stderr().isBlank());
+
+        return success ? ResultType.SUCCESS : ResultType.FAIL;
+    }
+
+    private String decideFeedback(ResultType resultType, SubmitOutcome outcome) {
+        if (resultType == ResultType.SUCCESS) {
+            return "반복문과 조건을 적절히 사용해 문제를 정확히 해결했어요. 다음에는 입력 처리 부분을 더 간결하게 작성해보세요.";
+        }
+
+        return outcome.failReason();
+    }
+
+    private Integer toIntegerSafely(Long value) { // 굳이 필요 없는데 그냥 안전장치
+        if (value == null) {
+            return null;
+        }
+        if (value > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        if (value < Integer.MIN_VALUE) {
+            return Integer.MIN_VALUE;
+        }
+        return value.intValue();
+    }
+
+    private SubmitContext loadSubmitContext(Long userId, Long sessionId) {
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() ->
+                        new CustomException("세션을 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND)
+                );
+
+        if (!session.getUser().getId().equals(userId)) {
+            throw new CustomException("해당 세션에 접근할 수 없습니다.", ErrorCode.FORBIDDEN);
+        }
+
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new CustomException("종료된 세션에는 제출할 수 없습니다.", ErrorCode.BAD_REQUEST);
+        }
+
+        Problem problem = problemRepository.findById(session.getProblem().getId())
+                .orElseThrow(() ->
+                        new CustomException("문제를 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND)
+                );
+
+        if (problem.getTestcasesInput() == null || problem.getTestcasesInput().isBlank()) {
+            throw new CustomException("테스트 입력이 존재하지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        if (problem.getTestcasesOutput() == null || problem.getTestcasesOutput().isBlank()) {
+            throw new CustomException("테스트 출력이 존재하지 않습니다.", ErrorCode.INTERNAL_SERVER_ERROR);
+        }
+
+        int solveTime =
+                (int) Duration.between(session.getStartedAt(), LocalDateTime.now()).toSeconds();
+
+        return new SubmitContext(session, problem, solveTime);
     }
 }
