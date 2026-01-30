@@ -148,7 +148,9 @@
                 </dd>
               </div>
               <div
-                v-if="modalContext?.type === 'step'"
+                v-if="
+                  modalContext?.type === 'step' || modalContext?.type === 'recommend'
+                "
                 class="cf-modal-row"
               >
                 <dt>내 상태</dt>
@@ -324,16 +326,27 @@ async function fetchCurriculums() {
 }
 
 function normalizeRecommendedResponse(raw) {
-  const data = raw?.data?.data ?? raw?.data ?? raw
+  const payload = raw?.data?.data ?? raw?.data ?? raw
+  if (!payload) return null
+  // API: data.recommendedProblem = { problem, userStatus, statistics }
+  const data =
+    payload.recommendedProblem ??
+    payload.recommended_problem ??
+    payload
   if (!data) return null
   const problem = data.problem ?? (data.problemId != null || data.id ? data : null)
   const problemId = problem?.problemId ?? problem?.id
-  const stats = data.statistics ?? {}
+  const stats = data.statistics ?? problem?.statistics ?? {}
+  const userStatus = data.userStatus ?? data.user_status ?? {}
   return {
     problem: problem ? { ...problem, problemId } : null,
     statistics: {
       successCount: stats.successCount ?? stats.success_count ?? 0,
       submissionCount: stats.submissionCount ?? stats.submission_count ?? 0,
+    },
+    userStatus: {
+      isSolved: userStatus.isSolved ?? userStatus.is_solved ?? false,
+      isTried: userStatus.isTried ?? userStatus.is_tried ?? false,
     },
   }
 }
@@ -344,7 +357,7 @@ async function fetchRecommendedForCurriculum(curriculumIdx) {
     curriculum?.curriculumId ?? curriculum?.curriculum_id ?? curriculum?.id
   if (curriculumId == null) return
   try {
-    const res = await api.get(`/curriculums/${curriculumId}/recomend`)
+    const res = await api.get(`/curriculums/${curriculumId}/recommend`)
     const normalized = normalizeRecommendedResponse(res)
     const list = [...curriculums.value]
     list[curriculumIdx] = {
