@@ -1,155 +1,156 @@
 <template>
-  <div class="ide-container">
-    <!-- 메인→IDE 진입 시 로딩 모달 -->
-    <div v-if="isInitializing" class="ide-loading-overlay">
-      <div class="ide-loading-card">
-        <p class="ide-loading-text">로딩중...</p>
+  <div class="flex flex-col w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 overflow-hidden bg-[var(--color-farm-paper)]">
+    <!-- 로딩 모달 -->
+    <div v-if="isInitializing" class="fixed inset-0 flex items-center justify-center bg-[rgba(245,242,232,0.9)] z-[100]">
+      <div class="card bg-base-100 shadow-lg rounded-2xl p-6">
+        <p class="text-base font-semibold text-[var(--color-farm-brown-dark)]">로딩중...</p>
       </div>
     </div>
 
-    <!-- 기능 바: Navbar 밑 -->
-    <div class="ide-toolbar">
-      <!-- 왼쪽: 뒤로가기 + FR-CODE-011 타이머 -->
-      <button class="ide-back-button" @click="handleBack">
-        <i class="pi pi-arrow-left"></i>
-        <span>뒤로가기</span>
-      </button>
-      <span v-if="!isInitializing && (problemStartTime > 0 || timerStoppedAt != null)" class="ide-timer">⏱️ {{ elapsedDisplay }}</span>
-
-      <!-- 오른쪽: 당근 3개(사용 횟수 안내) + 힌트 버튼 + 종 아이콘 -->
-      <div class="ide-toolbar-right">
-        <div class="ide-carrot-group" aria-label="힌트 잔여 횟수">
-          <span
-            v-for="i in 3"
-            :key="i"
-            class="ide-carrot-wrap"
-            :class="{ 'ide-carrot-used': hintUsed >= i }"
-          >
+    <!-- 툴바 -->
+    <div class="flex items-center justify-between w-full h-14 px-6 flex-shrink-0 bg-[var(--color-farm-paper)] border-b border-[var(--color-farm-cream)]">
+      <div class="flex items-center gap-4">
+        <button type="button" class="btn btn-ghost btn-sm gap-2 text-[var(--color-farm-brown-dark)] hover:text-[var(--color-farm-green)]" @click="handleBack">
+          <i class="pi pi-arrow-left"></i>
+          <span>뒤로가기</span>
+        </button>
+        <span v-if="!isInitializing && (problemStartTime > 0 || timerStoppedAt != null)" class="text-sm font-medium text-[var(--color-farm-brown-dark)]">⏱️ {{ elapsedDisplay }}</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-0.5" aria-label="힌트 잔여 횟수">
+          <span v-for="i in 3" :key="i" class="inline-flex transition-all duration-200" :class="{ 'grayscale opacity-55': hintUsed >= i }">
             <CarrotIcon />
           </span>
         </div>
-        <button
-          type="button"
-          class="ide-hint-button"
-          :class="{ 'ide-hint-button-exhausted': hintRemaining <= 0 }"
-          :disabled="hintRemaining <= 0"
-          :title="hintRemaining <= 0 ? '힌트를 모두 사용했습니다' : '힌트 열기'"
-          @click="showHintModal = true"
-        >
-          힌트
-        </button>
-        <!-- 종 아이콘 -->
-        <button class="ide-bell-button" aria-label="알림">
+        <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="알림">
           <BellIcon />
         </button>
       </div>
     </div>
 
-    <!-- 좌우 분할 레이아웃 -->
-    <div class="ide-layout">
-      <!-- 왼쪽 패널: 문제 설명 영역 -->
-      <aside class="ide-panel-left" :style="{ width: leftPanelWidth + '%' }">
-        <div class="ide-panel-content">
-          <ProblemPanel
-          :hint-remaining="hintRemaining"
-          :hint-max="hintMax"
-          @open-report="handleOpenReport"
-          @hint-used="onHintUsedFromPanel"
-        />
-        </div>
-      </aside>
+    <!-- 레이아웃: [힌트 토글 | 힌트 패널? | 문제 | 리사이저 | 에디터+터미널] -->
+    <div class="flex flex-row flex-1 min-h-0 overflow-hidden w-full">
+      <!-- 힌트 패널 접기/펼치기 버튼 (접혀 있을 때만 보이는 펼치기 버튼) -->
+      <div v-if="!hintPanelOpen" class="flex flex-shrink-0 items-stretch bg-[#FFE082] border-r border-base-300">
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm btn-square rounded-none h-full min-w-10 text-[var(--color-farm-brown-dark)] hover:bg-[rgba(0,0,0,0.06)]"
+          title="힌트 패널 펼치기"
+          @click="hintPanelOpen = true"
+        >
+          <iconify-icon icon="mdi:chevron-right" class="text-xl"></iconify-icon>
+        </button>
+      </div>
 
-      <!-- 리사이저 바 -->
-      <div 
-        class="ide-resizer"
-        @mousedown="startResize"
-      ></div>
-
-      <!-- 오른쪽 패널: 에디터 + 터미널 영역 -->
-      <main class="ide-panel-right" :style="{ width: (100 - leftPanelWidth) + '%' }">
-        <div class="ide-right-wrapper" :class="{ 'is-locked': !isLoggedIn }">
-          <div class="ide-editor-container">
-            <MonacoEditor />
-            <!-- FR-CODE-002-1: 에디터 우측 하단 저장 상태 -->
-            <div v-if="isLoggedIn" class="ide-save-status">
-              <div>{{ saveStatusText }}</div>
-              <div v-if="recentlySentText" class="ide-save-status-sub">{{ recentlySentText }}</div>
-              <div v-if="snapshotStoppedByIdle" class="ide-save-status-sub ide-save-status-stopped">코드 전송이 멈춘 상태입니다</div>
-            </div>
-          </div>
-          
-          <!-- 실행/제출 버튼 영역 -->
-          <div class="ide-action-buttons">
-            <button class="ide-submit-button" @click="handleSubmit">
-              <span class="play-icon">▷</span>
-              <span>제출하기</span>
-            </button>
+      <!-- 힌트 패널 (펼쳤을 때) -->
+      <Transition name="hint-panel">
+        <div v-show="hintPanelOpen" class="flex flex-shrink-0 w-[300px] min-w-[280px] max-w-[320px] h-full min-h-0 overflow-hidden">
+          <div class="flex flex-col w-full h-full relative">
+            <HintPanel
+              :hint-remaining="hintRemaining"
+              :hint-max="hintMax"
+              @hint-used="onHintUsedFromPanel"
+            />
             <button
-              class="ide-run-button"
-              :disabled="isRunLoading"
-              @click="handleRun"
+              type="button"
+              class="btn btn-ghost btn-sm btn-square absolute top-2 right-2 text-[var(--color-farm-brown-dark)] hover:bg-base-200/50"
+              title="힌트 패널 접기"
+              @click="hintPanelOpen = false"
             >
-              <span v-if="isRunLoading" class="play-icon">⏱️</span>
-              <span v-else class="play-icon">▷</span>
-              <span>{{ isRunLoading ? '실행 중...' : '실행하기' }}</span>
-            </button>
-            <button class="ide-escape-button" @click="handleEscape">
-              <EscapeIcon :size="20" />
-              <span>탈주하기</span>
+              <iconify-icon icon="mdi:chevron-left" class="text-lg"></iconify-icon>
             </button>
           </div>
+        </div>
+      </Transition>
 
-          <!-- 에디터-터미널 세로 리사이저 -->
-          <div
-            class="ide-terminal-resizer"
-            @mousedown="startResizeVertical"
-          ></div>
-          <div class="ide-terminal-wrap" :style="{ height: terminalHeight + 'px' }">
-            <TerminalPanel ref="terminalPanel" />
+      <!-- 문제 + 에디터 영역 -->
+      <div class="flex flex-1 min-w-0 min-h-0 overflow-hidden flex-row">
+        <aside class="flex flex-col min-h-0 overflow-hidden border-r border-[var(--color-farm-cream)] flex-shrink-0" :style="{ width: leftPanelWidth + '%' }">
+          <div class="w-full h-full min-h-0 overflow-hidden flex flex-col p-2 sm:p-4">
+            <ProblemPanel @open-report="handleOpenReport" />
           </div>
+        </aside>
 
-          <!-- 로그인 필요 안내 오버레이 -->
-          <div v-if="!isLoggedIn" class="ide-lock-overlay">
-            <div class="ide-lock-card">
-              <p class="ide-lock-title">로그인이 필요해요</p>
-              <p class="ide-lock-desc">
-                문제를 풀고 제출 결과를 확인하려면 먼저 로그인해주세요.
-              </p>
-              <div class="ide-lock-actions">
-                <router-link to="/login" class="ide-lock-primary">
-                  로그인하러 가기
-                </router-link>
-                <router-link to="/signup" class="ide-lock-secondary">
-                  회원가입
-                </router-link>
+        <div class="w-1 flex-shrink-0 bg-[var(--color-farm-cream)] hover:bg-[var(--color-farm-green-light)] cursor-col-resize transition-colors ide-resizer-hit" @mousedown="startResize"></div>
+
+        <main class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden bg-[var(--color-farm-paper)]" :style="{ width: (100 - leftPanelWidth) + '%' }">
+          <div class="relative flex flex-col flex-1 min-h-0" :class="{ 'pointer-events-none': !isLoggedIn }">
+            <div class="flex-1 min-h-0 relative ide-editor-container" :class="{ 'blur-sm': !isLoggedIn }">
+              <MonacoEditor />
+            </div>
+            <div v-if="isLoggedIn" class="absolute bottom-2 right-3 text-xs text-[var(--color-farm-brown)] text-right pointer-events-none">
+              <div>{{ saveStatusText }}</div>
+              <div v-if="recentlySentText" class="text-[0.7rem]">{{ recentlySentText }}</div>
+              <div v-if="snapshotStoppedByIdle" class="text-[0.7rem] text-[var(--color-farm-point)]">코드 전송이 멈춘 상태입니다</div>
+            </div>
+
+            <div class="flex gap-3 px-4 py-3 flex-shrink-0 bg-[var(--color-farm-paper)] border-t border-b border-[var(--color-farm-cream)]">
+              <button type="button" class="btn btn-sm h-9 min-w-[119px] bg-gradient-to-r from-[#7A5C3E] to-[#CDFF86] text-white border-none rounded-2xl shadow hover:shadow-md transition-all" @click="handleSubmit">
+                <span class="font-bold">▷</span>
+                <span>제출하기</span>
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm btn-outline h-9 min-w-[119px] rounded-2xl border-neutral-300 text-[var(--color-farm-brown-dark)] hover:border-[var(--color-farm-green)]"
+                :disabled="isRunLoading"
+                @click="openRunInputModal"
+              >
+                <span v-if="isRunLoading" class="font-bold">⏱️</span>
+                <span v-else class="font-bold">▷</span>
+                <span>{{ isRunLoading ? '실행 중...' : '실행하기' }}</span>
+              </button>
+              <button type="button" class="btn btn-sm btn-outline h-9 min-w-[100px] rounded-2xl border-neutral-300 text-[var(--color-farm-brown-dark)] hover:border-[var(--color-farm-point)] hover:text-[var(--color-farm-point)]" @click="handleEscape">
+                <EscapeIcon :size="20" />
+                <span>탈주하기</span>
+              </button>
+            </div>
+
+            <div class="h-1.5 flex-shrink-0 bg-[var(--color-farm-cream)] hover:bg-[var(--color-farm-green-light)] cursor-row-resize transition-colors" @mousedown="startResizeVertical"></div>
+            <div class="flex-shrink-0 overflow-hidden bg-[var(--color-farm-paper)]" :style="{ height: terminalHeight + 'px' }">
+              <TerminalPanel ref="terminalPanel" />
+            </div>
+
+            <div v-if="!isLoggedIn" class="absolute inset-0 flex items-center justify-center bg-[rgba(245,242,232,0.8)] z-10">
+              <div class="card bg-base-100 shadow-xl rounded-2xl p-8 max-w-md text-center">
+                <p class="text-lg font-bold text-[var(--color-farm-brown-dark)] mb-2">로그인이 필요해요</p>
+                <p class="text-sm text-[#7a6a4a] mb-5">문제를 풀고 제출 결과를 확인하려면 먼저 로그인해주세요.</p>
+                <div class="flex gap-3 justify-center">
+                  <router-link to="/login" class="btn btn-sm rounded-full bg-[var(--color-farm-green)] text-white border-none hover:bg-[var(--color-farm-green-dark)]">로그인하러 가기</router-link>
+                  <router-link to="/signup" class="btn btn-sm btn-outline rounded-full">회원가입</router-link>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
 
-    <!-- 리포트 모달 (제출 성공/탈주 시) -->
-    <ReportModal
-      :show="showReportModal"
-      :report="reportData"
-      @close="onReportModalClose"
-    />
+    <ReportModal :show="showReportModal" :report="reportData" @close="onReportModalClose" />
 
-    <!-- 수동 힌트 모달 (채팅형) -->
-    <HintModal
-      :show="showHintModal"
-      :messages="hintMessages"
-      :loading="hintLoading"
-      :used-hint="hintUsed"
-      :max-hint="hintMax"
-      @close="showHintModal = false"
-      @send="(q) => onHintSend(q)"
-    />
+    <!-- stdin 입력 모달 -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showRunInputModal" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]" @click.self="showRunInputModal = false">
+          <div class="card bg-base-100 shadow-2xl rounded-xl p-6 min-w-[360px] max-w-[90vw] max-h-[85vh] flex flex-col border border-base-300">
+            <h3 class="text-lg font-semibold text-[var(--color-farm-brown-dark)] mb-1">stdin 입력</h3>
+            <p class="text-sm text-[#7a6a4a] mb-3">코드에서 input()으로 읽을 값을 입력하세요. 여러 줄 입력 가능.</p>
+            <textarea
+              v-model="runInputContent"
+              class="textarea textarea-bordered w-full min-h-[120px] font-mono text-sm resize-y"
+              placeholder="예: 4&#10;1 2 3 4&#10;5"
+              rows="8"
+            ></textarea>
+            <div class="flex justify-end gap-3 mt-4">
+              <button type="button" class="btn btn-ghost btn-sm" @click="showRunInputModal = false">취소</button>
+              <button type="button" class="btn btn-sm bg-[var(--color-farm-green)] text-white border-none hover:bg-[var(--color-farm-green-dark)]" @click="confirmRunWithInput">실행</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
-    <!-- 힌트 차감 토스트 -->
     <Transition name="toast">
-      <div v-if="toastMessage" class="ide-toast">{{ toastMessage }}</div>
+      <div v-if="toastMessage" class="fixed bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 text-sm text-white bg-[var(--color-farm-brown-dark)] rounded-lg shadow-lg z-[1100]">{{ toastMessage }}</div>
     </Transition>
   </div>
 </template>
@@ -158,10 +159,10 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
+import HintPanel from '@/components/organisms/HintPanel.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
 import ReportModal from '@/components/organisms/ReportModal.vue'
-import HintModal from '@/components/organisms/HintModal.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
 import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
@@ -169,7 +170,6 @@ import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
 import * as sessionApi from '@/api/session'
 import { getReportDetail, getMockReportData, buildReportFromSubmitResponse } from '@/api/reports'
-import * as hintApi from '@/api/hint'
 
 const router = useRouter()
 const route = useRoute()
@@ -193,13 +193,14 @@ const showReportModal = ref(false)
 const reportData = ref(null)
 /** 제출 내역에서 열었을 때 true → 닫을 때 메인으로 이동하지 않음 */
 const reportModalFromHistory = ref(false)
-/** 수동 힌트: 모달, 채팅 메시지, 잔여 횟수 */
-const showHintModal = ref(false)
-const hintMessages = ref([])
+/** 실행 시 stdin 입력 모달 */
+const showRunInputModal = ref(false)
+const runInputContent = ref('')
 const hintUsed = ref(0)
 const hintMax = ref(3)
-const hintLoading = ref(false)
 const hintRemaining = computed(() => Math.max(0, hintMax.value - hintUsed.value))
+/** 힌트(채팅) 패널 접기/펼치기 */
+const hintPanelOpen = ref(true)
 /** 힌트 차감 토스트 (FR-CODE-010-1) */
 const toastMessage = ref('')
 let toastTimer = null
@@ -239,7 +240,7 @@ const startResize = (e) => {
 
 const handleResize = (e) => {
   if (!isResizing.value) return
-  const container = document.querySelector('.ide-layout')
+  const container = document.querySelector('.ide-main-wrap')
   if (!container) return
   const containerRect = container.getBoundingClientRect()
   const newLeftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100
@@ -634,7 +635,37 @@ const handleSubmit = async () => {
   }
 }
 
-const handleRun = async () => {
+/** 코드에 input() 호출이 있는지 휴리스틱 검사 (Python 기준) */
+const codeNeedsStdin = (code) => {
+  if (!code || typeof code !== 'string') return false
+  return code.includes('input(')
+}
+
+/** 실행하기 클릭: input()이 있으면 stdin 모달, 없으면 바로 실행 */
+const openRunInputModal = () => {
+  if (!isLoggedIn.value) return
+  const sid = ideStore.sessionId
+  if (!sid) {
+    if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
+    return
+  }
+  const code = ideStore.getCode(route.params.id)
+  if (codeNeedsStdin(code)) {
+    runInputContent.value = terminalPanel.value?.getFullInput?.() ?? ''
+    showRunInputModal.value = true
+  } else {
+    doRunWithInput('')
+  }
+}
+
+/** 모달에서 실행 버튼 클릭: 입력창 내용을 input으로 API 호출 */
+const confirmRunWithInput = () => {
+  showRunInputModal.value = false
+  doRunWithInput(runInputContent.value ?? '')
+}
+
+/** 실제 실행 API 호출 (input: stdin 전체 문자열) */
+const doRunWithInput = async (input) => {
   if (!isLoggedIn.value) return
   const sid = ideStore.sessionId
   if (!sid) {
@@ -643,10 +674,12 @@ const handleRun = async () => {
   }
   isRunLoading.value = true
   const code = ideStore.getCode(route.params.id)
-  if (terminalPanel.value) terminalPanel.value.clear()
-  if (terminalPanel.value) terminalPanel.value.write('실행 중...\r\n')
+  if (terminalPanel.value) {
+    terminalPanel.value.setRunning(true)
+    terminalPanel.value.write('\r\n\x1b[33m[Running...]\x1b[0m\r\n')
+  }
   try {
-    const { data: res } = await sessionApi.runCode(sid, { language: API_LANGUAGE, code })
+    const { data: res } = await sessionApi.runCode(sid, { language: API_LANGUAGE, code, input: input ?? '' })
     const d = res?.data
     const execTimeMs = d?.execTime ?? 0
     const execTimeSec = (execTimeMs / 1000).toFixed(2)
@@ -681,6 +714,10 @@ const handleRun = async () => {
       terminalPanel.value.write('❌ 실행 실패\r\n')
     }
   } finally {
+    if (terminalPanel.value) {
+      terminalPanel.value.clearInputAndShowPrompt()
+      terminalPanel.value.setRunning(false)
+    }
     isRunLoading.value = false
   }
 }
@@ -729,33 +766,6 @@ function onHintUsedFromPanel({ usedHint, maxHint }) {
   showToast(`힌트가 차감되었습니다. (잔여: ${(maxHint ?? 3) - (usedHint ?? 0)}/${maxHint ?? 3})`)
 }
 
-/** 수동 힌트 전송: 채팅 메시지 추가 후 API(mock) 호출, 차감 토스트 */
-async function onHintSend(userQuestion) {
-  const sid = ideStore.sessionId
-  hintMessages.value.push({ role: 'user', text: userQuestion, createdAt: new Date().toISOString() })
-  hintLoading.value = true
-  try {
-    const code = ideStore.getCode(route.params.id)
-    const res = await hintApi.requestManualHint(sid, { userQuestion, code })
-    const d = res?.data
-    if (d) {
-      hintMessages.value.push({ role: 'assistant', text: d.content, createdAt: d.createdAt })
-      hintUsed.value = d.usedHint ?? hintUsed.value
-      hintMax.value = d.maxHint ?? hintMax.value
-      const remaining = (d.maxHint ?? 3) - (d.usedHint ?? 0)
-      showToast(`힌트가 차감되었습니다. (잔여: ${remaining}/${d.maxHint ?? 3})`)
-    }
-  } catch (_) {
-    hintMessages.value.push({
-      role: 'assistant',
-      text: '힌트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
-      createdAt: new Date().toISOString()
-    })
-  } finally {
-    hintLoading.value = false
-  }
-}
-
 function showToast(msg) {
   toastMessage.value = msg
   if (toastTimer) clearTimeout(toastTimer)
@@ -767,431 +777,40 @@ function showToast(msg) {
 </script>
 
 <style scoped>
-.ide-container {
-  width: 100%;
-  height: calc(100vh - 4rem); /* 헤더 높이 제외 */
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  background-color: var(--color-farm-paper);
-}
-
-/* 기능 바 스타일 */
-.ide-toolbar {
-  width: 100%;
-  height: 3.5rem; /* 56px */
-  background-color: var(--color-farm-paper);
-  border-bottom: 1px solid var(--color-farm-cream);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 1.5rem;
-  flex-shrink: 0;
-}
-
-.ide-back-button {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  color: var(--color-farm-brown-dark);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-size: 0.875rem;
-  font-weight: 500;
-  transition: color 0.2s;
-}
-
-.ide-back-button:hover {
-  color: var(--color-farm-green);
-}
-
-.ide-back-button i {
-  font-size: 1rem;
-}
-
-.ide-timer {
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: var(--color-farm-brown-dark);
-  margin-left: 1rem;
-}
-
-.ide-toolbar-right {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.ide-carrot-group {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
-
-.ide-carrot-wrap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: filter 0.2s, opacity 0.2s;
-}
-.ide-carrot-wrap.ide-carrot-used {
-  filter: grayscale(1);
-  opacity: 0.55;
-}
-
-.ide-hint-button {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.9rem;
-  color: var(--color-farm-brown-dark);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  border-radius: 0.5rem;
-  transition: all 0.2s;
-}
-.ide-hint-button:hover:not(:disabled) {
-  color: var(--color-farm-green);
-  background-color: var(--color-farm-cream);
-}
-.ide-hint-button:disabled,
-.ide-hint-button-exhausted {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.ide-bell-button {
-  padding: 0.5rem;
-  color: var(--color-farm-brown-dark);
-  background: transparent;
-  border: none;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.ide-bell-button:hover {
-  color: var(--color-farm-green);
-  background-color: var(--color-farm-cream);
-}
-
-.ide-layout {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  flex: 1;
-  overflow: hidden;
-}
-
-/* 데스크톱: 좌우 분할 */
-@media (min-width: 768px) {
-  .ide-layout {
-    flex-direction: row;
-  }
-}
-
-.ide-panel-left {
-  width: 100%;
-  height: 50%;
-  background-color: var(--color-farm-paper);
-  border-right: 1px solid var(--color-farm-cream);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 데스크톱: 왼쪽 패널 너비 - 동적으로 조절 가능 */
-@media (min-width: 768px) {
-  .ide-panel-left {
-    height: 100%;
-    flex-shrink: 0;
-  }
-}
-
-.ide-panel-content {
-  width: 100%;
-  height: 100%;
-  padding: 0.25rem 1.5rem 1.5rem 1.5rem;
-}
-
-.ide-panel-right {
-  width: 100%;
-  height: 50%;
-  background-color: var(--color-farm-paper);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.ide-right-wrapper {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.ide-right-wrapper.is-locked .ide-editor-container,
-.ide-right-wrapper.is-locked .ide-action-buttons,
-.ide-right-wrapper.is-locked .ide-terminal-resizer,
-.ide-right-wrapper.is-locked .ide-terminal-wrap {
-  filter: blur(4px);
-  pointer-events: none;
-}
-
-/* 리사이저 바 */
-.ide-resizer {
-  width: 4px;
-  background-color: var(--color-farm-cream);
-  cursor: col-resize;
-  flex-shrink: 0;
-  transition: background-color 0.2s;
+.ide-resizer-hit {
   position: relative;
 }
-
-.ide-resizer:hover {
-  background-color: var(--color-farm-green-light);
-}
-
-.ide-resizer::before {
+.ide-resizer-hit::before {
   content: '';
   position: absolute;
-  left: -2px;
-  right: -2px;
+  left: -4px;
+  right: -4px;
   top: 0;
   bottom: 0;
   cursor: col-resize;
 }
-
-/* 데스크톱: 오른쪽 패널 너비 - 동적으로 조절 가능 */
-@media (min-width: 768px) {
-  .ide-panel-right {
-    height: 100%;
-    flex-shrink: 0;
-  }
-  
-  .ide-resizer {
-    display: block;
-  }
-}
-
-@media (max-width: 767px) {
-  .ide-resizer {
-    display: none;
-  }
-}
-
 .ide-editor-container {
-  width: 100%;
-  flex: 1;
-  position: relative;
-  min-height: 0; /* flexbox에서 overflow를 위해 필요 */
+  min-height: 200px;
 }
-
-/* 에디터-터미널 세로 리사이저 */
-.ide-terminal-resizer {
-  flex-shrink: 0;
-  height: 6px;
-  background: var(--color-farm-cream);
-  cursor: row-resize;
-  transition: background-color 0.2s;
+/* 힌트 패널 접기/펼치기 트랜지션 */
+.hint-panel-enter-active,
+.hint-panel-leave-active {
+  transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease;
 }
-.ide-terminal-resizer:hover {
-  background: var(--color-farm-green-light);
-}
-.ide-terminal-resizer::before {
-  content: '';
-  display: block;
-  position: relative;
-  left: 0;
-  right: 0;
-  top: -4px;
-  bottom: -4px;
-  min-height: 14px;
-  cursor: row-resize;
-}
-.ide-terminal-wrap {
-  flex-shrink: 0;
-  min-height: 150px;
-  display: flex;
-  flex-direction: column;
+.hint-panel-enter-from,
+.hint-panel-leave-to {
+  width: 0;
+  min-width: 0;
+  opacity: 0;
   overflow: hidden;
 }
-.ide-terminal-wrap .terminal-panel {
-  flex: 1;
-  min-height: 0;
+.modal-enter-active,
+.modal-leave-active {
+  transition: opacity 0.2s ease;
 }
-
-/* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */
-.ide-save-status {
-  position: absolute;
-  bottom: 8px;
-  right: 12px;
-  font-size: 0.75rem;
-  color: var(--color-farm-brown);
-  pointer-events: none;
-  white-space: nowrap;
-  text-align: right;
-}
-.ide-save-status-sub {
-  margin-top: 2px;
-  font-size: 0.7rem;
-  color: var(--color-farm-brown);
-}
-.ide-save-status-stopped {
-  color: var(--color-farm-point, #e07c4a);
-}
-
-/* 실행/제출 버튼 영역 */
-.ide-action-buttons {
-  display: flex;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
-  background-color: var(--color-farm-paper);
-  border-top: 1px solid var(--color-farm-cream);
-  border-bottom: 1px solid var(--color-farm-cream);
-  flex-shrink: 0;
-  justify-content: flex-start; /* 왼쪽 정렬 */
-}
-
-.ide-submit-button {
-  width: 119px; /* 디자인 목업 기준 */
-  padding: 0.5rem 1.25rem;
-  background: linear-gradient(90deg, #7A5C3E 0%, #CDFF86 100%);
-  color: white;
-  border: none;
-  border-radius: 18px; /* 매우 둥근 모서리 */
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  height: 36px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  flex-shrink: 0;
-}
-
-.ide-submit-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-}
-
-.ide-submit-button .play-icon {
-  font-size: 0.875rem;
-  color: white;
-  font-weight: bold;
-  line-height: 1;
-}
-
-.ide-run-button {
-  width: 119px; /* 제출하기와 동일한 크기 */
-  padding: 0.5rem 1.25rem;
-  background-color: white;
-  color: var(--color-farm-brown-dark);
-  border: 1px solid #E0E0E0;
-  border-radius: 18px; /* 매우 둥근 모서리 */
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  height: 36px;
-  flex-shrink: 0;
-}
-
-.ide-run-button:hover:not(:disabled) {
-  background-color: #FAFAFA;
-  border-color: var(--color-farm-green);
-}
-
-.ide-run-button:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.ide-run-button .play-icon {
-  font-size: 0.875rem;
-  color: var(--color-farm-brown-dark);
-  font-weight: bold;
-  line-height: 1;
-}
-
-.ide-escape-button {
-  width: auto;
-  min-width: 100px;
-  padding: 0.5rem 1rem;
-  background-color: white;
-  color: var(--color-farm-brown-dark);
-  border: 1px solid #E0E0E0;
-  border-radius: 18px; /* 매우 둥근 모서리 */
-  font-size: 0.875rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  height: 36px;
-  flex-shrink: 0;
-}
-
-.ide-escape-button:hover {
-  background-color: #FAFAFA;
-  border-color: var(--color-farm-point);
-  color: var(--color-farm-point);
-}
-
-/* 탈주 아이콘 크기 조정 */
-.ide-escape-button .escape-icon {
-  font-size: 1.1rem;
-}
-
-/* 메인→IDE 진입 시 로딩 모달 */
-.ide-loading-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(245, 242, 232, 0.9);
-  z-index: 100;
-}
-.ide-loading-card {
-  background: #fff;
-  border-radius: 1rem;
-  padding: 1.5rem 2rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-}
-.ide-loading-text {
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--color-farm-brown-dark);
-}
-
-/* 힌트 차감 토스트 */
-.ide-toast {
-  position: fixed;
-  bottom: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.6rem 1.25rem;
-  font-size: 0.9rem;
-  color: #fff;
-  background: var(--color-farm-brown-dark);
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1100;
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
 }
 .toast-enter-active,
 .toast-leave-active {
@@ -1202,93 +821,9 @@ function showToast(msg) {
   opacity: 0;
   transform: translateX(-50%) translateY(0.5rem);
 }
-
-/* 로그인 필요 오버레이 */
-.ide-lock-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(245, 242, 232, 0.8);
-  z-index: 10;
-}
-
-.ide-lock-card {
-  background: #fff;
-  border-radius: 1rem;
-  padding: 1.5rem 2rem;
-  max-width: 360px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
-  text-align: center;
-}
-
-.ide-lock-title {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--color-farm-brown-dark);
-  margin-bottom: 0.5rem;
-}
-
-.ide-lock-desc {
-  font-size: 0.9rem;
-  color: #7a6a4a;
-  margin-bottom: 1.25rem;
-}
-
-.ide-lock-actions {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: center;
-}
-
-.ide-lock-primary,
-.ide-lock-secondary {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.ide-lock-primary {
-  background-color: var(--color-farm-green);
-  color: #fff;
-}
-
-.ide-lock-primary:hover {
-  background-color: var(--color-farm-green-dark);
-}
-
-.ide-lock-secondary {
-  background-color: #fff;
-  color: var(--color-farm-brown-dark);
-  border: 1px solid #e0e0e0;
-}
-
-.ide-lock-secondary:hover {
-  background-color: #fafafa;
-}
-
-
-/* 스크롤바 스타일링 */
-.ide-panel-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.ide-panel-content::-webkit-scrollbar-track {
-  background: var(--color-farm-cream);
-}
-
-.ide-panel-content::-webkit-scrollbar-thumb {
-  background: var(--color-farm-green-light);
-  border-radius: 4px;
-}
-
-.ide-panel-content::-webkit-scrollbar-thumb:hover {
-  background: var(--color-farm-green);
+@media (max-width: 767px) {
+  .ide-resizer-hit {
+    display: none;
+  }
 }
 </style>

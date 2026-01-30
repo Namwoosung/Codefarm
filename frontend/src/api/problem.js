@@ -6,7 +6,7 @@ import api from './index'
  * - TODO: 백엔드 스펙이 완전히 통일되면 legacy 필드(p.time_limit 등)는 정리한다.
  * @param {object} raw
  * @param {number} fallbackId
- * @returns {{ problemId:number, title:string, description:string, difficulty:string, algorithm:any, timeLimit:number, memoryLimit:number, exampleInput:string, exampleOutput:string, problemType:string, createdAt:string|null }}
+ * @returns {{ problemId:number, title:string, description:string, concept:string, difficulty:string, algorithm:any, timeLimit:number, memoryLimit:number, exampleInput:string, exampleOutput:string, problemType:string, createdAt:string|null }}
  */
 function normalizeProblem(raw, fallbackId) {
   const p = raw ?? {}
@@ -19,11 +19,14 @@ function normalizeProblem(raw, fallbackId) {
     problemId: id,
     title: p.title ?? '',
     description: p.description ?? '',
+    concept: p.concept ?? '',
     difficulty,
     algorithm: p.algorithm ?? [],
     // legacy 필드 이름은 여기에서만 한 번에 처리
     timeLimit: p.timeLimit ?? p.time_limit ?? 1,
     memoryLimit: p.memoryLimit ?? p.memory_limit ?? 256,
+    inputDescription: p.inputDescription ?? p.input_description ?? '',
+    outputDescription: p.outputDescription ?? p.output_description ?? '',
     exampleInput: p.exampleInput ?? p.example_input ?? '',
     exampleOutput: p.exampleOutput ?? p.example_output ?? '',
     problemType: p.problemType ?? p.problem_type ?? 'NORMAL',

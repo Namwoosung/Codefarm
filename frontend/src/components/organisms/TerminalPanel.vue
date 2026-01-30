@@ -6,10 +6,17 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
+
+/** 터미널 상태: READY(입력 가능) | RUNNING(API 대기 중, 입력 차단) */
+const mode = ref('READY')
+/** 현재 줄에 입력 중인 문자열 */
+const inputBuffer = ref('')
+/** 서버로 보낼 전체 입력 (여러 줄, 실행 시 한 번에 전송) */
+const fullInput = ref('')
 
 let term = null
 let fitAddon = null
@@ -27,7 +34,7 @@ onMounted(async () => {
   
   // 1. 터미널 객체 생성
   term = new Terminal({
-    cursorBlink: true,
+    cursorBlink: false,
     fontSize: 14,
     fontFamily: '"D2Coding", "Courier New", monospace',
     fontWeight: 'bold',
@@ -50,6 +57,9 @@ onMounted(async () => {
   const container = document.getElementById('xterm-container')
   if (container) {
     term.open(container)
+
+    // stdin은 모달에서 받으므로 터미널 입력 비활성화 (출력 전용)
+    term.onData(() => {})
     
     // 4. 터미널 크기 조정 (약간의 지연을 두어 DOM이 완전히 렌더링된 후)
     setTimeout(() => {
@@ -73,7 +83,7 @@ onMounted(async () => {
     })
     resizeObserver.observe(container)
     
-    // 복사: 선택 영역 Ctrl+C 시 클립보드에 복사
+    // 복사만 허용 (Ctrl+C), 붙여넣기·타이핑은 입력 막혀 있음
     term.attachCustomKeyEventHandler((e) => {
       if (e.ctrlKey && e.key === 'c') {
         const sel = term.getSelection()
@@ -84,9 +94,6 @@ onMounted(async () => {
       }
       if (e.ctrlKey && e.key === 'v') {
         e.preventDefault()
-        navigator.clipboard?.readText().then((text) => {
-          if (text && term) term.write(text)
-        }).catch(() => {})
       }
       return true
     })
@@ -118,6 +125,22 @@ function normalizeLineEndings(text) {
 }
 
 defineExpose({
+  /** 서버로 보낼 전체 입력 (현재 줄 포함). 실행 시 API input 필드에 전달 */
+  getFullInput: () => {
+    const line = inputBuffer.value
+    return fullInput.value + (line ? line + '\n' : '')
+  },
+  /** 입력 버퍼 초기화 (실행 완료 후 호출, 프롬프트/커서 출력 없음) */
+  clearInputAndShowPrompt: () => {
+    fullInput.value = ''
+    inputBuffer.value = ''
+    if (term) term.write('\r\n')
+    mode.value = 'READY'
+  },
+  /** RUNNING: 입력 차단, READY: 입력 가능 */
+  setRunning: (running) => {
+    mode.value = running ? 'RUNNING' : 'READY'
+  },
   write: (text) => {
     if (term) term.write(normalizeLineEndings(text))
   },
@@ -126,7 +149,12 @@ defineExpose({
     if (term && text) term.write(ANSI_RED + normalizeLineEndings(text) + ANSI_RESET)
   },
   clear: () => {
-    if (term) term.clear()
+    if (term) {
+      term.clear()
+      fullInput.value = ''
+      inputBuffer.value = ''
+      mode.value = 'READY'
+    }
   },
   terminal: term
 })
@@ -196,5 +224,10 @@ defineExpose({
 
 :deep(.xterm-cursor-layer) {
   z-index: 2;
+}
+
+/* 출력 전용 터미널: 커서 숨김 */
+:deep(.xterm-cursor) {
+  visibility: hidden;
 }
 </style>
