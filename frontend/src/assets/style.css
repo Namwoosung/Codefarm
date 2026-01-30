@@ -24,6 +24,12 @@
   --color-farm-paper: #FFFDF5;
   --color-farm-olive: #4A4A29;
   --color-farm-point: #E07A5F;
+  /* 문제 패널 다크 영역 (제출 내역 등, 프로그래머스 스타일) */
+  --color-panel-dark-bg: #2d2a26;
+  --color-panel-dark-surface: #38342e;
+  --color-panel-dark-border: #4a4540;
+  --color-panel-dark-text: #e8e4df;
+  --color-panel-dark-text-muted: #a39e96;
 }
 
 :root {
