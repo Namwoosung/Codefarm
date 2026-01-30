@@ -51,13 +51,12 @@ export const getLatestCode = (sessionId) => {
 }
 
 /**
- * 실행하기 (백엔드 @NotBlank: 공백만 있으면 400이므로 비공백 1글자 이상 필요)
+ * 실행하기 (input 없으면 빈 문자열 전송, input() 시 stdin으로 사용)
  * @param {number} sessionId
  * @param {{ language: string, code: string, input?: string }} body
  */
-const RUN_DEFAULT_INPUT = '.' // @NotBlank 통과용 최소 비공백
 export const runCode = (sessionId, { language, code, input }) => {
-  const body = { language, code, input: (input != null && input.trim()) ? input : RUN_DEFAULT_INPUT }
+  const body = { language, code, input: input != null ? String(input) : '' }
   return api.post(`/sessions/${sessionId}/run`, body)
 }
 

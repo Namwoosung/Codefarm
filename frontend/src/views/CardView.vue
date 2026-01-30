@@ -118,19 +118,37 @@
         leave-from-class="opacity-100 scale-100 translate-y-0"
         leave-to-class="opacity-0 scale-95 translate-y-2"
       >
-        <div v-if="selectedCard" :class="popupCardContainerClass">
-          <div
-            v-if="isGachaModal && drawMessage"
-            class="absolute top-3 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-black/70 text-white text-sm font-bold shadow-lg backdrop-blur-sm"
-          >
-            {{ drawMessage }}
-          </div>
-          <img
-            :src="selectedCard.image"
-            :alt="selectedCard.name"
-            class="w-full h-full object-contain block"
-            loading="lazy"
-          />
+        <div
+          ref="modalCardEl"
+          class="modal-card-3d"
+          :class="popupCardContainerClass"
+          :style="modalPointerStyle"
+          @pointerenter="onModalPointerMove"
+          @pointermove="onModalPointerMove"
+          @pointerleave="onModalPointerLeave"
+        >
+          <figure class="w-full h-full rounded-2xl overflow-visible relative block m-0">
+            <div
+              v-if="isGachaModal && drawMessage"
+              class="absolute top-3 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-black/70 text-white text-sm font-bold shadow-lg backdrop-blur-sm"
+            >
+              {{ drawMessage }}
+            </div>
+            <img
+              :src="modalCardImage"
+              :alt="selectedCard.name"
+              class="w-full h-full object-contain block"
+              loading="lazy"
+            />
+          </figure>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
+          <div></div>
         </div>
       </Transition>
     </div>
@@ -194,6 +212,15 @@ const closeCardModal = () => {
 }
 const selectedCard = ref(null)
 const isGachaModal = ref(false)
+
+// 백엔드가 카드 이미지를 .svg로 주는 경우 .png로 변환
+const modalCardImage = computed(() => {
+  const c = selectedCard.value
+  if (!c) return ''
+  const raw = c.image ?? c.cardImage ?? c.img ?? ''
+  return typeof raw === 'string' ? raw.replace(/\.svg$/i, '.png') : ''
+})
+
 const scrollLockPrev = {
   htmlOverflow: '',
   htmlPaddingRight: '',
@@ -271,11 +298,57 @@ const scroll = (grade, direction) => {
 }
 const popupCardContainerClass = computed(() => {
   const base =
-    'relative bg-transparent rounded-2xl overflow-hidden shadow-2xl shadow-[0_0_60px_rgba(255,255,255,0.35)]'
+    'hover-3d relative bg-transparent rounded-2xl overflow-visible shadow-2xl shadow-[0_0_60px_rgba(255,255,255,0.35)]'
   const grade = selectedCard.value?.grade
-  // 슬롯의 약 2.5배 크기 (SPECIAL: 320 -> 800, 그 외: 140 -> 350)
   return grade === 'SPECIAL'
     ? `${base} w-[min(92vw,800px)] aspect-[1024/723]`
     : `${base} w-[min(92vw,350px)] aspect-[1872/2613]`
 })
+
+const modalCardEl = ref(null)
+const modalPointerPos = ref({ x: 0, y: 0 })
+const modalPointerActive = ref(false)
+
+function getModalPointerPosition(e) {
+  const el = modalCardEl.value
+  if (!el) return null
+  const rect = el.getBoundingClientRect()
+  const clientX = e.clientX ?? e.touches?.[0]?.clientX
+  const clientY = e.clientY ?? e.touches?.[0]?.clientY
+  if (clientX == null || clientY == null) return null
+  const normX = (clientX - rect.left) / rect.width
+  const normY = (clientY - rect.top) / rect.height
+  const x = Math.max(-1, Math.min(1, (normX - 0.5) * 2))
+  const y = Math.max(-1, Math.min(1, (0.5 - normY) * 2))
+  return { x, y }
+}
+
+function onModalPointerMove(e) {
+  modalPointerActive.value = true
+  const pos = getModalPointerPosition(e)
+  if (pos) modalPointerPos.value = pos
+}
+
+function onModalPointerLeave() {
+  modalPointerActive.value = false
+  modalPointerPos.value = { x: 0, y: 0 }
+}
+
+const modalPointerStyle = computed(() => {
+  if (!modalPointerActive.value) return {}
+  const { x, y } = modalPointerPos.value
+  return {
+    '--transform': `${x}, ${y}`,
+    '--shine': `${(x + 1) * 50}% ${(y + 1) * 50}%`,
+    '--shadow': `${x * 0.5}rem ${y * 0.5}rem`,
+  }
+})
 </script>
+
+<style scoped>
+/* 3D 기울임 시 카드가 잘리지 않도록 overflow 제거 */
+.modal-card-3d,
+.modal-card-3d > :first-child {
+  overflow: visible !important;
+}
+</style>
