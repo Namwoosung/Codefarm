@@ -3,6 +3,7 @@ package com.ssafy.codefarm.curriculum.controller;
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.dto.SuccessResponse;
 import com.ssafy.codefarm.curriculum.dto.response.CurriculumDetailResponseDto;
+import com.ssafy.codefarm.curriculum.dto.response.CurriculumRecommendResponseDto;
 import com.ssafy.codefarm.curriculum.service.CurriculumService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,5 +32,17 @@ public class CurriculumController {
                 curriculumService.getCurriculumDetail(curriculumId, userId);
 
         return SuccessResponse.success("커리큘럼 상세 조회 성공", responseDto);
+    }
+
+    @GetMapping("/{curriculumId}/recommend")
+    public SuccessResponse getRecommendedProblem(
+            @PathVariable Long curriculumId,
+            @AuthenticationPrincipal CustomUserDetails userDetails
+    ) {
+
+        CurriculumRecommendResponseDto curriculumRecommendResponseDto =
+                curriculumService.getRecommendedProblem(curriculumId, userDetails.getUserId());
+
+        return SuccessResponse.success("커리큘럼 추천 문제 조회 성공", curriculumRecommendResponseDto);
     }
 }
