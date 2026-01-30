@@ -2,8 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 /** 문제에 처음 들어갔을 때 보여줄 기본 코드 (solution 함수 구조) */
-export const DEFAULT_CODE = `def solution():
-    print("코드팜에 어서오세요!")`
+export const DEFAULT_CODE = `print("코드팜에 어서오세요!")`
 
 export const useIdeStore = defineStore('ide', () => {
   // 문제 ID별로 저장된 코드 { [problemId]: string }
