@@ -100,18 +100,11 @@ const pointerTransformStyle = computed(() => {
   }
 })
 
-// S3 등급별 동물 카드: .svg → .png 사용
-const toCardImageUrl = (url) => {
-  if (typeof url !== 'string' || !url) return ''
-  return url.replace(/\.svg$/i, '.png')
-}
-
 // 카드 상세 팝업에서 사용하는 카드 정보
 const view = computed(() => {
   const card = props.card ?? {}
-  const rawImage = card.image ?? card.cardImage ?? card.img ?? ''
   return {
-    image: toCardImageUrl(rawImage),
+    image: card.image ?? card.cardImage ?? card.img ?? '',
     name: card.name ?? card.cardName ?? 'Unknown',
     grade: card.grade ?? card.cardGrade ?? '',
   }
