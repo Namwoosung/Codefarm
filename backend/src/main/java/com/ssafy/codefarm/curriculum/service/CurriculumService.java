@@ -5,10 +5,7 @@ import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.curriculum.dto.query.CurriculumDetailQueryDto;
 import com.ssafy.codefarm.curriculum.dto.query.CurriculumProblemDetailQueryDto;
 import com.ssafy.codefarm.curriculum.dto.query.CurriculumProblemOrderDto;
-import com.ssafy.codefarm.curriculum.dto.response.CurriculumDetailResponseDto;
-import com.ssafy.codefarm.curriculum.dto.response.CurriculumProblemItemResponseDto;
-import com.ssafy.codefarm.curriculum.dto.response.CurriculumRecommendResponseDto;
-import com.ssafy.codefarm.curriculum.dto.response.CurriculumResponseDto;
+import com.ssafy.codefarm.curriculum.dto.response.*;
 import com.ssafy.codefarm.curriculum.entity.Curriculum;
 import com.ssafy.codefarm.curriculum.repository.CurriculumRepository;
 import com.ssafy.codefarm.problem.dto.query.ProblemListQueryDto;
@@ -102,5 +99,97 @@ public class CurriculumService {
         ProblemListItemResponseDto item = ProblemListItemResponseDto.from(recommended, true);
 
         return new CurriculumRecommendResponseDto(true, item);
+    }
+
+    @Transactional(readOnly = true)
+    public CurriculumListResponseDto getCurriculumList(Long userId) {
+
+        boolean isLogined = userId != null;
+
+        List<Curriculum> curriculums = curriculumRepository.findAll();
+
+        List<CurriculumListItemResponseDto> items =
+                curriculums.stream()
+                        .map(curriculum ->
+                                buildCurriculumListItem(curriculum, userId, isLogined)
+                        )
+                        .toList();
+
+        return new CurriculumListResponseDto(isLogined, items);
+    }
+
+    private CurriculumListItemResponseDto buildCurriculumListItem(
+            Curriculum curriculum,
+            Long userId,
+            boolean isLogined
+    ) {
+
+        // ===== 상세 조회 =====
+        CurriculumDetailQueryDto curriculumDto =
+                curriculumRepository.findCurriculumDetail(curriculum.getId());
+
+        List<CurriculumProblemDetailQueryDto> problemDtos =
+                curriculumRepository.findCurriculumProblemList(
+                        curriculum.getId(),
+                        userId
+                );
+
+        List<CurriculumProblemItemResponseDto> problems =
+                problemDtos.stream()
+                        .map(dto -> CurriculumProblemItemResponseDto.from(dto, isLogined))
+                        .toList();
+
+        Integer solvedProblemCount = null;
+
+        if (isLogined) {
+            solvedProblemCount = (int) problemDtos.stream()
+                    .filter(dto -> Boolean.TRUE.equals(dto.isSolved()))
+                    .count();
+        }
+
+        CurriculumResponseDto curriculumResponseDto =
+                CurriculumResponseDto.from(
+                        curriculumDto,
+                        solvedProblemCount,
+                        problems
+                );
+
+        // ===== 추천 문제 =====
+        ProblemListItemResponseDto recommended = null;
+
+        if (isLogined && curriculum.getCurriculumDifficulty() >= 4) {
+
+            List<CurriculumProblemOrderDto> orders =
+                    curriculumRepository.findCurriculumProblemOrders(
+                            curriculum.getId(),
+                            userId
+                    );
+
+            CurriculumProblemOrderDto blocked =
+                    orders.stream()
+                            .filter(p -> !Boolean.TRUE.equals(p.isSolved()))
+                            .findFirst()
+                            .orElse(null);
+
+            if (blocked != null) {
+
+                ProblemListQueryDto rec =
+                        curriculumRepository.findRandomRecommendedProblem(
+                                blocked.algorithm(),
+                                blocked.difficulty(),
+                                userId
+                        );
+
+                if (rec != null) {
+                    recommended =
+                            ProblemListItemResponseDto.from(rec, true);
+                }
+            }
+        }
+
+        return new CurriculumListItemResponseDto(
+                curriculumResponseDto,
+                recommended
+        );
     }
 }
