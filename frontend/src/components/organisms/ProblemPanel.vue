@@ -1,6 +1,6 @@
 <template>
   <div class="problem-panel">
-    <!-- 문제 설명 영역 (스크롤 가능) -->
+    <!-- 문제 설명 + AI 채팅 영역 통합 스크롤 -->
     <div class="problem-content">
       <!-- 문제 번호 -->
       <div class="mb-4">
@@ -50,37 +50,37 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- AI 선생님 채팅창 틀 -->
-    <div class="problem-chat-section">
-      <div class="flex items-start space-x-3 mb-4">
-        <div class="w-10 h-10 bg-farm-yellow rounded-full flex items-center justify-center flex-shrink-0">
-          <iconify-icon icon="mdi:robot" class="text-xl text-farm-brown-dark"></iconify-icon>
+      <!-- AI 선생님 채팅창 틀 (문제 패널과 함께 스크롤) -->
+      <div class="problem-chat-section">
+        <div class="flex items-start space-x-3 mb-4">
+          <div class="w-10 h-10 bg-farm-yellow rounded-full flex items-center justify-center flex-shrink-0">
+            <iconify-icon icon="mdi:robot" class="text-xl text-farm-brown-dark"></iconify-icon>
+          </div>
+          <div class="flex-1">
+            <p class="text-farm-brown-dark text-sm">
+              도움이 필요하신가요? 어떤 부분에서 어렵다고 느끼셨나요?
+            </p>
+          </div>
         </div>
-        <div class="flex-1">
-          <p class="text-farm-brown-dark text-sm">
-            도움이 필요하신가요? 어떤 부분에서 어렵다고 느끼셨나요?
-          </p>
-        </div>
-      </div>
-      
-      <div class="relative">
-        <textarea
-          v-model="chatInput"
-          placeholder="어떤 부분에서 어려움을 느꼈는지 적어주세요..."
-          class="w-full p-3 border border-farm-cream rounded-lg bg-white text-farm-brown-dark placeholder-farm-brown resize-none focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent"
-          rows="3"
-        ></textarea>
         
-        <div class="flex items-center justify-between mt-2">
-          <span class="text-sm text-farm-brown">당근 수: {{ carrotCount }}/3</span>
-          <button
-            class="p-2 bg-farm-green text-white rounded-lg hover:bg-farm-green-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            :disabled="!chatInput.trim() || carrotCount <= 0"
-          >
-            <iconify-icon icon="mdi:send" class="text-xl"></iconify-icon>
-          </button>
+        <div class="relative">
+          <textarea
+            v-model="chatInput"
+            placeholder="어떤 부분에서 어려움을 느꼈는지 적어주세요..."
+            class="w-full p-3 border border-farm-cream rounded-lg bg-white text-farm-brown-dark placeholder-farm-brown resize-none focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent"
+            rows="3"
+          ></textarea>
+          
+          <div class="flex items-center justify-between mt-2">
+            <span class="text-sm text-farm-brown">당근 수: {{ carrotCount }}/3</span>
+            <button
+              class="p-2 bg-farm-green text-white rounded-lg hover:bg-farm-green-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              :disabled="!chatInput.trim() || carrotCount <= 0"
+            >
+              <iconify-icon icon="mdi:send" class="text-xl"></iconify-icon>
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -144,6 +144,7 @@ onMounted(() => {
 
 .problem-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -151,7 +152,6 @@ onMounted(() => {
   border-top: 1px solid var(--color-farm-cream);
   padding: 1.5rem;
   background-color: var(--color-farm-paper);
-  flex-shrink: 0;
 }
 
 /* 스크롤바 스타일링 */

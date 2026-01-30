@@ -13,8 +13,29 @@ const normalizeCodingLevel = (codingLevel) => {
   return NaN
 }
 
+/** localStorage의 토큰을 읽어, 만료되었으면 제거하고 null 반환 */
+function getValidTokenFromStorage() {
+  const raw = localStorage.getItem('token')
+  if (!raw) return null
+  try {
+    const payload = raw.split('.')[1]
+    if (!payload) return raw
+    const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+    if (decoded.exp != null && typeof decoded.exp === 'number') {
+      const now = Math.floor(Date.now() / 1000)
+      if (decoded.exp < now) {
+        localStorage.removeItem('token')
+        return null
+      }
+    }
+    return raw
+  } catch {
+    return raw
+  }
+}
+
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem('token') || null)
+  const token = ref(getValidTokenFromStorage())
   const user = ref(null)
 
   // 새로고침 시에도 로그인 상태 유지를 위해 user 복원
@@ -103,6 +124,18 @@ export const useAuthStore = defineStore('auth', () => {
     return response.data?.data?.isAvailable ?? false
   }
 
+  /** 토큰은 있는데 user가 비어 있을 때(새로고침 등) GET /users/profiles로 사용자 복구 */
+  const fetchUserIfNeeded = async () => {
+    if (!token.value || user.value != null) return
+    try {
+      const res = await api.get('/users/profiles')
+      user.value = res.data?.data ?? null
+    } catch (_) {
+      // 401 등이면 인터셉터에서 이미 logout 처리됨
+      user.value = null
+    }
+  }
+
   return {
     token,
     user,
@@ -114,6 +147,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     signup,
+    fetchUserIfNeeded,
     checkEmailDuplicate,
     checkNicknameDuplicate
   }
