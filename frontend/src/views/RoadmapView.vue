@@ -452,7 +452,7 @@ function onClickRecommend(curriculumIdx) {
   min-height: 0;
   display: block;
   object-fit: cover;
-  object-position: center top;
+  object-position: center center;
 }
 .cf-roadmap-level-header {
   position: absolute;
