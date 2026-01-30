@@ -149,20 +149,42 @@
       </Transition>
     </Teleport>
 
+    <!-- 확인 모달 (탈주/페이지 이탈 등) -->
+    <ConfirmModal
+      :show="confirmState.show"
+      :title="confirmState.title"
+      :message="confirmState.message"
+      :variant="confirmState.variant"
+      :confirm-text="confirmState.confirmText"
+      :cancel-text="confirmState.cancelText"
+      @confirm="onConfirmModalConfirm"
+      @cancel="onConfirmModalCancel"
+    />
+
+    <!-- 힌트 차감 토스트 -->
     <Transition name="toast">
-      <div v-if="toastMessage" class="fixed bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 text-sm text-white bg-[var(--color-farm-brown-dark)] rounded-lg shadow-lg z-[1100]">{{ toastMessage }}</div>
+      <div v-if="toastMessage" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100] w-[min(520px,calc(100vw-2rem))]">
+        <div role="alert" class="alert alert-info alert-soft shadow-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span class="text-sm font-semibold">{{ toastMessage }}</span>
+        </div>
+      </div>
     </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import HintPanel from '@/components/organisms/HintPanel.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
 import ReportModal from '@/components/organisms/ReportModal.vue'
+import HintModal from '@/components/organisms/HintModal.vue'
+import ConfirmModal from '@/components/organisms/ConfirmModal.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
 import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
@@ -204,6 +226,43 @@ const hintPanelOpen = ref(true)
 /** 힌트 차감 토스트 (FR-CODE-010-1) */
 const toastMessage = ref('')
 let toastTimer = null
+/** confirm 대체 모달 (탈주/이탈) */
+const confirmState = reactive({
+  show: false,
+  title: '',
+  message: '',
+  variant: 'warning', // 'info' | 'success' | 'warning' | 'error'
+  confirmText: '확인',
+  cancelText: '취소',
+})
+let confirmResolver = null
+
+function requestConfirm({ title, message, variant = 'warning', confirmText = '확인', cancelText = '취소' } = {}) {
+  confirmState.title = title ?? ''
+  confirmState.message = message ?? ''
+  confirmState.variant = variant
+  confirmState.confirmText = confirmText
+  confirmState.cancelText = cancelText
+  confirmState.show = true
+
+  return new Promise((resolve) => {
+    confirmResolver = resolve
+  })
+}
+
+function closeConfirm(result) {
+  confirmState.show = false
+  const r = confirmResolver
+  confirmResolver = null
+  if (typeof r === 'function') r(!!result)
+}
+
+function onConfirmModalConfirm() {
+  closeConfirm(true)
+}
+function onConfirmModalCancel() {
+  closeConfirm(false)
+}
 // FR-CODE-002-1: 저장 상태 표시
 const lastSavedAt = ref(null)
 const isSaveInProgress = ref(false)
@@ -515,23 +574,26 @@ watch(() => route.params.id, async (newId, oldId) => {
 })
 
 /** FR-CODE-010: 코드 작성 중 나가기 시 확인 메시지 (뒤로가기/라우트 이탈) */
-onBeforeRouteLeave(async (to, from, next) => {
+onBeforeRouteLeave(async (to, from) => {
   const code = ideStore.getCode(route.params.id)
   const hasCode = code != null && String(code).trim() !== ''
   const message = hasCode
     ? '작성 중인 코드가 있습니다. 정말 나가시겠습니까?'
     : '진행 상황은 저장되지 않습니다. 정말 페이지를 벗어나시겠습니까?'
-  const ok = window.confirm(message)
-  if (!ok) {
-    next(false)
-    return
-  }
+  const ok = await requestConfirm({
+    title: '페이지 나가기',
+    message,
+    variant: hasCode ? 'warning' : 'info',
+    confirmText: '나가기',
+    cancelText: '취소',
+  })
+  if (!ok) return false
   await closeSessionOnLeave()
   if (snapshotIntervalId) {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
   }
-  next()
+  return true
 })
 
 onUnmounted(() => {
@@ -550,6 +612,9 @@ onUnmounted(() => {
   window.removeEventListener('online', onOnline)
   window.removeEventListener('offline', onOffline)
   window.removeEventListener('beforeunload', onBeforeUnload)
+
+  // confirm 대기 중이면 안전하게 취소 처리
+  if (confirmResolver) closeConfirm(false)
 })
 
 const handleBack = async () => {
@@ -723,7 +788,14 @@ const doRunWithInput = async (input) => {
 }
 
 const handleEscape = async () => {
-  if (!confirm('정말 탈주하시겠습니까?')) return
+  const ok = await requestConfirm({
+    title: '탈주하기',
+    message: '정말 탈주하시겠습니까?',
+    variant: 'warning',
+    confirmText: '탈주',
+    cancelText: '취소',
+  })
+  if (!ok) return
   const sid = ideStore.sessionId
   if (sid && isLoggedIn.value) {
     try {
@@ -811,6 +883,159 @@ function showToast(msg) {
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+
+/* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */
+.ide-save-status {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  font-size: 0.75rem;
+  color: var(--color-farm-brown);
+  pointer-events: none;
+  white-space: nowrap;
+  text-align: right;
+}
+.ide-save-status-sub {
+  margin-top: 2px;
+  font-size: 0.7rem;
+  color: var(--color-farm-brown);
+}
+.ide-save-status-stopped {
+  color: var(--color-farm-point, #e07c4a);
+}
+
+/* 실행/제출 버튼 영역 */
+.ide-action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background-color: var(--color-farm-paper);
+  border-top: 1px solid var(--color-farm-cream);
+  border-bottom: 1px solid var(--color-farm-cream);
+  flex-shrink: 0;
+  justify-content: flex-start; /* 왼쪽 정렬 */
+}
+
+.ide-submit-button {
+  width: 119px; /* 디자인 목업 기준 */
+  padding: 0.5rem 1.25rem;
+  background: linear-gradient(90deg, #7A5C3E 0%, #CDFF86 100%);
+  color: white;
+  border: none;
+  border-radius: 18px; /* 매우 둥근 모서리 */
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 36px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
+}
+
+.ide-submit-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.ide-submit-button .play-icon {
+  font-size: 0.875rem;
+  color: white;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.ide-run-button {
+  width: 119px; /* 제출하기와 동일한 크기 */
+  padding: 0.5rem 1.25rem;
+  background-color: white;
+  color: var(--color-farm-brown-dark);
+  border: 1px solid #E0E0E0;
+  border-radius: 18px; /* 매우 둥근 모서리 */
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.ide-run-button:hover:not(:disabled) {
+  background-color: #FAFAFA;
+  border-color: var(--color-farm-green);
+}
+
+.ide-run-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.ide-run-button .play-icon {
+  font-size: 0.875rem;
+  color: var(--color-farm-brown-dark);
+  font-weight: bold;
+  line-height: 1;
+}
+
+.ide-escape-button {
+  width: auto;
+  min-width: 100px;
+  padding: 0.5rem 1rem;
+  background-color: white;
+  color: var(--color-farm-brown-dark);
+  border: 1px solid #E0E0E0;
+  border-radius: 18px; /* 매우 둥근 모서리 */
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 36px;
+  flex-shrink: 0;
+}
+
+.ide-escape-button:hover {
+  background-color: #FAFAFA;
+  border-color: var(--color-farm-point);
+  color: var(--color-farm-point);
+}
+
+/* 탈주 아이콘 크기 조정 */
+.ide-escape-button .escape-icon {
+  font-size: 1.1rem;
+}
+
+/* 메인→IDE 진입 시 로딩 모달 */
+.ide-loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 242, 232, 0.9);
+  z-index: 100;
+}
+.ide-loading-card {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+.ide-loading-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-farm-brown-dark);
 }
 .toast-enter-active,
 .toast-leave-active {

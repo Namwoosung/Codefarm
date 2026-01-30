@@ -71,7 +71,7 @@ const onMqlChange = ref(null)
 
 // 탭 1개당 '스프레드(좌/우 2페이지)'로 가정
 const tabs = [
-  { key: 'info', label: '내 정보' },
+  { key: 'info', label: '학습 기록' },
   { key: 'record', label: '학습 기록' },
   // { key: 'settings', label: '설정' },
 ]
