@@ -1,12 +1,20 @@
 <template>
   <div class="ide-container">
+    <!-- 메인→IDE 진입 시 로딩 모달 -->
+    <div v-if="isInitializing" class="ide-loading-overlay">
+      <div class="ide-loading-card">
+        <p class="ide-loading-text">로딩중...</p>
+      </div>
+    </div>
+
     <!-- 기능 바: Navbar 밑 -->
     <div class="ide-toolbar">
-      <!-- 왼쪽: 뒤로가기 -->
+      <!-- 왼쪽: 뒤로가기 + FR-CODE-011 타이머 -->
       <button class="ide-back-button" @click="handleBack">
         <i class="pi pi-arrow-left"></i>
         <span>뒤로가기</span>
       </button>
+      <span v-if="!isInitializing && problemStartTime > 0" class="ide-timer">⏱️ {{ elapsedDisplay }}</span>
 
       <!-- 오른쪽: 당근 3개 + 종 아이콘 -->
       <div class="ide-toolbar-right">
@@ -31,7 +39,7 @@
       <!-- 왼쪽 패널: 문제 설명 영역 -->
       <aside class="ide-panel-left" :style="{ width: leftPanelWidth + '%' }">
         <div class="ide-panel-content">
-          <ProblemPanel />
+          <ProblemPanel @open-report="handleOpenReport" />
         </div>
       </aside>
 
@@ -74,8 +82,15 @@
               <span>탈주하기</span>
             </button>
           </div>
-          
-          <TerminalPanel ref="terminalPanel" />
+
+          <!-- 에디터-터미널 세로 리사이저 -->
+          <div
+            class="ide-terminal-resizer"
+            @mousedown="startResizeVertical"
+          ></div>
+          <div class="ide-terminal-wrap" :style="{ height: terminalHeight + 'px' }">
+            <TerminalPanel ref="terminalPanel" />
+          </div>
 
           <!-- 로그인 필요 안내 오버레이 -->
           <div v-if="!isLoggedIn" class="ide-lock-overlay">
@@ -97,6 +112,13 @@
         </div>
       </main>
     </div>
+
+    <!-- 리포트 모달 (제출 성공/탈주 시) -->
+    <ReportModal
+      :show="showReportModal"
+      :report="reportData"
+      @close="onReportModalClose"
+    />
   </div>
 </template>
 
@@ -106,20 +128,22 @@ import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
+import ReportModal from '@/components/organisms/ReportModal.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
 import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
-import { storeToRefs } from 'pinia'
 import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
 import * as sessionApi from '@/api/session'
+import { getReportDetail, getMockReportData, buildReportFromSubmitResponse } from '@/api/reports'
 
 const router = useRouter()
 const route = useRoute()
 const terminalPanel = ref(null)
 const authStore = useAuthStore()
 const ideStore = useIdeStore()
-const { isLoggedIn } = storeToRefs(authStore)
+// 스토어 로그인 상태를 computed로 참조해 로그아웃 시에도 블러/오버레이 즉시 반영
+const isLoggedIn = computed(() => !!authStore.token)
 
 // 백엔드 언어 코드 (에디터는 python, API는 PYTHON)
 const API_LANGUAGE = 'PYTHON'
@@ -127,13 +151,22 @@ const API_LANGUAGE = 'PYTHON'
 // 패널 리사이저 관련
 const leftPanelWidth = ref(50) // 기본 50%
 const isResizing = ref(false)
+const terminalHeight = ref(280) // 터미널 영역 높이 (px)
+const isResizingVertical = ref(false)
 const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
+const isInitializing = ref(true) // 메인→IDE 진입 시 세션/문제 로드 중
+const showReportModal = ref(false)
+const reportData = ref(null)
+/** 제출 내역에서 열었을 때 true → 닫을 때 메인으로 이동하지 않음 */
+const reportModalFromHistory = ref(false)
 // FR-CODE-002-1: 저장 상태 표시
 const lastSavedAt = ref(null)
 const isSaveInProgress = ref(false)
 const saveFailed = ref(false)
 const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
 const lastStatusTick = ref(Date.now()) // "N초 전" 갱신용
+/** FR-CODE-011: 문제 풀이 시작 시각 (타이머 표시용) */
+const problemStartTime = ref(0)
 const snapshotStoppedByIdle = ref(false) // 10초 무입력으로 전송 중단 시 true (테스트 확인용)
 let snapshotIntervalId = null
 let statusTickIntervalId = null
@@ -175,6 +208,31 @@ const stopResize = () => {
   document.removeEventListener('mouseup', stopResize)
 }
 
+// 에디터-터미널 세로 리사이저
+const TERMINAL_MIN_HEIGHT = 150
+const TERMINAL_MAX_HEIGHT = 600
+const startResizeVertical = (e) => {
+  isResizingVertical.value = true
+  document.addEventListener('mousemove', handleResizeVertical)
+  document.addEventListener('mouseup', stopResizeVertical)
+  e.preventDefault()
+}
+const handleResizeVertical = (e) => {
+  if (!isResizingVertical.value) return
+  const rightPanel = document.querySelector('.ide-panel-right')
+  if (!rightPanel) return
+  const rect = rightPanel.getBoundingClientRect()
+  const newHeight = rect.bottom - e.clientY
+  if (newHeight >= TERMINAL_MIN_HEIGHT && newHeight <= TERMINAL_MAX_HEIGHT) {
+    terminalHeight.value = newHeight
+  }
+}
+const stopResizeVertical = () => {
+  isResizingVertical.value = false
+  document.removeEventListener('mousemove', handleResizeVertical)
+  document.removeEventListener('mouseup', stopResizeVertical)
+}
+
 // FR-CODE-002-1: "💾 저장됨 (3초 전)", "💾 저장 중...", "⚠️ 연결 끊김"
 const saveStatusText = computed(() => {
   if (!isOnline.value) return '⚠️ 연결 끊김'
@@ -195,9 +253,22 @@ const recentlySentText = computed(() => {
   return ''
 })
 
+/** FR-CODE-011: 경과 시간 "⏱️ MM:SS" 또는 "⏱️ H:MM:SS" */
+const elapsedDisplay = computed(() => {
+  const start = problemStartTime.value
+  if (!start) return '0:00'
+  const sec = Math.max(0, Math.floor((lastStatusTick.value - start) / 1000))
+  const m = Math.floor(sec / 60)
+  const s = sec % 60
+  const pad = (n) => String(n).padStart(2, '0')
+  if (sec < 3600) return `${m}:${pad(s)}`
+  const h = Math.floor(sec / 3600)
+  return `${h}:${pad(m)}:${pad(s)}`
+})
+
 /** 세션 초기화: 활성 세션 조회 또는 세션 생성 후 최신 코드 로드 (라우트 id = 백엔드 problemId) */
 async function initSession() {
-  if (!isLoggedIn) return
+  if (!isLoggedIn.value) return
   const problemId = Number(route.params.id)
   if (!problemId) return
 
@@ -339,15 +410,31 @@ async function closeSessionOnLeave() {
   ideStore.clearSession()
 }
 
+/** FR-CODE-010: 브라우저 닫기/새로고침 시 작성 중인 코드 있으면 확인 (beforeunload) */
+function onBeforeUnload(e) {
+  const code = ideStore.getCode(route.params.id)
+  if (code != null && String(code).trim() !== '') {
+    e.preventDefault()
+    e.returnValue = ''
+  }
+}
+
 onMounted(async () => {
-  await initSession()
+  isInitializing.value = true
+  try {
+    await initSession()
+    problemStartTime.value = Date.now()
+  } finally {
+    isInitializing.value = false
+  }
   // 10초 저장은 첫 입력 후에만 시작 (startSnapshotInterval은 lastCodeInputAt 변경 시 watch에서 호출)
-  // "N초 전" 1초마다 갱신
+  // "N초 전" 1초마다 갱신 (FR-CODE-011 타이머도 동일 간격으로 갱신)
   statusTickIntervalId = setInterval(() => {
     lastStatusTick.value = Date.now()
   }, 1000)
   window.addEventListener('online', onOnline)
   window.addEventListener('offline', onOffline)
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 // 첫 입력(또는 30초 idle 후 재입력) 시 10초 스냅샷 interval 시작
@@ -357,11 +444,25 @@ watch(() => ideStore.lastCodeInputAt, () => {
 
 // 같은 IDE 페이지에서 문제 ID만 바뀐 경우 세션 재초기화 (interval은 입력 시 다시 시작)
 watch(() => route.params.id, async (newId, oldId) => {
-  if (newId && newId !== oldId) await initSession()
+  if (newId && newId !== oldId) {
+    isInitializing.value = true
+    try {
+      await initSession()
+      problemStartTime.value = Date.now()
+    } finally {
+      isInitializing.value = false
+    }
+  }
 })
 
+/** FR-CODE-010: 코드 작성 중 나가기 시 확인 메시지 (뒤로가기/라우트 이탈) */
 onBeforeRouteLeave(async (to, from, next) => {
-  const ok = window.confirm('진행 상황은 저장되지 않습니다. 정말 페이지를 벗어나시겠습니까?')
+  const code = ideStore.getCode(route.params.id)
+  const hasCode = code != null && String(code).trim() !== ''
+  const message = hasCode
+    ? '작성 중인 코드가 있습니다. 정말 나가시겠습니까?'
+    : '진행 상황은 저장되지 않습니다. 정말 페이지를 벗어나시겠습니까?'
+  const ok = window.confirm(message)
   if (!ok) {
     next(false)
     return
@@ -377,6 +478,8 @@ onBeforeRouteLeave(async (to, from, next) => {
 onUnmounted(() => {
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
+  document.removeEventListener('mousemove', handleResizeVertical)
+  document.removeEventListener('mouseup', stopResizeVertical)
   if (snapshotIntervalId) {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
@@ -387,21 +490,29 @@ onUnmounted(() => {
   }
   window.removeEventListener('online', onOnline)
   window.removeEventListener('offline', onOffline)
+  window.removeEventListener('beforeunload', onBeforeUnload)
 })
 
 const handleBack = async () => {
-  router.push('/')
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/')
+  }
 }
 
 const handleSubmit = async () => {
-  if (!isLoggedIn) return
+  if (!isLoggedIn.value) return
   const sid = ideStore.sessionId
   if (!sid) {
     if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
     return
   }
   const code = ideStore.getCode(route.params.id)
-  if (terminalPanel.value) terminalPanel.value.write('제출 중...\r\n')
+  if (terminalPanel.value) {
+    terminalPanel.value.write('제출 중...\r\n')
+    terminalPanel.value.write('채점 중... \r\n')
+  }
   try {
     const { data: res } = await sessionApi.submitCode(sid, { language: API_LANGUAGE, code })
     const success = isSubmitSuccess(res)
@@ -414,23 +525,42 @@ const handleSubmit = async () => {
         terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
       }
     }
-    // 1) 제출 성공 시: 세션 닫기 (리포트 화면은 추후 구현 시 라우팅 추가)
+    // 1) 제출 성공 시: 세션 닫기 후 리포트 모달 표시 (채점·결과는 submit 응답으로 구성)
     if (success) {
       await closeSessionOnLeave()
       if (snapshotIntervalId) {
         clearInterval(snapshotIntervalId)
         snapshotIntervalId = null
       }
+      const problemTitle = `문제 #${route.params.id}`
+      reportData.value = buildReportFromSubmitResponse(res, problemTitle)
+      const reportId = res?.data?.submissionContext?.resultId ?? res?.data?.resultId ?? res?.data?.reportId
+      try {
+        const fetched = reportId != null ? await getReportDetail(reportId) : null
+        if (fetched?.result) {
+          reportData.value.result = { ...reportData.value.result, ...fetched.result }
+        }
+      } catch (_) {}
+      reportModalFromHistory.value = false
+      showReportModal.value = true
     }
   } catch (err) {
     if (terminalPanel.value) {
-      terminalPanel.value.write(`제출 실패: ${err.response?.data?.message || err.message}\r\n`)
+      const msg = err.response?.data?.message || err.message
+      terminalPanel.value.write(`제출 실패: ${msg}\r\n`)
+      const data = err.response?.data
+      if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+        try {
+          terminalPanel.value.write('\r\n' + JSON.stringify(data, null, 2) + '\r\n')
+        } catch (_) {}
+      }
+      terminalPanel.value.write('❌ 제출 실패\r\n')
     }
   }
 }
 
 const handleRun = async () => {
-  if (!isLoggedIn) return
+  if (!isLoggedIn.value) return
   const sid = ideStore.sessionId
   if (!sid) {
     if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
@@ -483,7 +613,7 @@ const handleRun = async () => {
 const handleEscape = async () => {
   if (!confirm('정말 탈주하시겠습니까?')) return
   const sid = ideStore.sessionId
-  if (sid && isLoggedIn) {
+  if (sid && isLoggedIn.value) {
     try {
       await sessionApi.giveUp(sid)
     } catch (_) {}
@@ -493,7 +623,28 @@ const handleEscape = async () => {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
   }
-  router.push('/')
+  reportData.value = getMockReportData('문제 풀이 결과', { withGrading: false })
+  reportModalFromHistory.value = false
+  showReportModal.value = true
+}
+
+/** 제출 내역 탭에서 특정 결과의 리포트 보기 */
+const handleOpenReport = async (resultId) => {
+  reportModalFromHistory.value = true
+  try {
+    reportData.value = await getReportDetail(resultId)
+    if (!reportData.value) reportData.value = getMockReportData(`문제 #${route.params.id}`)
+  } catch (_) {
+    reportData.value = getMockReportData(`문제 #${route.params.id}`)
+  }
+  showReportModal.value = true
+}
+
+const onReportModalClose = () => {
+  showReportModal.value = false
+  reportData.value = null
+  if (!reportModalFromHistory.value) router.push('/')
+  reportModalFromHistory.value = false
 }
 </script>
 
@@ -540,6 +691,13 @@ const handleEscape = async () => {
 
 .ide-back-button i {
   font-size: 1rem;
+}
+
+.ide-timer {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--color-farm-brown-dark);
+  margin-left: 1rem;
 }
 
 .ide-toolbar-right {
@@ -605,7 +763,7 @@ const handleEscape = async () => {
 .ide-panel-content {
   width: 100%;
   height: 100%;
-  padding: 1.5rem;
+  padding: 0.25rem 1.5rem 1.5rem 1.5rem;
 }
 
 .ide-panel-right {
@@ -626,7 +784,8 @@ const handleEscape = async () => {
 
 .ide-right-wrapper.is-locked .ide-editor-container,
 .ide-right-wrapper.is-locked .ide-action-buttons,
-.ide-right-wrapper.is-locked .terminal-panel {
+.ide-right-wrapper.is-locked .ide-terminal-resizer,
+.ide-right-wrapper.is-locked .ide-terminal-wrap {
   filter: blur(4px);
   pointer-events: none;
 }
@@ -678,6 +837,40 @@ const handleEscape = async () => {
   flex: 1;
   position: relative;
   min-height: 0; /* flexbox에서 overflow를 위해 필요 */
+}
+
+/* 에디터-터미널 세로 리사이저 */
+.ide-terminal-resizer {
+  flex-shrink: 0;
+  height: 6px;
+  background: var(--color-farm-cream);
+  cursor: row-resize;
+  transition: background-color 0.2s;
+}
+.ide-terminal-resizer:hover {
+  background: var(--color-farm-green-light);
+}
+.ide-terminal-resizer::before {
+  content: '';
+  display: block;
+  position: relative;
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
+  min-height: 14px;
+  cursor: row-resize;
+}
+.ide-terminal-wrap {
+  flex-shrink: 0;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ide-terminal-wrap .terminal-panel {
+  flex: 1;
+  min-height: 0;
 }
 
 /* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */
@@ -809,6 +1002,28 @@ const handleEscape = async () => {
 /* 탈주 아이콘 크기 조정 */
 .ide-escape-button .escape-icon {
   font-size: 1.1rem;
+}
+
+/* 메인→IDE 진입 시 로딩 모달 */
+.ide-loading-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 242, 232, 0.9);
+  z-index: 100;
+}
+.ide-loading-card {
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+.ide-loading-text {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-farm-brown-dark);
 }
 
 /* 로그인 필요 오버레이 */

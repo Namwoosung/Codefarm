@@ -38,7 +38,8 @@ onMounted(async () => {
       foreground: '#4E3B2A',
       cursor: '#7BAE5F',
       cursorAccent: '#7BAE5F'
-    }
+    },
+    allowProposedApi: true
   })
   
   // 2. FitAddon 추가 (크기 자동 조정)
@@ -72,6 +73,24 @@ onMounted(async () => {
     })
     resizeObserver.observe(container)
     
+    // 복사: 선택 영역 Ctrl+C 시 클립보드에 복사
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.ctrlKey && e.key === 'c') {
+        const sel = term.getSelection()
+        if (sel) {
+          e.preventDefault()
+          navigator.clipboard?.writeText(sel).catch(() => {})
+        }
+      }
+      if (e.ctrlKey && e.key === 'v') {
+        e.preventDefault()
+        navigator.clipboard?.readText().then((text) => {
+          if (text && term) term.write(text)
+        }).catch(() => {})
+      }
+      return true
+    })
+    
     // cleanup을 위해 저장
     container._resizeObserver = resizeObserver
   }
@@ -92,13 +111,19 @@ onUnmounted(() => {
 const ANSI_RED = '\x1b[31m'
 const ANSI_RESET = '\x1b[0m'
 
+/** xterm에 맞게 줄바꿈 정규화 (\n → \r\n) */
+function normalizeLineEndings(text) {
+  if (text == null || typeof text !== 'string') return ''
+  return text.replace(/\r?\n/g, '\r\n')
+}
+
 defineExpose({
   write: (text) => {
-    if (term) term.write(text)
+    if (term) term.write(normalizeLineEndings(text))
   },
   /** stderr 출력 (빨간색) */
   writeStderr: (text) => {
-    if (term && text) term.write(ANSI_RED + text + ANSI_RESET)
+    if (term && text) term.write(ANSI_RED + normalizeLineEndings(text) + ANSI_RESET)
   },
   clear: () => {
     if (term) term.clear()
@@ -110,13 +135,13 @@ defineExpose({
 <style scoped>
 .terminal-panel {
   width: 100%;
-  height: 250px;
-  min-height: 200px;
+  height: 100%;
+  min-height: 120px;
   background-color: var(--color-farm-paper);
   border-top: 1px solid var(--color-farm-cream);
   display: flex;
   flex-direction: column;
-  flex-shrink: 0;
+  flex: 1;
   position: relative;
 }
 
@@ -128,6 +153,7 @@ defineExpose({
   overflow: hidden;
   position: relative;
   display: block;
+  user-select: text;
 }
 
 /* xterm.js 스타일 오버라이드 */
@@ -137,6 +163,7 @@ defineExpose({
   font-family: "D2Coding", "Courier New", monospace !important;
   font-weight: bold !important;
   padding: 0 !important;
+  user-select: text;
 }
 
 :deep(.xterm-viewport) {
