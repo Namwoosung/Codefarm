@@ -14,18 +14,29 @@
         <i class="pi pi-arrow-left"></i>
         <span>뒤로가기</span>
       </button>
-      <span v-if="!isInitializing && problemStartTime > 0" class="ide-timer">⏱️ {{ elapsedDisplay }}</span>
+      <span v-if="!isInitializing && (problemStartTime > 0 || timerStoppedAt != null)" class="ide-timer">⏱️ {{ elapsedDisplay }}</span>
 
-      <!-- 오른쪽: 당근 3개 + 종 아이콘 -->
+      <!-- 오른쪽: 당근 3개(사용 횟수 안내) + 힌트 버튼 + 종 아이콘 -->
       <div class="ide-toolbar-right">
-        <!-- 당근 아이콘 3개 -->
+        <div class="ide-carrot-group" aria-label="힌트 잔여 횟수">
+          <span
+            v-for="i in 3"
+            :key="i"
+            class="ide-carrot-wrap"
+            :class="{ 'ide-carrot-used': hintUsed >= i }"
+          >
+            <CarrotIcon />
+          </span>
+        </div>
         <button
-          v-for="i in 3"
-          :key="i"
-          class="ide-carrot-button"
-          aria-label="당근"
+          type="button"
+          class="ide-hint-button"
+          :class="{ 'ide-hint-button-exhausted': hintRemaining <= 0 }"
+          :disabled="hintRemaining <= 0"
+          :title="hintRemaining <= 0 ? '힌트를 모두 사용했습니다' : '힌트 열기'"
+          @click="showHintModal = true"
         >
-          <CarrotIcon />
+          힌트
         </button>
         <!-- 종 아이콘 -->
         <button class="ide-bell-button" aria-label="알림">
@@ -39,7 +50,12 @@
       <!-- 왼쪽 패널: 문제 설명 영역 -->
       <aside class="ide-panel-left" :style="{ width: leftPanelWidth + '%' }">
         <div class="ide-panel-content">
-          <ProblemPanel @open-report="handleOpenReport" />
+          <ProblemPanel
+          :hint-remaining="hintRemaining"
+          :hint-max="hintMax"
+          @open-report="handleOpenReport"
+          @hint-used="onHintUsedFromPanel"
+        />
         </div>
       </aside>
 
@@ -119,6 +135,22 @@
       :report="reportData"
       @close="onReportModalClose"
     />
+
+    <!-- 수동 힌트 모달 (채팅형) -->
+    <HintModal
+      :show="showHintModal"
+      :messages="hintMessages"
+      :loading="hintLoading"
+      :used-hint="hintUsed"
+      :max-hint="hintMax"
+      @close="showHintModal = false"
+      @send="(q) => onHintSend(q)"
+    />
+
+    <!-- 힌트 차감 토스트 -->
+    <Transition name="toast">
+      <div v-if="toastMessage" class="ide-toast">{{ toastMessage }}</div>
+    </Transition>
   </div>
 </template>
 
@@ -129,6 +161,7 @@ import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
 import ReportModal from '@/components/organisms/ReportModal.vue'
+import HintModal from '@/components/organisms/HintModal.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
 import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
@@ -136,6 +169,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
 import * as sessionApi from '@/api/session'
 import { getReportDetail, getMockReportData, buildReportFromSubmitResponse } from '@/api/reports'
+import * as hintApi from '@/api/hint'
 
 const router = useRouter()
 const route = useRoute()
@@ -159,6 +193,16 @@ const showReportModal = ref(false)
 const reportData = ref(null)
 /** 제출 내역에서 열었을 때 true → 닫을 때 메인으로 이동하지 않음 */
 const reportModalFromHistory = ref(false)
+/** 수동 힌트: 모달, 채팅 메시지, 잔여 횟수 */
+const showHintModal = ref(false)
+const hintMessages = ref([])
+const hintUsed = ref(0)
+const hintMax = ref(3)
+const hintLoading = ref(false)
+const hintRemaining = computed(() => Math.max(0, hintMax.value - hintUsed.value))
+/** 힌트 차감 토스트 (FR-CODE-010-1) */
+const toastMessage = ref('')
+let toastTimer = null
 // FR-CODE-002-1: 저장 상태 표시
 const lastSavedAt = ref(null)
 const isSaveInProgress = ref(false)
@@ -167,6 +211,8 @@ const isOnline = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
 const lastStatusTick = ref(Date.now()) // "N초 전" 갱신용
 /** FR-CODE-011: 문제 풀이 시작 시각 (타이머 표시용) */
 const problemStartTime = ref(0)
+/** 제출 성공 시 타이머 멈춘 시점의 경과 ms (null이면 타이머 동작 중) */
+const timerStoppedAt = ref(null)
 const snapshotStoppedByIdle = ref(false) // 10초 무입력으로 전송 중단 시 true (테스트 확인용)
 let snapshotIntervalId = null
 let statusTickIntervalId = null
@@ -253,8 +299,18 @@ const recentlySentText = computed(() => {
   return ''
 })
 
-/** FR-CODE-011: 경과 시간 "⏱️ MM:SS" 또는 "⏱️ H:MM:SS" */
+/** FR-CODE-011: 경과 시간 "⏱️ MM:SS" 또는 "⏱️ H:MM:SS" (제출 성공 시 멈춘 값 사용) */
 const elapsedDisplay = computed(() => {
+  const stopped = timerStoppedAt.value
+  if (stopped != null) {
+    const sec = Math.max(0, Math.floor(stopped / 1000))
+    const m = Math.floor(sec / 60)
+    const s = sec % 60
+    const pad = (n) => String(n).padStart(2, '0')
+    if (sec < 3600) return `${m}:${pad(s)}`
+    const h = Math.floor(sec / 3600)
+    return `${h}:${pad(m)}:${pad(s)}`
+  }
   const start = problemStartTime.value
   if (!start) return '0:00'
   const sec = Math.max(0, Math.floor((lastStatusTick.value - start) / 1000))
@@ -424,6 +480,7 @@ onMounted(async () => {
   try {
     await initSession()
     problemStartTime.value = Date.now()
+    timerStoppedAt.value = null
   } finally {
     isInitializing.value = false
   }
@@ -449,6 +506,7 @@ watch(() => route.params.id, async (newId, oldId) => {
     try {
       await initSession()
       problemStartTime.value = Date.now()
+      timerStoppedAt.value = null
     } finally {
       isInitializing.value = false
     }
@@ -517,16 +575,33 @@ const handleSubmit = async () => {
     const { data: res } = await sessionApi.submitCode(sid, { language: API_LANGUAGE, code })
     const success = isSubmitSuccess(res)
     if (terminalPanel.value) {
-      terminalPanel.value.write(res?.message || '제출 완료\r\n')
-      if (res?.data) terminalPanel.value.write(JSON.stringify(res.data, null, 2) + '\r\n')
-      if (success) {
-        terminalPanel.value.write('\r\n✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
+      const ec = res?.data?.evaluationContext
+      if (ec) {
+        if (success) {
+          terminalPanel.value.write(`📊 테스트 ${ec.passedCount ?? ec.totalCount}/${ec.totalCount}개 통과 (100%)\r\n`)
+          terminalPanel.value.write('✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
+        } else {
+          const passed = ec.passedCount ?? 0
+          const total = ec.totalCount
+          const pct = total > 0 ? Math.round((passed / total) * 100) : 0
+          terminalPanel.value.write('\r\n│ 📊 채점 결과: ' + `${passed} / ${total}개 테스트 통과 (${pct}%)` + '\r\n')
+          if (ec.failReason) terminalPanel.value.write('│ ❌ 사유: ' + ec.failReason + '\r\n')
+          terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
+        }
       } else {
-        terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
+        terminalPanel.value.write(res?.message || '제출 완료\r\n')
+        if (res?.data) terminalPanel.value.write(JSON.stringify(res.data, null, 2) + '\r\n')
+        if (success) {
+          terminalPanel.value.write('✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
+        } else {
+          terminalPanel.value.write('❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
+        }
       }
     }
     // 1) 제출 성공 시: 세션 닫기 후 리포트 모달 표시 (채점·결과는 submit 응답으로 구성)
     if (success) {
+      timerStoppedAt.value = lastStatusTick.value - problemStartTime.value
+      problemStartTime.value = 0
       await closeSessionOnLeave()
       if (snapshotIntervalId) {
         clearInterval(snapshotIntervalId)
@@ -646,6 +721,49 @@ const onReportModalClose = () => {
   if (!reportModalFromHistory.value) router.push('/')
   reportModalFromHistory.value = false
 }
+
+/** 문제 패널 채팅에서 힌트 사용 시 툴바 당근·잔여 횟수 동기화 */
+function onHintUsedFromPanel({ usedHint, maxHint }) {
+  hintUsed.value = usedHint ?? hintUsed.value
+  hintMax.value = maxHint ?? hintMax.value
+  showToast(`힌트가 차감되었습니다. (잔여: ${(maxHint ?? 3) - (usedHint ?? 0)}/${maxHint ?? 3})`)
+}
+
+/** 수동 힌트 전송: 채팅 메시지 추가 후 API(mock) 호출, 차감 토스트 */
+async function onHintSend(userQuestion) {
+  const sid = ideStore.sessionId
+  hintMessages.value.push({ role: 'user', text: userQuestion, createdAt: new Date().toISOString() })
+  hintLoading.value = true
+  try {
+    const code = ideStore.getCode(route.params.id)
+    const res = await hintApi.requestManualHint(sid, { userQuestion, code })
+    const d = res?.data
+    if (d) {
+      hintMessages.value.push({ role: 'assistant', text: d.content, createdAt: d.createdAt })
+      hintUsed.value = d.usedHint ?? hintUsed.value
+      hintMax.value = d.maxHint ?? hintMax.value
+      const remaining = (d.maxHint ?? 3) - (d.usedHint ?? 0)
+      showToast(`힌트가 차감되었습니다. (잔여: ${remaining}/${d.maxHint ?? 3})`)
+    }
+  } catch (_) {
+    hintMessages.value.push({
+      role: 'assistant',
+      text: '힌트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.',
+      createdAt: new Date().toISOString()
+    })
+  } finally {
+    hintLoading.value = false
+  }
+}
+
+function showToast(msg) {
+  toastMessage.value = msg
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastMessage.value = ''
+    toastTimer = null
+  }, 3000)
+}
 </script>
 
 <style scoped>
@@ -706,7 +824,45 @@ const onReportModalClose = () => {
   gap: 0.75rem;
 }
 
-.ide-carrot-button,
+.ide-carrot-group {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.ide-carrot-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: filter 0.2s, opacity 0.2s;
+}
+.ide-carrot-wrap.ide-carrot-used {
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+.ide-hint-button {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+  color: var(--color-farm-brown-dark);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+.ide-hint-button:hover:not(:disabled) {
+  color: var(--color-farm-green);
+  background-color: var(--color-farm-cream);
+}
+.ide-hint-button:disabled,
+.ide-hint-button-exhausted {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .ide-bell-button {
   padding: 0.5rem;
   color: var(--color-farm-brown-dark);
@@ -719,9 +875,6 @@ const onReportModalClose = () => {
   align-items: center;
   justify-content: center;
 }
-
-
-.ide-carrot-button:hover,
 .ide-bell-button:hover {
   color: var(--color-farm-green);
   background-color: var(--color-farm-cream);
@@ -1024,6 +1177,30 @@ const onReportModalClose = () => {
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-farm-brown-dark);
+}
+
+/* 힌트 차감 토스트 */
+.ide-toast {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.6rem 1.25rem;
+  font-size: 0.9rem;
+  color: #fff;
+  background: var(--color-farm-brown-dark);
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1100;
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 0.25s, transform 0.25s;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(0.5rem);
 }
 
 /* 로그인 필요 오버레이 */

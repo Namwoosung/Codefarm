@@ -2,7 +2,12 @@
   <Teleport to="body">
     <div v-if="show" class="report-modal-overlay" @click.self="$emit('close')">
       <div class="report-modal-card">
-        <h2 class="report-modal-title">Report</h2>
+        <div class="report-modal-header">
+          <h2 class="report-modal-title">Report</h2>
+          <button type="button" class="report-modal-close" aria-label="모달 닫기" @click="$emit('close')">
+            <iconify-icon icon="mdi:close"></iconify-icon>
+          </button>
+        </div>
         <p v-if="report?.result" class="report-modal-id"># {{ report.result.resultId }}</p>
         <!-- FR-CODE-009: 문제 정보 -->
         <div v-if="report?.result?.problem" class="report-modal-section">
@@ -144,11 +149,31 @@ function formatLanguage(lang) {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
 }
 
+.report-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+}
+
 .report-modal-title {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--color-farm-green, #5e8d48);
-  margin: 0 0 0.25rem 0;
+  margin: 0;
+}
+
+.report-modal-close {
+  padding: 0.35rem;
+  color: var(--color-farm-brown, #4e3b2a);
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 0.5rem;
+}
+.report-modal-close:hover {
+  background: var(--color-farm-cream);
+  color: var(--color-farm-brown-dark);
 }
 
 .report-modal-id {
