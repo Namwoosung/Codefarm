@@ -135,7 +135,7 @@
               {{ drawMessage }}
             </div>
             <img
-              :src="selectedCard.image"
+              :src="modalCardImage"
               :alt="selectedCard.name"
               class="w-full h-full object-contain block"
               loading="lazy"
@@ -212,6 +212,15 @@ const closeCardModal = () => {
 }
 const selectedCard = ref(null)
 const isGachaModal = ref(false)
+
+// 백엔드가 카드 이미지를 .svg로 주는 경우 .png로 변환
+const modalCardImage = computed(() => {
+  const c = selectedCard.value
+  if (!c) return ''
+  const raw = c.image ?? c.cardImage ?? c.img ?? ''
+  return typeof raw === 'string' ? raw.replace(/\.svg$/i, '.png') : ''
+})
+
 const scrollLockPrev = {
   htmlOverflow: '',
   htmlPaddingRight: '',
