@@ -81,8 +81,15 @@
               <span>탈주하기</span>
             </button>
           </div>
-          
-          <TerminalPanel ref="terminalPanel" />
+
+          <!-- 에디터-터미널 세로 리사이저 -->
+          <div
+            class="ide-terminal-resizer"
+            @mousedown="startResizeVertical"
+          ></div>
+          <div class="ide-terminal-wrap" :style="{ height: terminalHeight + 'px' }">
+            <TerminalPanel ref="terminalPanel" />
+          </div>
 
           <!-- 로그인 필요 안내 오버레이 -->
           <div v-if="!isLoggedIn" class="ide-lock-overlay">
@@ -134,6 +141,8 @@ const API_LANGUAGE = 'PYTHON'
 // 패널 리사이저 관련
 const leftPanelWidth = ref(50) // 기본 50%
 const isResizing = ref(false)
+const terminalHeight = ref(280) // 터미널 영역 높이 (px)
+const isResizingVertical = ref(false)
 const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
 const isInitializing = ref(true) // 메인→IDE 진입 시 세션/문제 로드 중
 // FR-CODE-002-1: 저장 상태 표시
@@ -181,6 +190,31 @@ const stopResize = () => {
   isResizing.value = false
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
+}
+
+// 에디터-터미널 세로 리사이저
+const TERMINAL_MIN_HEIGHT = 150
+const TERMINAL_MAX_HEIGHT = 600
+const startResizeVertical = (e) => {
+  isResizingVertical.value = true
+  document.addEventListener('mousemove', handleResizeVertical)
+  document.addEventListener('mouseup', stopResizeVertical)
+  e.preventDefault()
+}
+const handleResizeVertical = (e) => {
+  if (!isResizingVertical.value) return
+  const rightPanel = document.querySelector('.ide-panel-right')
+  if (!rightPanel) return
+  const rect = rightPanel.getBoundingClientRect()
+  const newHeight = rect.bottom - e.clientY
+  if (newHeight >= TERMINAL_MIN_HEIGHT && newHeight <= TERMINAL_MAX_HEIGHT) {
+    terminalHeight.value = newHeight
+  }
+}
+const stopResizeVertical = () => {
+  isResizingVertical.value = false
+  document.removeEventListener('mousemove', handleResizeVertical)
+  document.removeEventListener('mouseup', stopResizeVertical)
 }
 
 // FR-CODE-002-1: "💾 저장됨 (3초 전)", "💾 저장 중...", "⚠️ 연결 끊김"
@@ -397,6 +431,8 @@ onBeforeRouteLeave(async (to, from, next) => {
 onUnmounted(() => {
   document.removeEventListener('mousemove', handleResize)
   document.removeEventListener('mouseup', stopResize)
+  document.removeEventListener('mousemove', handleResizeVertical)
+  document.removeEventListener('mouseup', stopResizeVertical)
   if (snapshotIntervalId) {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
@@ -410,7 +446,11 @@ onUnmounted(() => {
 })
 
 const handleBack = async () => {
-  router.push('/')
+  if (window.history.length > 1) {
+    router.back()
+  } else {
+    router.push('/')
+  }
 }
 
 const handleSubmit = async () => {
@@ -444,7 +484,15 @@ const handleSubmit = async () => {
     }
   } catch (err) {
     if (terminalPanel.value) {
-      terminalPanel.value.write(`제출 실패: ${err.response?.data?.message || err.message}\r\n`)
+      const msg = err.response?.data?.message || err.message
+      terminalPanel.value.write(`제출 실패: ${msg}\r\n`)
+      const data = err.response?.data
+      if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+        try {
+          terminalPanel.value.write('\r\n' + JSON.stringify(data, null, 2) + '\r\n')
+        } catch (_) {}
+      }
+      terminalPanel.value.write('❌ 제출 실패\r\n')
     }
   }
 }
@@ -646,7 +694,8 @@ const handleEscape = async () => {
 
 .ide-right-wrapper.is-locked .ide-editor-container,
 .ide-right-wrapper.is-locked .ide-action-buttons,
-.ide-right-wrapper.is-locked .terminal-panel {
+.ide-right-wrapper.is-locked .ide-terminal-resizer,
+.ide-right-wrapper.is-locked .ide-terminal-wrap {
   filter: blur(4px);
   pointer-events: none;
 }
@@ -698,6 +747,40 @@ const handleEscape = async () => {
   flex: 1;
   position: relative;
   min-height: 0; /* flexbox에서 overflow를 위해 필요 */
+}
+
+/* 에디터-터미널 세로 리사이저 */
+.ide-terminal-resizer {
+  flex-shrink: 0;
+  height: 6px;
+  background: var(--color-farm-cream);
+  cursor: row-resize;
+  transition: background-color 0.2s;
+}
+.ide-terminal-resizer:hover {
+  background: var(--color-farm-green-light);
+}
+.ide-terminal-resizer::before {
+  content: '';
+  display: block;
+  position: relative;
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
+  min-height: 14px;
+  cursor: row-resize;
+}
+.ide-terminal-wrap {
+  flex-shrink: 0;
+  min-height: 150px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.ide-terminal-wrap .terminal-panel {
+  flex: 1;
+  min-height: 0;
 }
 
 /* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */
