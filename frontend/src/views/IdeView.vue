@@ -111,6 +111,13 @@
         </div>
       </main>
     </div>
+
+    <!-- 리포트 모달 (제출 성공/탈주 시) -->
+    <ReportModal
+      :show="showReportModal"
+      :report="reportData"
+      @close="onReportModalClose"
+    />
   </div>
 </template>
 
@@ -120,12 +127,14 @@ import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
+import ReportModal from '@/components/organisms/ReportModal.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
 import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
 import * as sessionApi from '@/api/session'
+import { getReportDetail, getMockReportData } from '@/api/reports'
 
 const router = useRouter()
 const route = useRoute()
@@ -145,6 +154,8 @@ const terminalHeight = ref(280) // 터미널 영역 높이 (px)
 const isResizingVertical = ref(false)
 const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
 const isInitializing = ref(true) // 메인→IDE 진입 시 세션/문제 로드 중
+const showReportModal = ref(false)
+const reportData = ref(null)
 // FR-CODE-002-1: 저장 상태 표시
 const lastSavedAt = ref(null)
 const isSaveInProgress = ref(false)
@@ -474,13 +485,19 @@ const handleSubmit = async () => {
         terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
       }
     }
-    // 1) 제출 성공 시: 세션 닫기 (리포트 화면은 추후 구현 시 라우팅 추가)
+    // 1) 제출 성공 시: 세션 닫기 후 리포트 모달 표시
     if (success) {
       await closeSessionOnLeave()
       if (snapshotIntervalId) {
         clearInterval(snapshotIntervalId)
         snapshotIntervalId = null
       }
+      const reportId = res?.data?.resultId ?? res?.data?.reportId
+      try {
+        reportData.value = reportId != null ? await getReportDetail(reportId) : null
+      } catch (_) {}
+      if (!reportData.value) reportData.value = getMockReportData()
+      showReportModal.value = true
     }
   } catch (err) {
     if (terminalPanel.value) {
@@ -561,6 +578,13 @@ const handleEscape = async () => {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
   }
+  reportData.value = getMockReportData()
+  showReportModal.value = true
+}
+
+const onReportModalClose = () => {
+  showReportModal.value = false
+  reportData.value = null
   router.push('/')
 }
 </script>
