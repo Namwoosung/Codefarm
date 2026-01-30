@@ -73,37 +73,50 @@
         </div>
       </div>
 
-      <!-- AI 선생님 채팅창 틀 (문제 패널과 함께 스크롤) -->
+      <!-- AI 선생님 채팅창 (수동 힌트) -->
       <div class="problem-chat-section">
-        <div class="flex items-start space-x-3 mb-4">
-          <div class="w-10 h-10 bg-farm-yellow rounded-full flex items-center justify-center flex-shrink-0">
-            <iconify-icon icon="mdi:robot" class="text-xl text-farm-brown-dark"></iconify-icon>
+        <div class="problem-chat-messages">
+          <div v-if="chatMessages.length === 0" class="flex items-start space-x-3 mb-4">
+            <div class="w-10 h-10 bg-farm-yellow rounded-full flex items-center justify-center flex-shrink-0">
+              <iconify-icon icon="mdi:robot" class="text-xl text-farm-brown-dark"></iconify-icon>
+            </div>
+            <div class="flex-1">
+              <p class="text-farm-brown-dark text-sm">
+                도움이 필요하신가요? 어떤 부분에서 어렵다고 느끼셨나요?
+              </p>
+            </div>
           </div>
-          <div class="flex-1">
-            <p class="text-farm-brown-dark text-sm">
-              도움이 필요하신가요? 어떤 부분에서 어렵다고 느끼셨나요?
-            </p>
+          <!-- 채팅 메시지 (질문 + 힌트) -->
+          <div v-for="(msg, idx) in chatMessages" :key="idx" class="problem-chat-msg" :class="msg.role === 'user' ? 'problem-chat-msg-user' : 'problem-chat-msg-assistant'">
+            <span class="problem-chat-msg-label">{{ msg.role === 'user' ? '나' : '힌트' }}</span>
+            <p class="problem-chat-msg-text">{{ msg.text }}</p>
+          </div>
+          <div v-if="hintLoading" class="problem-chat-msg problem-chat-msg-assistant">
+            <span class="problem-chat-msg-label">힌트</span>
+            <p class="problem-chat-msg-text">💡 힌트 생성 중...</p>
           </div>
         </div>
-        
-        <div class="relative">
+        <!-- 질문 입력 + 전송 -->
+        <form class="problem-chat-form" @submit.prevent="sendHint">
           <textarea
             v-model="chatInput"
             placeholder="어떤 부분에서 어려움을 느꼈는지 적어주세요..."
-            class="w-full p-3 border border-farm-cream rounded-lg bg-white text-farm-brown-dark placeholder-farm-brown resize-none focus:outline-none focus:ring-2 focus:ring-farm-green focus:border-transparent"
+            class="problem-chat-input"
             rows="3"
+            :disabled="hintLoading || hintRemaining <= 0"
+            @keydown.enter.exact="onHintEnter"
           ></textarea>
-          
           <div class="flex items-center justify-between mt-2">
-            <span class="text-sm text-farm-brown">당근 수: {{ carrotCount }}/3</span>
+            <span class="text-sm text-farm-brown">당근 수: {{ hintRemaining }}/{{ hintMax }}</span>
             <button
-              class="p-2 bg-farm-green text-white rounded-lg hover:bg-farm-green-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              :disabled="!chatInput.trim() || carrotCount <= 0"
+              type="submit"
+              class="problem-chat-send"
+              :disabled="!chatInput.trim() || hintLoading || hintRemaining <= 0"
             >
               <iconify-icon icon="mdi:send" class="text-xl"></iconify-icon>
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
 
@@ -162,13 +175,19 @@ import { useRoute } from 'vue-router'
 import { getProblemDetail } from '@/api/problem'
 import { useIdeStore } from '@/stores/ide'
 import { getSessionResultsList, getMockSessionResults } from '@/api/session'
+import * as hintApi from '@/api/hint'
 
-const emit = defineEmits(['open-report'])
+const props = defineProps({
+  hintRemaining: { type: Number, default: 3 },
+  hintMax: { type: Number, default: 3 }
+})
+const emit = defineEmits(['open-report', 'hint-used'])
 const route = useRoute()
 const ideStore = useIdeStore()
 const problem = ref(null)
 const chatInput = ref('')
-const carrotCount = ref(3) // 당근 수는 나중에 API에서 가져올 예정
+const chatMessages = ref([])
+const hintLoading = ref(false)
 
 const activeTab = ref('problem')
 const resultsList = ref([])
@@ -216,6 +235,39 @@ const formatResultDate = (iso) => {
 const formatLanguage = (lang) => {
   const map = { PYTHON: 'Python3', JAVA: 'Java', JAVASCRIPT: 'JavaScript', CPP: 'C++' }
   return map[lang] ?? lang ?? '-'
+}
+
+// 엔터 시 전송 가능하면 전송, 아니면 줄바꿈 유지
+function onHintEnter(e) {
+  if (chatInput.value?.trim() && !hintLoading.value && props.hintRemaining > 0) {
+    e.preventDefault()
+    sendHint()
+  }
+}
+
+// 수동 힌트 전송 (채팅창에서 질문 입력 후 전송)
+async function sendHint() {
+  const q = chatInput.value?.trim()
+  if (!q || hintLoading.value || props.hintRemaining <= 0) return
+  chatMessages.value.push({ role: 'user', text: q, createdAt: new Date().toISOString() })
+  chatInput.value = ''
+  hintLoading.value = true
+  try {
+    const sid = ideStore.sessionId
+    const code = ideStore.getCode(route.params.id)
+    const res = await hintApi.requestManualHint(sid, { userQuestion: q, code })
+    const d = res?.data
+    if (d) {
+      chatMessages.value.push({ role: 'assistant', text: d.content, createdAt: d.createdAt })
+      emit('hint-used', { usedHint: d.usedHint ?? 0, maxHint: d.maxHint ?? 3 })
+    } else {
+      chatMessages.value.push({ role: 'assistant', text: '힌트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', createdAt: new Date().toISOString() })
+    }
+  } catch (_) {
+    chatMessages.value.push({ role: 'assistant', text: '힌트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', createdAt: new Date().toISOString() })
+  } finally {
+    hintLoading.value = false
+  }
 }
 
 // 결과 목록 로드 (API 실패/빈 배열 시 목 데이터 사용)
@@ -299,8 +351,90 @@ onMounted(() => {
 
 .problem-chat-section {
   border-top: 1px solid var(--color-farm-cream);
-  padding: 1.5rem;
+  padding: 0;
   background-color: var(--color-farm-paper);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.problem-chat-messages {
+  max-height: 280px;
+  min-height: 120px;
+  overflow-y: auto;
+  margin-bottom: 0.5rem;
+}
+.problem-chat-msg {
+  margin-bottom: 1rem;
+  max-width: 90%;
+}
+.problem-chat-msg-user {
+  margin-left: auto;
+  text-align: right;
+}
+.problem-chat-msg-assistant {
+  margin-right: auto;
+  text-align: left;
+}
+.problem-chat-msg-label {
+  font-size: 0.75rem;
+  color: var(--color-farm-brown);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+.problem-chat-msg-text {
+  display: inline-block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.9rem;
+  margin: 0;
+  text-align: left;
+}
+.problem-chat-msg-user .problem-chat-msg-text {
+  background: var(--color-farm-green-light);
+  color: var(--color-farm-brown-dark);
+}
+.problem-chat-msg-assistant .problem-chat-msg-text {
+  background: var(--color-farm-cream);
+  color: var(--color-farm-brown-dark);
+}
+
+.problem-chat-form {
+  margin-top: 0.5rem;
+}
+.problem-chat-input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--color-farm-cream);
+  border-radius: 0.5rem;
+  background: #fff;
+  color: var(--color-farm-brown-dark);
+  font-size: 0.9rem;
+  resize: none;
+  font-family: inherit;
+}
+.problem-chat-input:focus {
+  outline: none;
+  border-color: var(--color-farm-green);
+}
+.problem-chat-input:disabled {
+  background: var(--color-farm-cream);
+  cursor: not-allowed;
+}
+.problem-chat-send {
+  padding: 0.5rem;
+  background: var(--color-farm-green);
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.problem-chat-send:hover:not(:disabled) {
+  background: var(--color-farm-green-dark);
+}
+.problem-chat-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 제출 내역 영역 (라이트 테마) */
@@ -457,10 +591,16 @@ onMounted(() => {
 .problem-results-table-wrap::-webkit-scrollbar {
   width: 8px;
 }
+.problem-chat-messages::-webkit-scrollbar {
+  width: 6px;
+}
 
 .problem-content::-webkit-scrollbar-track,
 .problem-results-table-wrap::-webkit-scrollbar-track {
   background: var(--color-farm-cream);
+}
+.problem-chat-messages::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .problem-content::-webkit-scrollbar-thumb,
@@ -468,9 +608,16 @@ onMounted(() => {
   background: var(--color-farm-green-light);
   border-radius: 4px;
 }
+.problem-chat-messages::-webkit-scrollbar-thumb {
+  background: var(--color-farm-green-light);
+  border-radius: 3px;
+}
 
 .problem-content::-webkit-scrollbar-thumb:hover,
 .problem-results-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: var(--color-farm-green);
+}
+.problem-chat-messages::-webkit-scrollbar-thumb:hover {
   background: var(--color-farm-green);
 }
 </style>
