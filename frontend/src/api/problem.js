@@ -1,6 +1,37 @@
 import api from './index'
 
 /**
+ * 백엔드 문제 응답을 프론트 도메인 모델로 변환하는 어댑터.
+ * - 백엔드 필드명이 바뀌더라도 이 함수 한 곳에서만 대응하도록 캡슐화한다.
+ * - TODO: 백엔드 스펙이 완전히 통일되면 legacy 필드(p.time_limit 등)는 정리한다.
+ * @param {object} raw
+ * @param {number} fallbackId
+ * @returns {{ problemId:number, title:string, description:string, difficulty:string, algorithm:any, timeLimit:number, memoryLimit:number, exampleInput:string, exampleOutput:string, problemType:string, createdAt:string|null }}
+ */
+function normalizeProblem(raw, fallbackId) {
+  const p = raw ?? {}
+  const id = p.problemId ?? fallbackId
+
+  const difficulty =
+    typeof p.difficulty === 'number' ? `LEVEL${p.difficulty}` : (p.difficulty ?? 'LEVEL1')
+
+  return {
+    problemId: id,
+    title: p.title ?? '',
+    description: p.description ?? '',
+    difficulty,
+    algorithm: p.algorithm ?? [],
+    // legacy 필드 이름은 여기에서만 한 번에 처리
+    timeLimit: p.timeLimit ?? p.time_limit ?? 1,
+    memoryLimit: p.memoryLimit ?? p.memory_limit ?? 256,
+    exampleInput: p.exampleInput ?? p.example_input ?? '',
+    exampleOutput: p.exampleOutput ?? p.example_output ?? '',
+    problemType: p.problemType ?? p.problem_type ?? 'NORMAL',
+    createdAt: p.createdAt ?? p.created_at ?? null
+  }
+}
+
+/**
  * 문제 목록 조회 (동적 쿼리)
  * @param {object} [queryParams] - 쿼리 파라미터 (page, size, difficulty 등)
  * @returns {Promise<{ data: array, total?: number }>}
@@ -34,22 +65,8 @@ export const getProblemDetail = async (problemId) => {
     throw new Error(`문제를 찾을 수 없습니다: ${problemId}`)
   }
 
-  const p = raw?.problem ?? raw
-  const difficulty =
-    typeof p.difficulty === 'number' ? `LEVEL${p.difficulty}` : (p.difficulty ?? 'LEVEL1')
-  const problem = {
-    problemId: p.problemId ?? id,
-    title: p.title ?? '',
-    description: p.description ?? '',
-    difficulty,
-    algorithm: p.algorithm ?? [],
-    timeLimit: p.timeLimit ?? p.time_limit ?? 1,
-    memoryLimit: p.memoryLimit ?? p.memory_limit ?? 256,
-    exampleInput: p.exampleInput ?? p.example_input ?? '',
-    exampleOutput: p.exampleOutput ?? p.example_output ?? '',
-    problemType: p.problemType ?? p.problem_type ?? 'NORMAL',
-    createdAt: p.createdAt ?? p.created_at ?? null
-  }
+  // 백엔드 응답을 프론트 도메인 모델로 통일
+  const problem = normalizeProblem(raw?.problem ?? raw, id)
 
   return {
     isLogined: raw?.isLogined ?? res?.isLogined ?? true,
