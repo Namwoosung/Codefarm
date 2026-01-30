@@ -142,10 +142,9 @@
                 "
                 class="cf-modal-row"
               >
-                <dt>정답</dt>
+                <dt>정답률</dt>
                 <dd>
-                  {{ modalContent.statistics.successCount }} /
-                  {{ modalContent.statistics.submissionCount }}
+                  {{ formatSuccessRate(modalContent.statistics.successCount, modalContent.statistics.submissionCount) }}
                 </dd>
               </div>
               <div
@@ -386,6 +385,13 @@ watch(
   }
 )
 
+function formatSuccessRate(successCount, submissionCount) {
+  const s = successCount ?? 0
+  const t = submissionCount ?? 0
+  if (t === 0) return '0%'
+  return `${Math.round((s / t) * 100)}%`
+}
+
 function getStepProblem(curriculumIdx, level) {
   const curriculum = curriculums.value[curriculumIdx]
   if (!curriculum || !Array.isArray(curriculum.problems)) return null
@@ -406,7 +412,9 @@ function getStepSummary(curriculumIdx, level) {
   if (problem?.difficulty) parts.push(`난이도 ${problem.difficulty}`)
   if (problem?.algorithm) parts.push(`알고리즘 ${problem.algorithm}`)
   if (statistics?.submissionCount != null && statistics?.successCount != null) {
-    parts.push(`정답 ${statistics.successCount}/${statistics.submissionCount}`)
+    parts.push(
+      `정답률 ${formatSuccessRate(statistics.successCount, statistics.submissionCount)}`
+    )
   }
   if (userStatus?.isSolved) parts.push('내 상태: 해결함')
   else if (userStatus?.isTried) parts.push('내 상태: 시도함')
