@@ -1,7 +1,29 @@
 <template>
   <div class="problem-panel">
-    <!-- 문제 설명 + AI 채팅 영역 통합 스크롤 -->
-    <div class="problem-content">
+    <!-- 탭: 문제 | 제출 내역 (프로그래머스 스타일) -->
+    <div class="problem-tabs">
+      <button
+        type="button"
+        class="problem-tab"
+        :class="{ 'problem-tab-active': activeTab === 'problem' }"
+        @click="activeTab = 'problem'"
+      >
+        <iconify-icon icon="mdi:book-open-variant" class="problem-tab-icon"></iconify-icon>
+        {{ problem?.title || '문제' }}
+      </button>
+      <button
+        type="button"
+        class="problem-tab"
+        :class="{ 'problem-tab-active': activeTab === 'results' }"
+        @click="activeTab = 'results'; loadResults()"
+      >
+        <iconify-icon icon="mdi:format-list-bulleted" class="problem-tab-icon"></iconify-icon>
+        제출 내역
+      </button>
+    </div>
+
+    <!-- 문제 탭 -->
+    <div v-show="activeTab === 'problem'" class="problem-content">
       <!-- 문제 번호 -->
       <div class="mb-4">
         <span class="text-farm-brown text-lg font-medium"># {{ problem?.problemId || '로딩 중...' }}</span>
@@ -84,6 +106,53 @@
         </div>
       </div>
     </div>
+
+    <!-- 제출 내역 탭 (라이트 테마) -->
+    <div v-show="activeTab === 'results'" class="problem-results-wrap">
+      <p class="problem-results-disclaimer">현재 표시되는 제출 내역은 임시 데이터이며, 차후 백엔드 API와 연동될 예정입니다.</p>
+      <div class="problem-results-header">
+        <span class="problem-results-count">{{ resultsList.length }}개의 제출</span>
+        <button type="button" class="problem-results-refresh" @click="loadResults" :disabled="resultsLoading">
+          <iconify-icon icon="mdi:refresh" class="problem-results-refresh-icon" :class="{ 'problem-results-refresh-spin': resultsLoading }"></iconify-icon>
+          새로고침
+        </button>
+      </div>
+      <div class="problem-results-table-wrap">
+        <table class="problem-results-table">
+          <thead>
+            <tr>
+              <th>제출일시</th>
+              <th>언어</th>
+              <th>채점 내역</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(row, idx) in resultsList"
+              :key="row.resultId ?? idx"
+              class="problem-results-row"
+              :class="{ 'problem-results-row-clickable': row.hasReport && row.resultId }"
+              @click="row.hasReport && row.resultId ? emit('open-report', row.resultId) : null"
+            >
+              <td>
+                <span class="problem-results-datetime">{{ formatResultDate(row.createdAt) }}</span>
+                <iconify-icon v-if="row.hasReport && row.resultId" icon="mdi:chevron-right" class="problem-results-chevron"></iconify-icon>
+              </td>
+              <td>{{ formatLanguage(row.language) }}</td>
+              <td>
+                <span class="problem-results-badge" :class="resultTypeClass(row.resultType)">
+                  <iconify-icon v-if="row.resultType === 'SUCCESS'" icon="mdi:check-circle" class="problem-results-badge-icon"></iconify-icon>
+                  {{ resultTypeLabel(row.resultType) }} {{ row.accuracy }} / 100
+                </span>
+              </td>
+            </tr>
+            <tr v-if="resultsList.length === 0 && !resultsLoading">
+              <td colspan="3" class="problem-results-empty">제출 내역이 없습니다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -91,11 +160,19 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProblemDetail } from '@/api/problem'
+import { useIdeStore } from '@/stores/ide'
+import { getSessionResultsList, getMockSessionResults } from '@/api/session'
 
+const emit = defineEmits(['open-report'])
 const route = useRoute()
+const ideStore = useIdeStore()
 const problem = ref(null)
 const chatInput = ref('')
 const carrotCount = ref(3) // 당근 수는 나중에 API에서 가져올 예정
+
+const activeTab = ref('problem')
+const resultsList = ref([])
+const resultsLoading = ref(false)
 
 // 난이도에 따른 점수 계산 (임시)
 const getDifficultyScore = (difficulty) => {
@@ -115,18 +192,54 @@ const formatMemory = (memoryMB) => {
   return `${memoryMB.toLocaleString()}MiB`
 }
 
+// 제출 내역: 결과 타입 라벨
+const resultTypeLabel = (resultType) => {
+  const map = { SUCCESS: '정답', FAIL: '오답', GIVE_UP: '탈주' }
+  return map[resultType] ?? resultType
+}
+
+// 제출 내역: 결과 타입별 CSS 클래스
+const resultTypeClass = (resultType) => {
+  const map = { SUCCESS: 'result-success', FAIL: 'result-fail', GIVE_UP: 'result-giveup' }
+  return map[resultType] ?? ''
+}
+
+// 제출일시 포맷 (YYYY-MM-DD HH:mm:ss)
+const formatResultDate = (iso) => {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}
+
+// 언어 표시명
+const formatLanguage = (lang) => {
+  const map = { PYTHON: 'Python3', JAVA: 'Java', JAVASCRIPT: 'JavaScript', CPP: 'C++' }
+  return map[lang] ?? lang ?? '-'
+}
+
+// 결과 목록 로드 (API 실패/빈 배열 시 목 데이터 사용)
+const loadResults = async () => {
+  const sid = ideStore.sessionId
+  resultsLoading.value = true
+  try {
+    const list = await getSessionResultsList(sid)
+    resultsList.value = list?.length ? list : getMockSessionResults()
+  } catch (_) {
+    resultsList.value = getMockSessionResults()
+  } finally {
+    resultsLoading.value = false
+  }
+}
+
 // 문제 상세 정보 로드
 const loadProblem = async () => {
   try {
     const problemId = route.params.id
     const data = await getProblemDetail(problemId)
     problem.value = data.problem
-    // TODO: userStatus, statistics도 필요시 사용
-    // userStatus = data.userStatus
-    // statistics = data.statistics
   } catch (error) {
     console.error('문제를 불러오는 중 오류가 발생했습니다:', error)
-    // TODO: 에러 처리 UI 추가
   }
 }
 
@@ -142,6 +255,42 @@ onMounted(() => {
   height: 100%;
 }
 
+/* 탭 (프로그래머스 스타일) */
+.problem-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--color-farm-cream);
+  background: var(--color-farm-paper);
+  flex-shrink: 0;
+}
+
+.problem-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-farm-brown);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+
+.problem-tab:hover {
+  color: var(--color-farm-brown-dark);
+}
+
+.problem-tab-active {
+  color: var(--color-farm-green-dark);
+  border-bottom-color: var(--color-farm-green);
+}
+
+.problem-tab-icon {
+  font-size: 1.1rem;
+}
+
 .problem-content {
   flex: 1;
   min-height: 0;
@@ -154,21 +303,174 @@ onMounted(() => {
   background-color: var(--color-farm-paper);
 }
 
-/* 스크롤바 스타일링 */
-.problem-content::-webkit-scrollbar {
-  width: 8px;
+/* 제출 내역 영역 (라이트 테마) */
+.problem-results-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-farm-paper);
+  color: var(--color-farm-brown-dark);
 }
 
-.problem-content::-webkit-scrollbar-track {
+.problem-results-disclaimer {
+  font-size: 0.75rem;
+  color: var(--color-farm-brown);
+  margin: 0 0 0.5rem 0;
+  padding: 0.25rem 0;
+  line-height: 1.4;
+}
+
+.problem-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0 0.75rem 0;
+  border-bottom: 1px solid var(--color-farm-cream);
+  flex-shrink: 0;
+}
+
+.problem-results-count {
+  font-size: 0.9rem;
+  color: var(--color-farm-brown);
+}
+
+.problem-results-refresh {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--color-farm-brown);
+  background: var(--color-farm-cream);
+  border: 1px solid var(--color-farm-cream);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.problem-results-refresh:hover:not(:disabled) {
+  color: var(--color-farm-brown-dark);
+  border-color: var(--color-farm-green);
+  background: rgba(126, 174, 95, 0.1);
+}
+
+.problem-results-refresh:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.problem-results-refresh-icon {
+  font-size: 1rem;
+}
+
+.problem-results-refresh-spin {
+  animation: problem-results-spin 0.8s linear infinite;
+}
+
+@keyframes problem-results-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.problem-results-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.problem-results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.problem-results-table thead {
+  position: sticky;
+  top: 0;
+  background: var(--color-farm-paper);
+  z-index: 1;
+}
+
+.problem-results-table th {
+  padding: 0.6rem 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-farm-brown);
+  border-bottom: 1px solid var(--color-farm-cream);
+}
+
+.problem-results-table td {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--color-farm-cream);
+  color: var(--color-farm-brown-dark);
+}
+
+.problem-results-row-clickable {
+  cursor: pointer;
+}
+
+.problem-results-row-clickable:hover {
   background: var(--color-farm-cream);
 }
 
-.problem-content::-webkit-scrollbar-thumb {
+.problem-results-datetime {
+  margin-right: 0.25rem;
+}
+
+.problem-results-chevron {
+  font-size: 0.9rem;
+  color: var(--color-farm-brown);
+  vertical-align: middle;
+}
+
+.problem-results-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.problem-results-badge-icon {
+  font-size: 1rem;
+}
+
+.result-success {
+  color: var(--color-farm-green-dark);
+}
+
+.result-fail {
+  color: var(--color-farm-point);
+}
+
+.result-giveup {
+  color: var(--color-farm-brown);
+}
+
+.problem-results-empty {
+  text-align: center;
+  color: var(--color-farm-brown);
+  padding: 2rem !important;
+}
+
+/* 스크롤바 스타일링 */
+.problem-content::-webkit-scrollbar,
+.problem-results-table-wrap::-webkit-scrollbar {
+  width: 8px;
+}
+
+.problem-content::-webkit-scrollbar-track,
+.problem-results-table-wrap::-webkit-scrollbar-track {
+  background: var(--color-farm-cream);
+}
+
+.problem-content::-webkit-scrollbar-thumb,
+.problem-results-table-wrap::-webkit-scrollbar-thumb {
   background: var(--color-farm-green-light);
   border-radius: 4px;
 }
 
-.problem-content::-webkit-scrollbar-thumb:hover {
+.problem-content::-webkit-scrollbar-thumb:hover,
+.problem-results-table-wrap::-webkit-scrollbar-thumb:hover {
   background: var(--color-farm-green);
 }
 </style>
