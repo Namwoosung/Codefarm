@@ -81,7 +81,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/problems/*").permitAll()
                         .requestMatchers("/api/v1/problems/me").authenticated()
 
-                        .requestMatchers("/api/v1/curriculums/lists").permitAll()
+                        .requestMatchers("/api/v1/curriculums/*").permitAll()
 
                         // 개발 단계 테스트
                         .requestMatchers("/test/**").permitAll()
