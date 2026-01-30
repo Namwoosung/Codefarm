@@ -1,6 +1,5 @@
 <template>
   <div class="bg-farm-cream">
-    <!-- Banner: 고정 높이 — 캐릭터 크기와 무관하게 배너 높이 유지 -->
     <section class="bg-[#7AA74E] overflow-hidden">
       <div
         class="mx-auto max-w-7xl px-6 py-16 md:py-20 relative flex flex-col justify-center overflow-hidden cf-banner-inner"
@@ -27,37 +26,11 @@
       </div>
     </section>
 
-    <!-- Content -->
     <main class="mx-auto max-w-7xl px-6 py-12">
       <PageTitle title="커리큘럼" />
 
-      <!-- 추천 문제 버튼 -->
-      <div class="mt-4 flex justify-end">
-        <div class="cf-recommend-wrapper">
-          <button type="button" class="cf-recommend-btn">
-            추천 문제 보기
-          </button>
-          <div class="cf-recommend-tooltip">
-            <p class="cf-recommend-title">
-              {{ firstRecommended?.problem?.title || '추천 문제 요약' }}
-            </p>
-            <p v-if="firstRecommended" class="cf-recommend-desc">
-              난이도 {{ firstRecommended.problem.difficulty }}
-              · 알고리즘 {{ firstRecommended.problem.algorithm }}
-              · 정답
-              {{ firstRecommended.statistics.successCount }} /
-              {{ firstRecommended.statistics.submissionCount }}
-            </p>
-            <p v-else class="cf-recommend-desc">
-              추천 문제 정보를 불러오는 중입니다.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <section class="mt-8 relative">
         <div class="cf-panel">
-          <!-- 이미지 기반 로드맵 -->
           <div class="cf-panel-inner">
             <div
               v-for="(img, idx) in roadmapImages"
@@ -69,7 +42,10 @@
                 :src="img"
                 :alt="`레벨 ${idx + 1} roadmap`"
               />
-              <span class="cf-roadmap-level-label">LEVEL {{ idx + 1 }}</span>
+              <div class="cf-roadmap-level-header">
+                <span class="cf-roadmap-level-label">LEVEL {{ idx + 1 }}</span>
+                <span class="cf-roadmap-level-topic">{{ levelTopics[idx] }}</span>
+              </div>
               <div class="cf-roadmap-levels">
                 <div
                   v-for="n in 5"
@@ -88,35 +64,138 @@
                   <button
                     type="button"
                     class="cf-level-btn"
-                    :aria-label="`레벨 ${idx + 1}-${n}`"
+                    :aria-label="`레벨 ${idx + 1} - ${n}`"
                     @click="onClickLevel(idx + 1, n)"
                     @mouseenter="onHoverLevel(idx + 1, n)"
                     @mouseleave="onLeaveLevel"
                   />
                 </div>
               </div>
+              <Transition name="cf-summary">
+                <div
+                  v-if="hoveredRoadmap === idx + 1 && hoveredLevel"
+                  class="cf-level-summary"
+                >
+                  <p class="cf-level-summary-title">
+                    {{
+                      getStepProblem(idx, hoveredLevel)?.problem?.title ||
+                        `LEVEL ${idx + 1} - STEP ${hoveredLevel}`
+                    }}
+                  </p>
+                  <p class="cf-level-summary-desc">
+                    {{
+                      getStepSummary(idx, hoveredLevel) ||
+                        '문제 요약 정보를 불러올 수 없습니다.'
+                    }}
+                  </p>
+                </div>
+              </Transition>
+
               <div
-                v-if="hoveredRoadmap === idx + 1 && hoveredLevel"
-                class="cf-level-summary"
+                v-if="idx === 3 || idx === 4"
+                class="cf-roadmap-recommend"
               >
-                <p class="cf-level-summary-title">
-                  {{
-                    getStepProblem(idx, hoveredLevel)?.problem?.title ||
-                      `LEVEL ${idx + 1} · STEP ${hoveredLevel}`
-                  }}
-                </p>
-                <p class="cf-level-summary-desc">
-                  {{
-                    getStepSummary(idx, hoveredLevel) ||
-                      '문제 요약 정보를 불러올 수 없습니다.'
-                  }}
-                </p>
+                <div class="cf-recommend-wrapper">
+                  <button
+                    type="button"
+                    class="cf-recommend-btn"
+                    @click="onClickRecommend(idx)"
+                  >
+                    추천 문제 보기
+                  </button>
+                  <div class="cf-recommend-tooltip">
+                    <p class="cf-recommend-title">
+                      {{ recommendedByLevel[idx]?.problem?.title || '추천 문제 요약' }}
+                    </p>
+                    <p v-if="recommendedByLevel[idx]" class="cf-recommend-desc">
+                      난이도 {{ recommendedByLevel[idx].problem.difficulty }}
+                      · 알고리즘 {{ recommendedByLevel[idx].problem.algorithm }}
+                      · 정답
+                      {{ recommendedByLevel[idx].statistics.successCount }} /
+                      {{ recommendedByLevel[idx].statistics.submissionCount }}
+                    </p>
+                    <p v-else class="cf-recommend-desc">
+                      추천 문제 정보를 불러오는 중입니다.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </section>
     </main>
+
+    <div
+      v-if="modalContext"
+      class="cf-modal-backdrop"
+      @click="closeModal"
+    >
+      <div
+        class="cf-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cf-modal-title"
+        @click.stop
+      >
+        <h2 id="cf-modal-title" class="cf-modal-title">
+          {{ modalStep?.problem?.title || '문제 상세' }}
+        </h2>
+        <div class="cf-modal-body">
+          <dl class="cf-modal-dl">
+            <template v-if="modalStep">
+              <div v-if="modalStep.problem?.difficulty" class="cf-modal-row">
+                <dt>난이도</dt>
+                <dd>{{ modalStep.problem.difficulty }}</dd>
+              </div>
+              <div v-if="modalStep.problem?.algorithm" class="cf-modal-row">
+                <dt>알고리즘</dt>
+                <dd>{{ modalStep.problem.algorithm }}</dd>
+              </div>
+              <div
+                v-if="
+                  modalStep.statistics?.submissionCount != null &&
+                  modalStep.statistics?.successCount != null
+                "
+                class="cf-modal-row"
+              >
+                <dt>정답</dt>
+                <dd>
+                  {{ modalStep.statistics.successCount }} /
+                  {{ modalStep.statistics.submissionCount }}
+                </dd>
+              </div>
+              <div class="cf-modal-row">
+                <dt>내 상태</dt>
+                <dd>
+                  {{
+                    modalStep.userStatus?.isSolved
+                      ? '해결함'
+                      : modalStep.userStatus?.isTried
+                        ? '시도함'
+                        : '미시도'
+                  }}
+                </dd>
+              </div>
+            </template>
+            <p v-else class="cf-modal-no-data">문제 정보를 불러올 수 없습니다.</p>
+          </dl>
+        </div>
+        <div class="cf-modal-actions">
+          <button type="button" class="cf-modal-btn cf-modal-btn-close" @click="closeModal">
+            닫기
+          </button>
+          <button
+            type="button"
+            class="cf-modal-btn cf-modal-btn-ide"
+            :disabled="!modalStep?.problem?.problemId"
+            @click="goToIdeFromModal"
+          >
+            IDE로 이동
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -134,20 +213,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const debug = ref(false)
 const hoveredRoadmap = ref(null)
 const hoveredLevel = ref(null)
 const curriculums = ref([])
-
-/**
- * 라우팅/동작은 프로젝트에 맞게 바꿔도 됨
- * 예) router.push({ name: 'curriculum', params: { level } })
- */
-function onClickHelp() {
-  // TODO: 힌트 모달 / 도움말 페이지
-  // router.push({ name: 'help' })
-  console.log('Help clicked')
-}
+const modalContext = ref(null)
 
 const roadmapImages = [
   roadmapImage1,
@@ -155,6 +224,14 @@ const roadmapImages = [
   roadmapImage3,
   roadmapImage4,
   roadmapImage5,
+]
+
+const levelTopics = [
+  '입출력과 사칙연산',
+  '조건문',
+  '반복문',
+  '스택과 큐',
+  '완전탐색',
 ]
 
 async function fetchCurriculums() {
@@ -199,8 +276,18 @@ function getStepSummary(curriculumIdx, level) {
   return parts.join(' · ')
 }
 
-const firstRecommended = computed(() => {
-  return curriculums.value[0]?.recommendedProblem || null
+function getRecommendedForLevel(curriculumIdx) {
+  return curriculums.value[curriculumIdx]?.recommendedProblem || null
+}
+
+const recommendedByLevel = computed(() =>
+  curriculums.value.map((c) => c?.recommendedProblem ?? null)
+)
+
+const modalStep = computed(() => {
+  const ctx = modalContext.value
+  if (!ctx) return null
+  return getStepProblem(ctx.curriculumIdx, ctx.level)
 })
 
 function onHoverLevel(roadmapIndex, level) {
@@ -213,14 +300,37 @@ function onLeaveLevel() {
 }
 
 function onClickLevel(roadmapIndex, level) {
-  // TODO: 레벨별 커리큘럼 라우팅 (기능 나중에 연결)
-  // router.push({ name: 'curriculum', query: { roadmap: roadmapIndex, level } })
-  console.log('Level clicked:', roadmapIndex, level)
+  const curriculumIdx = roadmapIndex - 1
+  const step = getStepProblem(curriculumIdx, level)
+  if (!step) return
+  modalContext.value = { curriculumIdx, level }
+}
+
+function closeModal() {
+  modalContext.value = null
+}
+
+function goToIdeFromModal() {
+  const ctx = modalContext.value
+  if (!ctx) return
+  const step = getStepProblem(ctx.curriculumIdx, ctx.level)
+  const problemId = step?.problem?.problemId
+  closeModal()
+  if (problemId != null) {
+    router.push({ name: 'ide', params: { id: String(problemId) } })
+  }
+}
+
+function onClickRecommend(curriculumIdx) {
+  const rec = getRecommendedForLevel(curriculumIdx)
+  const problemId = rec?.problem?.problemId
+  if (problemId != null) {
+    router.push({ name: 'ide', params: { id: String(problemId) } })
+  }
 }
 </script>
 
 <style scoped>
-/* Banner typography */
 .cf-hero-title {
   font-size: clamp(2rem, 3.2vw, 3.25rem);
   font-weight: 900;
@@ -231,7 +341,6 @@ function onClickLevel(roadmapIndex, level) {
   text-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
 }
 
-/* Banner: 이미지 크기와 무관하게 고정 높이 */
 .cf-banner-inner {
   height: 18rem;
 }
@@ -241,7 +350,6 @@ function onClickLevel(roadmapIndex, level) {
   }
 }
 
-/* Hero character: scaled up, lower body clipped */
 .cf-hero-char {
   pointer-events: none;
 }
@@ -250,7 +358,6 @@ function onClickLevel(roadmapIndex, level) {
   transform-origin: top center;
 }
 
-/* Panel */
 .cf-panel {
   border-radius: 28px;
   background: #ffffff;
@@ -262,7 +369,6 @@ function onClickLevel(roadmapIndex, level) {
   padding: 26px;
 }
 
-/* 추천 문제 버튼 */
 .cf-recommend-wrapper {
   position: relative;
   display: inline-block;
@@ -317,40 +423,70 @@ function onClickLevel(roadmapIndex, level) {
   color: #333;
   margin-bottom: 0.25rem;
 }
+
+.cf-roadmap-recommend {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  z-index: 5;
+}
 .cf-recommend-desc {
   font-size: 0.8rem;
   color: #555;
   line-height: 1.4;
 }
 
-/* Roadmap image area */
 .cf-roadmap {
   position: relative;
   width: 100%;
   max-width: 100%;
+  height: 400px;
+  max-height: 400px;
   border-radius: 22px;
   overflow: hidden;
   margin-bottom: 20px;
 }
 .cf-roadmap-img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  min-height: 0;
   display: block;
   object-fit: cover;
-  max-height: calc(100% - 50px);
   object-position: center top;
 }
-.cf-roadmap-level-label {
+.cf-roadmap-level-header {
   position: absolute;
   top: 1rem;
   left: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  z-index: 2;
+  pointer-events: none;
+}
+.cf-roadmap-level-label {
   font-size: 1.125rem;
   font-weight: 800;
   color: #fff;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
   letter-spacing: 0.05em;
-  z-index: 2;
-  pointer-events: none;
+}
+.cf-roadmap-level-topic {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.02em;
+}
+
+.cf-summary-enter-active,
+.cf-summary-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.cf-summary-enter-from,
+.cf-summary-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 .cf-level-summary {
@@ -359,32 +495,38 @@ function onClickLevel(roadmapIndex, level) {
   right: 6%;
   top: 50%;
   bottom: 10%;
-  padding: 0.85rem 1rem;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 18px 28px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  background: #fff9e9;
+  border: 5px solid #6f5338;
+  box-shadow: 0 8px 24px rgba(111, 83, 56, 0.2), 0 4px 12px rgba(0, 0, 0, 0.08);
   z-index: 3;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
 }
 .cf-level-summary-title {
-  font-size: 0.9rem;
+  font-size: 1.15rem;
   font-weight: 800;
-  color: #333;
-  margin-bottom: 0.25rem;
+  color: #4e3b2a;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  margin: 0;
 }
 .cf-level-summary-desc {
-  font-size: 0.8rem;
-  color: #555;
-  line-height: 1.4;
+  font-size: 1rem;
+  color: #4e3b2a;
+  line-height: 1.45;
+  margin: 0;
+  font-weight: 500;
 }
-
-/* 레벨 오버레이: 구름 + 번호 + 투명 버튼 */
 .cf-roadmap-levels {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  transform: translateY(-250px);
+  transform: translateY(-150px);
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -433,8 +575,6 @@ function onClickLevel(roadmapIndex, level) {
 }
 .cf-level:hover .cf-level-num {
   transform: translate(-50%, -50%);
-}
-.cf-level:hover .cf-level-num {
   color: #ffeb3b;
   text-shadow: 0 0 12px rgba(255, 235, 59, 0.7), 0 2px 4px rgba(0, 0, 0, 0.4);
 }
@@ -469,25 +609,92 @@ function onClickLevel(roadmapIndex, level) {
   .cf-level-cloud { width: 9rem; }
 }
 
-/* Transparent clickable hotspots */
-.cf-hotspot {
-  position: absolute;
-  background: transparent;
-  border: 0;
-  padding: 0;
+/* 문제 상세 모달 */
+.cf-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.4);
   cursor: pointer;
-  border-radius: 9999px;
-  /* 클릭/탭 하이라이트 최소화 */
-  outline: none;
 }
-.cf-hotspot:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.9);
-  outline-offset: 4px;
+.cf-modal {
+  width: 100%;
+  max-width: 28rem;
+  padding: 1.5rem;
+  background: #fff9e9;
+  border: 3px solid #7a5c3e;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  cursor: default;
 }
-
-/* 디버그용: 영역 확인 */
-.cf-hotspot-debug {
-  background: rgba(255, 0, 0, 0.14);
-  box-shadow: inset 0 0 0 2px rgba(255, 0, 0, 0.55);
+.cf-modal-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #4e3b2a;
+  margin: 0 0 1rem;
+  line-height: 1.35;
+}
+.cf-modal-body {
+  margin-bottom: 1.25rem;
+}
+.cf-modal-dl {
+  margin: 0;
+}
+.cf-modal-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+.cf-modal-row dt {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #5c4a3a;
+}
+.cf-modal-row dd {
+  margin: 0;
+  color: #4e3b2a;
+}
+.cf-modal-no-data {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #7a6b5a;
+}
+.cf-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+.cf-modal-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+.cf-modal-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.cf-modal-btn-close {
+  background: #e8e0d0;
+  color: #5c4a3a;
+  border: 1px solid #c4b8a8;
+}
+.cf-modal-btn-close:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+.cf-modal-btn-ide {
+  background: #7a5c3e;
+  color: #fff;
+  border: 1px solid #6b4e32;
+}
+.cf-modal-btn-ide:hover:not(:disabled) {
+  filter: brightness(1.08);
 }
 </style>
