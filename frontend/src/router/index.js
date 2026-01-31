@@ -1,8 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useIdeStore } from '@/stores/ide'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
+  scrollBehavior() {
+    return { left: 0, top: 0 }
+  },
   routes: [
     {
       path: '/',
@@ -72,6 +76,17 @@ const router = createRouter({
       component: () => import('@/views/IdeView.vue')
     },
   ],
+})
+
+router.beforeEach((to, from, next) => {
+  const ideStore = useIdeStore()
+  if (to.path.startsWith('/ide/')) {
+    ideStore.ideRouteLoading = true
+  }
+  if (from.path.startsWith('/ide/') && !to.path.startsWith('/ide/')) {
+    ideStore.ideRouteLoading = false
+  }
+  next()
 })
 
 export default router
