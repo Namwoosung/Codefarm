@@ -120,11 +120,9 @@ public class SessionService {
 
     @Transactional(readOnly = true)
     public SessionResponseDto getActiveSession(Long userId) {
-        Session session = sessionRepository.findByUserIdAndStatus(userId, SessionStatus.ACTIVE)
-                .orElseThrow(() ->
-                        new CustomException("활성 세션이 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
-
-        return SessionResponseDto.from(session);
+        return sessionRepository.findByUserIdAndStatus(userId, SessionStatus.ACTIVE)
+                .map(SessionResponseDto::from)
+                .orElse(null);
     }
 
     public SaveCodeSnapshotResponseDto saveCodeSnapshot(Long userId, Long sessionId, SaveCodeSnapshotRequestDto saveCodeSnapshotRequestDto) {
