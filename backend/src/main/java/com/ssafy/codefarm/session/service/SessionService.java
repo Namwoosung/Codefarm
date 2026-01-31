@@ -196,7 +196,7 @@ public class SessionService {
                 new ExecuteServerRequest(
                         requestDto.getLanguage(),
                         requestDto.getCode(),
-                        requestDto.getInput(),
+                        requestDto.getInput() == null ? "" : requestDto.getInput(),
                         2000,
                         128,
                         0.5
