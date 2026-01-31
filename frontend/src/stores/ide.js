@@ -46,10 +46,14 @@ export const useIdeStore = defineStore('ide', () => {
     sessionId.value = null
   }
 
+  // 메인/커리큘럼 → IDE 진입 시 전역 로딩 오버레이용
+  const ideRouteLoading = ref(false)
+
   return {
     codeByProblemId,
     sessionId,
     lastCodeInputAt,
+    ideRouteLoading,
     touchCodeInput,
     getCode,
     updateCode,

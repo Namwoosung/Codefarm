@@ -5,7 +5,7 @@
     </div>
     <div class="flex flex-col flex-1 min-h-0 p-3">
       <div class="flex-1 min-h-0 overflow-y-auto mb-3">
-        <div class="flex items-start gap-2 mb-3 p-2.5 rounded-lg bg-[#FFE082] shadow-sm">
+        <div class="flex items-start gap-2 mb-3 p-2.5 rounded-lg bg-white/70 shadow-sm">
           <div class="hint-avatar w-8 h-8 min-w-8 rounded-full bg-[#f5d54a] flex items-center justify-center flex-shrink-0">
             <CarrotIcon />
           </div>
