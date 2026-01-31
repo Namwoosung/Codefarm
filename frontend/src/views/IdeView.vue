@@ -193,6 +193,8 @@ const showReportModal = ref(false)
 const reportData = ref(null)
 /** 제출 내역에서 열었을 때 true → 닫을 때 메인으로 이동하지 않음 */
 const reportModalFromHistory = ref(false)
+/** 리포트 '메인 화면으로' 클릭 시 true → 이탈 확인 창 건너뜀 (세션 이미 종료됨) */
+const skipLeaveConfirm = ref(false)
 /** 실행 시 stdin 입력 모달 */
 const showRunInputModal = ref(false)
 const runInputContent = ref('')
@@ -484,6 +486,7 @@ onMounted(async () => {
     timerStoppedAt.value = null
   } finally {
     isInitializing.value = false
+    ideStore.ideRouteLoading = false
   }
   // 10초 저장은 첫 입력 후에만 시작 (startSnapshotInterval은 lastCodeInputAt 변경 시 watch에서 호출)
   // "N초 전" 1초마다 갱신 (FR-CODE-011 타이머도 동일 간격으로 갱신)
@@ -514,8 +517,18 @@ watch(() => route.params.id, async (newId, oldId) => {
   }
 })
 
-/** FR-CODE-010: 코드 작성 중 나가기 시 확인 메시지 (뒤로가기/라우트 이탈) */
+/** FR-CODE-010: 코드 작성 중 나가기 시 확인 메시지 (뒤로가기/라우트 이탈). 리포트에서 '메인 화면으로' 클릭 시에는 세션이 이미 종료되어 있으므로 확인 생략 */
 onBeforeRouteLeave(async (to, from, next) => {
+  if (skipLeaveConfirm.value) {
+    skipLeaveConfirm.value = false
+    await closeSessionOnLeave()
+    if (snapshotIntervalId) {
+      clearInterval(snapshotIntervalId)
+      snapshotIntervalId = null
+    }
+    next()
+    return
+  }
   const code = ideStore.getCode(route.params.id)
   const hasCode = code != null && String(code).trim() !== ''
   const message = hasCode
@@ -755,7 +768,10 @@ const handleOpenReport = async (resultId) => {
 const onReportModalClose = () => {
   showReportModal.value = false
   reportData.value = null
-  if (!reportModalFromHistory.value) router.push('/')
+  if (!reportModalFromHistory.value) {
+    skipLeaveConfirm.value = true
+    router.push('/')
+  }
   reportModalFromHistory.value = false
 }
 
