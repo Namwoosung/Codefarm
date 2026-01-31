@@ -1,98 +1,124 @@
 <template>
-  <div class="h-screen p-10 flex flex-col overflow-hidden" @dblclick.stop.prevent>
-    <div class="max-w-7xl mx-auto w-full flex flex-col flex-1 min-h-0">
-      <PageTitle title="카드" />
+  <div class="h-[750px] flex flex-col overflow-hidden bg-farm-cream" @dblclick.stop.prevent>
+    <div class="w-full flex flex-1 min-h-0">
+      <!-- 좌측: 카드 뽑기 영역 (1) -->
+      <aside class="w-1/4 h-full border-r-4 border-farm-brown-dark bg-farm-paper/50 p-8 flex flex-col items-center justify-center relative overflow-hidden">
+        <div class="relative z-10 w-full flex flex-col items-center gap-8">
+          <div class="text-center">
+            <h2 class="text-3xl font-black text-farm-brown-dark mb-2">Gacha!</h2>
+            <p class="text-farm-brown font-bold opacity-75">새로운 크루를 영입해보세요</p>
+          </div>
 
-      <div class="flex flex-col flex-1 min-h-0">
-        <!-- 카드 리스트 -->
-        <main class="w-full flex-1 min-h-0">
-          <div class="mb-4 h-[calc(100vh-200px)] border-[15px] border-[color:var(--color-farm-brown-dark)] bg-base-100 p-8 rounded-[20px] relative flex flex-col min-h-0 overflow-hidden">
+          <!-- 카드 뽑기 버튼 (이미지 형태나 큰 버튼) -->
+          <div class="relative group cursor-pointer" @click="gachaCard">
+            <div class="absolute inset-0 bg-farm-yellow rounded-3xl blur-xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
+            <div class="relative bg-white border-4 border-farm-brown-dark p-6 rounded-3xl shadow-[0_8px_0_#4E3B2A] group-hover:translate-y-1 group-hover:shadow-[0_4px_0_#4E3B2A] transition-all">
+              <img :src="cardListBg" class="w-32 h-32 object-contain mb-4 opacity-80" alt="gacha" />
+              <div class="bg-farm-olive text-white py-3 px-6 rounded-xl font-black text-center">
+                50P 소모
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white/80 backdrop-blur-sm border-2 border-farm-brown/20 rounded-2xl p-4 w-full text-center">
+            <p class="text-farm-brown font-bold text-sm mb-1 uppercase tracking-wider">My Points</p>
+            <p class="text-2xl font-black text-farm-brown-dark">{{ user?.point?.toLocaleString() }} P</p>
+          </div>
+        </div>
+        
+        <!-- 배경 장식 -->
+        <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-farm-green/10 rounded-full blur-3xl"></div>
+        <div class="absolute -top-10 -right-10 w-40 h-40 bg-farm-yellow/10 rounded-full blur-3xl"></div>
+      </aside>
+
+      <!-- 우측: 카드 리스트 영역 (3) -->
+      <main class="w-3/4 h-full flex flex-col min-h-0 bg-farm-cream/30">
+        <div class="flex-1 flex flex-col min-h-0 p-8">
+          <div class="relative flex-1 flex flex-col min-h-0 border-[12px] border-farm-brown-dark bg-white rounded-[40px] shadow-2xl overflow-hidden">
             <!-- 배경 이미지 -->
             <div
-              class="absolute inset-0 rounded-[20px] bg-center bg-cover opacity-25 pointer-events-none"
+              class="absolute inset-0 bg-center bg-cover opacity-25 pointer-events-none"
               :style="{ backgroundImage: `url(${cardListBg})` }"
             />
 
-            <div class="relative z-10 flex items-center justify-between gap-3 mb-6">
-              <h2 class="text-xl font-bold text-slate-800">{{ user?.nickname }}'s Farm Crew</h2>
-              <p class="ms-auto">내 포인트 : {{ user?.point }}</p>
-              <button
-                type="button"
-                class="btn rounded-xl border border-base-300 bg-gradient-to-b from-white to-base-200 text-base-content font-bold tracking-tight shadow-sm hover:-translate-y-0.5 active:translate-y-0"
-                @click="gachaCard"
-              >
-                카드뽑기
-              </button>
+            <div class="relative z-10 p-8 pb-8 flex items-center justify-between border-b border-farm-brown/5">
+              <div>
+                <h2 class="text-2xl font-black text-farm-brown-dark">{{ user?.nickname }}'s Farm Crew</h2>
+                <p class="text-farm-brown font-bold opacity-60">수집한 카드 목록을 확인하세요</p>
+              </div>
+              <div class="flex gap-4">
+                <div v-for="grade in GRADES" :key="grade" class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-farm-cream border border-farm-brown/10">
+                  <span :class="gradeMeta[grade].color" class="w-2 h-2 rounded-full"></span>
+                  <span class="text-xs font-black text-farm-brown-dark">{{ cardCountByGrade[grade] }}</span>
+                </div>
+              </div>
             </div>
 
-            <!-- 등급별 페이지 스냅 (한 번에 한 등급만 노출) -->
-            <div class="relative z-10 flex-1 min-h-0 overflow-y-auto overscroll-contain scrollbar-hide snap-y snap-mandatory scroll-smooth">
-              <section v-for="grade in GRADES" :key="grade" class="h-full snap-start relative group flex flex-col justify-center">
-                <div class="flex items-center justify-between mb-3 px-2">
-                  <h3 class="text-lg font-bold text-slate-700 flex items-center gap-2">
-                    <span :class="gradeMeta[grade].color" class="w-2 h-6 rounded-full"></span>
+            <!-- 등급별 리스트 -->
+            <div class="relative z-10 flex-1 min-h-0 overflow-y-auto scrollbar-hide snap-y snap-mandatory p-12 pt-8 pb-12">
+              <section v-for="grade in GRADES" :key="grade" class="mb-12 last:mb-0 snap-start">
+                <div class="flex items-center justify-between mb-4">
+                  <h3 class="text-xl font-black text-farm-brown-dark flex items-center gap-3">
+                    <span :class="gradeMeta[grade].color" class="w-3 h-8 rounded-lg shadow-sm"></span>
                     {{ gradeMeta[grade].name }}
                   </h3>
-                  <span class="text-sm text-slate-400">
+                  <span class="px-3 py-1 rounded-lg bg-farm-cream text-sm font-bold text-farm-brown">
                     {{ cardCountByGrade[grade] }} / {{ gradeMeta[grade].slots }}
                   </span>
                 </div>
 
-                <!-- 좌우 이동 버튼 -->
-                <button
-                  v-if="grade !== 'MEGA'"
-                  type="button"
-                  @click="scroll(grade, 'left')"
-                  class="absolute left-0 top-1/2 -translate-y-1/2 z-50 bg-white/90 border border-slate-200 rounded-full p-1.5 shadow-md hover:bg-white transition-opacity md:opacity-0 md:group-hover:opacity-100 flex items-center justify-center"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-
-                <button
-                  v-if="grade !== 'MEGA'"
-                  type="button"
-                  @click="scroll(grade, 'right')"
-                  class="absolute right-0 top-1/2 -translate-y-1/2 z-50 bg-white/90 border border-slate-200 rounded-full p-1.5 shadow-md hover:bg-white transition-opacity md:opacity-0 md:group-hover:opacity-100 flex items-center justify-center"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-
                 <!-- 가로 스크롤 슬롯 -->
-                <div
-                  :ref="(el) => setScrollEl(grade, el)"
-                  class="flex gap-5 overflow-x-auto overflow-y-visible pt-2 pb-4 px-2 scroll-smooth scrollbar-hide snap-x"
-                >
-                  <!-- 고정 슬롯(카드ID 기준으로 위치 배치) -->
-                  <div
-                    v-for="(slotCard, idx) in slotsByGrade[grade]"
-                    :key="`${grade}-slot-${idx}`"
-                    :class="[
-                      'flex-shrink-0 snap-start',
-                      grade === 'SPECIAL' ? 'w-[320px]' : 'w-[155px]',
-                    ]"
+                <div class="relative group">
+                  <!-- 좌우 이동 버튼 -->
+                  <button
+                    v-if="grade !== 'MEGA'"
+                    type="button"
+                    @click="scroll(grade, 'left')"
+                    class="absolute -left-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white border-2 border-farm-brown-dark rounded-full shadow-lg flex items-center justify-center hover:bg-farm-cream transition-all opacity-0 group-hover:opacity-100"
                   >
-                    <CardDetail v-if="slotCard" class="w-full" :card="slotCard" @showcard="openCardModal" />
+                    <iconify-icon icon="mdi:chevron-left" class="text-2xl text-farm-brown-dark"></iconify-icon>
+                  </button>
+
+                  <button
+                    v-if="grade !== 'MEGA'"
+                    type="button"
+                    @click="scroll(grade, 'right')"
+                    class="absolute -right-4 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-white border-2 border-farm-brown-dark rounded-full shadow-lg flex items-center justify-center hover:bg-farm-cream transition-all opacity-0 group-hover:opacity-100"
+                  >
+                    <iconify-icon icon="mdi:chevron-right" class="text-2xl text-farm-brown-dark"></iconify-icon>
+                  </button>
+
+                  <div
+                    :ref="(el) => setScrollEl(grade, el)"
+                    class="flex gap-6 overflow-x-auto pt-2 pb-6 px-2 scrollbar-hide snap-x"
+                  >
                     <div
-                      v-else
+                      v-for="(slotCard, idx) in slotsByGrade[grade]"
+                      :key="`${grade}-slot-${idx}`"
                       :class="[
-                        'bg-transparent border-2 border-dashed border-base-content/35 rounded-xl shadow-md flex items-center justify-center',
-                        'w-full',
-                        grade === 'SPECIAL' ? 'aspect-[1024/723]' : 'aspect-[1872/2613]',
+                        'flex-shrink-0 snap-start transition-transform hover:scale-105 duration-300',
+                        grade === 'SPECIAL' ? 'w-[340px]' : 'w-[170px]',
                       ]"
                     >
-                      <span class="text-4xl font-extrabold text-base-content/20">?</span>
+                      <CardDetail v-if="slotCard" class="w-full" :card="slotCard" @showcard="openCardModal" />
+                      <div
+                        v-else
+                        :class="[
+                          'bg-transparent border-2 border-dashed border-base-content/35 rounded-xl shadow-md flex items-center justify-center',
+                          'w-full',
+                          grade === 'SPECIAL' ? 'aspect-[1024/723]' : 'aspect-[1872/2613]',
+                        ]"
+                      >
+                        <span class="text-4xl font-extrabold text-base-content/20">?</span>
+                      </div>
                     </div>
                   </div>
                 </div>
               </section>
             </div>
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   </div>
 
