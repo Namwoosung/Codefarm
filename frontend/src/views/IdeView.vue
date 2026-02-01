@@ -45,21 +45,12 @@
       <!-- 힌트 패널 (펼쳤을 때) -->
       <Transition name="hint-panel">
         <div v-show="hintPanelOpen" class="flex flex-shrink-0 w-[300px] min-w-[280px] max-w-[320px] h-full min-h-0 overflow-hidden">
-          <div class="flex flex-col w-full h-full relative">
-            <HintPanel
-              :hint-remaining="hintRemaining"
-              :hint-max="hintMax"
-              @hint-used="onHintUsedFromPanel"
-            />
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm btn-square absolute top-2 right-2 text-[var(--color-farm-brown-dark)] hover:bg-base-200/50"
-              title="힌트 패널 접기"
-              @click="hintPanelOpen = false"
-            >
-              <iconify-icon icon="mdi:chevron-left" class="text-lg"></iconify-icon>
-            </button>
-          </div>
+          <HintPanel
+            :hint-remaining="hintRemaining"
+            :hint-max="hintMax"
+            @hint-used="onHintUsedFromPanel"
+            @close="hintPanelOpen = false"
+          />
         </div>
       </Transition>
 
@@ -107,7 +98,7 @@
               <div v-if="snapshotStoppedByIdle" class="text-[0.7rem] text-[var(--color-farm-point)]">코드 전송이 멈춘 상태입니다</div>
             </div>
 
-            <div class="flex gap-3 px-4 py-3 flex-shrink-0 bg-[var(--color-farm-paper)] border-t border-b border-[var(--color-farm-cream)]">
+            <div class="flex gap-3 px-4 py-2 flex-shrink-0 bg-[var(--color-farm-paper)] border-t border-b border-[var(--color-farm-cream)]">
               <button type="button" class="btn btn-sm h-9 min-w-[119px] bg-gradient-to-r from-[#7A5C3E] to-[#CDFF86] text-white border-none rounded-2xl shadow hover:shadow-md transition-all" @click="handleSubmit">
                 <span class="font-bold">▷</span>
                 <span>제출하기</span>
@@ -128,7 +119,7 @@
               </button>
             </div>
 
-            <div class="h-1.5 flex-shrink-0 bg-[var(--color-farm-cream)] hover:bg-[var(--color-farm-green-light)] cursor-row-resize transition-colors" @mousedown="startResizeVertical"></div>
+            <div class="h-1 flex-shrink-0 bg-[var(--color-farm-cream)] hover:bg-[var(--color-farm-green-light)] cursor-row-resize transition-colors" @mousedown="startResizeVertical"></div>
             <div class="flex-shrink-0 overflow-hidden bg-[var(--color-farm-paper)]" :style="{ height: terminalHeight + 'px' }">
               <TerminalPanel ref="terminalPanel" />
             </div>
@@ -251,6 +242,8 @@ const hintPanelOpen = ref(true)
 /** 문제 패널 탭 (problem | results) - 툴바에 표시 */
 const problemPanelActiveTab = ref('problem')
 const problemTitle = ref('문제')
+/** 이번 진입에서 방금 생성한 세션 ID (getLatestCode 호출 생략용) */
+const justCreatedSessionId = ref(null)
 /** 힌트 차감 토스트 (FR-CODE-010-1) */
 const toastMessage = ref('')
 let toastTimer = null
@@ -425,7 +418,13 @@ async function initSession() {
         return
       }
       ideStore.setSessionId(session.sessionId)
-      await loadLatestCode(problemId)
+      // 방금 이번 진입에서 생성한 세션이면 저장된 코드가 없으므로 latest 호출 생략
+      if (session.sessionId === justCreatedSessionId.value) {
+        ideStore.setCodeToDefault(problemId)
+        justCreatedSessionId.value = null
+      } else {
+        await loadLatestCode(problemId)
+      }
       return
     }
   } catch (err) {
@@ -440,8 +439,10 @@ async function initSession() {
 
   try {
     const { data: res } = await sessionApi.createSession(problemId)
-    ideStore.setSessionId(res?.data?.sessionId ?? null)
-    if (res?.data?.sessionId) {
+    const newSessionId = res?.data?.sessionId ?? null
+    ideStore.setSessionId(newSessionId)
+    if (newSessionId) {
+      justCreatedSessionId.value = newSessionId
       ideStore.setCodeToDefault(problemId)
       if (terminalPanel.value) terminalPanel.value.write('세션이 생성되었습니다.\r\n')
     }
@@ -545,6 +546,7 @@ function startSnapshotInterval() {
 /** 페이지 이탈 시 세션 종료 */
 async function closeSessionOnLeave() {
   const sid = ideStore.sessionId
+  justCreatedSessionId.value = null
   if (!sid) return
   try {
     await sessionApi.closeSession(sid)
@@ -626,13 +628,16 @@ onBeforeRouteLeave(async (to, from, next) => {
     confirmText: '나가기',
     cancelText: '취소',
   })
-  if (!ok) return false
+  if (!ok) {
+    next(false)
+    return
+  }
   await closeSessionOnLeave()
   if (snapshotIntervalId) {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
   }
-  return true
+  next()
 })
 
 onUnmounted(() => {
@@ -673,6 +678,7 @@ const handleSubmit = async () => {
   }
   const code = ideStore.getCode(route.params.id)
   if (terminalPanel.value) {
+    terminalPanel.value.clear()
     terminalPanel.value.write('제출 중...\r\n')
     terminalPanel.value.write('채점 중... \r\n')
   }
@@ -681,26 +687,25 @@ const handleSubmit = async () => {
     const success = isSubmitSuccess(res)
     if (terminalPanel.value) {
       const ec = res?.data?.evaluationContext
-      if (ec) {
-        if (success) {
-          terminalPanel.value.write(`📊 테스트 ${ec.passedCount ?? ec.totalCount}/${ec.totalCount}개 통과 (100%)\r\n`)
-          terminalPanel.value.write('✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
-        } else {
-          const passed = ec.passedCount ?? 0
-          const total = ec.totalCount
-          const pct = total > 0 ? Math.round((passed / total) * 100) : 0
-          terminalPanel.value.write('\r\n│ 📊 채점 결과: ' + `${passed} / ${total}개 테스트 통과 (${pct}%)` + '\r\n')
-          if (ec.failReason) terminalPanel.value.write('│ ❌ 사유: ' + ec.failReason + '\r\n')
-          terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
-        }
+      if (success) {
+        // 성공 시: evaluationContext 없음
+        terminalPanel.value.write('📊 모든 테스트 통과 (100%)\r\n')
+        terminalPanel.value.write('✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
+        if (res?.data?.execTime) terminalPanel.value.write(`⏱️ 실행 시간: ${res.data.execTime}ms\r\n`)
+        if (res?.data?.memory) terminalPanel.value.write(`💾 메모리: ${(res.data.memory / 1024).toFixed(2)}KB\r\n`)
+      } else if (ec) {
+        // 실패 시: evaluationContext 있음
+        const passed = ec.passedCount ?? 0
+        const total = ec.totalCount
+        const pct = total > 0 ? Math.round((passed / total) * 100) : 0
+        terminalPanel.value.write('\r\n│ 📊 채점 결과: ' + `${passed} / ${total}개 테스트 통과 (${pct}%)` + '\r\n')
+        if (ec.failReason) terminalPanel.value.write('│ ❌ 사유: ' + ec.failReason + '\r\n')
+        if (ec.isTimeout) terminalPanel.value.write('│ ⏱️ 시간 초과\r\n')
+        if (ec.isOom) terminalPanel.value.write('│ 💾 메모리 초과\r\n')
+        terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
       } else {
         terminalPanel.value.write(res?.message || '제출 완료\r\n')
-        if (res?.data) terminalPanel.value.write(JSON.stringify(res.data, null, 2) + '\r\n')
-        if (success) {
-          terminalPanel.value.write('✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
-        } else {
-          terminalPanel.value.write('❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
-        }
+        terminalPanel.value.write('❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
       }
     }
     // 1) 제출 성공 시: 세션 닫기 후 리포트 모달 표시 (채점·결과는 submit 응답으로 구성)
@@ -779,8 +784,9 @@ const doRunWithInput = async (input) => {
   isRunLoading.value = true
   const code = ideStore.getCode(route.params.id)
   if (terminalPanel.value) {
+    terminalPanel.value.clear()
     terminalPanel.value.setRunning(true)
-    terminalPanel.value.write('\r\n\x1b[33m[Running...]\x1b[0m\r\n')
+    terminalPanel.value.write('\x1b[33m[Running...]\x1b[0m\r\n')
   }
   try {
     const { data: res } = await sessionApi.runCode(sid, { language: API_LANGUAGE, code, input: input ?? '' })
@@ -836,9 +842,18 @@ const handleEscape = async () => {
   })
   if (!ok) return
   const sid = ideStore.sessionId
+  justCreatedSessionId.value = null
   if (sid && isLoggedIn.value) {
+    const code = ideStore.getCode(route.params.id)
     try {
-      await sessionApi.giveUp(sid)
+      // 1. give-up API 호출 (language, code 필요). 404 등 실패 시에도 close는 호출
+      await sessionApi.giveUp(sid, { language: API_LANGUAGE, code })
+    } catch (_) {
+      // give-up 미구현(404) 등 실패해도 무시
+    }
+    try {
+      // 2. 세션 종료는 항상 호출 (give-up 실패해도 세션이 닫혀야 다음 진입 시 새 세션 생성)
+      await sessionApi.closeSession(sid)
     } catch (_) {}
     ideStore.clearSession()
   }
