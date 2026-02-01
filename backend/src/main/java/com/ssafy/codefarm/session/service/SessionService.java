@@ -32,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Service
@@ -430,5 +431,37 @@ public class SessionService {
 
             return GiveUpSessionResponseDto.from(result);
         });
+    }
+
+    @Transactional(readOnly = true)
+    public SessionResultsResponseDto getSessionResults(
+            Long userId,
+            Long sessionId
+    ) {
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() ->
+                        new CustomException(
+                                "세션을 찾을 수 없습니다.",
+                                ErrorCode.RESOURCE_NOT_FOUND
+                        )
+                );
+
+        if (!session.getUser().getId().equals(userId)) {
+            throw new CustomException(
+                    "해당 세션에 접근할 수 없습니다.",
+                    ErrorCode.FORBIDDEN
+            );
+        }
+
+        List<Result> results =
+                resultRepository.findBySessionIdOrderByCreatedAtDesc(sessionId);
+
+        List<SessionResultItemResponseDto> items =
+                results.stream()
+                        .map(SessionResultItemResponseDto::from)
+                        .toList();
+
+        return SessionResultsResponseDto.from(items);
     }
 }

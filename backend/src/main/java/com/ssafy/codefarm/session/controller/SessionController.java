@@ -158,4 +158,19 @@ public class SessionController {
 
         return SuccessResponse.success("문제 풀이를 포기했습니다.", response);
     }
+
+    @GetMapping("/{sessionId}/results")
+    public SuccessResponse getSessionResults(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long sessionId
+    ) {
+
+        SessionResultsResponseDto responseDto =
+                sessionService.getSessionResults(
+                        userDetails.getUserId(),
+                        sessionId
+                );
+
+        return SuccessResponse.success("제출 이력 조회 성공", responseDto);
+    }
 }
