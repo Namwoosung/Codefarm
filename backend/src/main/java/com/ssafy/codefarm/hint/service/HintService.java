@@ -3,6 +3,8 @@ package com.ssafy.codefarm.hint.service;
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.hint.dto.requset.ManualHintRequestDto;
+import com.ssafy.codefarm.hint.dto.response.HintItemResponseDto;
+import com.ssafy.codefarm.hint.dto.response.HintListResponseDto;
 import com.ssafy.codefarm.hint.entity.Hint;
 import com.ssafy.codefarm.hint.entity.HintType;
 import com.ssafy.codefarm.hint.repository.HintRepository;
@@ -160,5 +162,28 @@ public class HintService {
                 session.getUsedHint(),
                 session.getMaxHint()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public HintListResponseDto getHints(Long sessionId, Long userId) {
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() ->
+                        new CustomException("세션을 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND)
+                );
+
+        if (!session.getUser().getId().equals(userId)) {
+            throw new CustomException("해당 세션에 접근할 수 없습니다.", ErrorCode.FORBIDDEN);
+        }
+
+        List<Hint> hints =
+                hintRepository.findBySessionIdOrderByCreatedAtDesc(sessionId);
+
+        List<HintItemResponseDto> items =
+                hints.stream()
+                        .map(HintItemResponseDto::from)
+                        .toList();
+
+        return HintListResponseDto.from(items);
     }
 }

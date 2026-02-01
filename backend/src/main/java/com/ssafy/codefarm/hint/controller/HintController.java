@@ -3,6 +3,7 @@ package com.ssafy.codefarm.hint.controller;
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.dto.SuccessResponse;
 import com.ssafy.codefarm.hint.dto.requset.ManualHintRequestDto;
+import com.ssafy.codefarm.hint.dto.response.HintListResponseDto;
 import com.ssafy.codefarm.hint.dto.response.ManualHintResponseDto;
 import com.ssafy.codefarm.hint.service.HintService;
 import jakarta.validation.Valid;
@@ -42,5 +43,17 @@ public class HintController {
                 hintService.createManualHint(sessionId, userDetails.getUserId(), requestDto);
 
         return SuccessResponse.success("힌트 생성 성공", manualHintResponseDto);
+    }
+
+    @GetMapping("/{sessionId}/hints")
+    public SuccessResponse getHints(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long sessionId
+    ) {
+
+        HintListResponseDto response =
+                hintService.getHints(sessionId, userDetails.getUserId());
+
+        return SuccessResponse.success("힌트 목록 조회 성공", response);
     }
 }
