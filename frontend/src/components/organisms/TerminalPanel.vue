@@ -65,6 +65,10 @@ onMounted(async () => {
     setTimeout(() => {
       try {
         fitAddon.fit()
+        // 초기 안내 메시지 출력
+        term.write('코드를 실행해보려면 \'실행하기\' 버튼을,\r\n')
+        term.write('최종 코드를 제출하려면 \'제출하기\' 버튼을 눌러주세요.\r\n')
+        term.write('그만 풀고 싶다면, \'탈주하기\' 버튼을 눌러주세요.\r\n')
       } catch (error) {
         console.error('Terminal fit error:', error)
       }

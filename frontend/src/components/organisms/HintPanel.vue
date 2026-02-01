@@ -1,7 +1,15 @@
 <template>
   <div class="flex flex-col w-full h-full min-w-[280px] max-w-[320px] bg-[#FFE082] border-r border-base-300 flex-shrink-0">
-    <div class="flex items-center px-4 py-3 border-b border-base-300 flex-shrink-0">
+    <div class="flex items-center justify-between px-4 h-10 min-h-10 border-b border-base-300 flex-shrink-0">
       <span class="text-sm font-semibold text-[#1a1a1a]">힌트</span>
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm btn-square text-[var(--color-farm-brown-dark)] hover:bg-base-200/50"
+        title="힌트 패널 접기"
+        @click="$emit('close')"
+      >
+        <iconify-icon icon="mdi:chevron-left" class="text-lg"></iconify-icon>
+      </button>
     </div>
     <div class="flex flex-col flex-1 min-h-0 p-3">
       <div class="flex-1 min-h-0 overflow-y-auto mb-3">
@@ -64,7 +72,7 @@ const props = defineProps({
   hintRemaining: { type: Number, default: 3 },
   hintMax: { type: Number, default: 3 }
 })
-const emit = defineEmits(['hint-used'])
+const emit = defineEmits(['hint-used', 'close'])
 
 const route = useRoute()
 const ideStore = useIdeStore()
@@ -82,7 +90,7 @@ async function sendHint() {
     const sid = ideStore.sessionId
     const code = ideStore.getCode(route.params.id)
     const res = await hintApi.requestManualHint(sid, { userQuestion: q, code })
-    const d = res?.data
+    const d = res?.data ?? res
     if (d) {
       chatMessages.value.push({ role: 'assistant', text: d.content, createdAt: d.createdAt })
       emit('hint-used', { usedHint: d.usedHint ?? 0, maxHint: d.maxHint ?? 3 })
