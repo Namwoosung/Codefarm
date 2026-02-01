@@ -8,6 +8,7 @@ export const useProfileStore = defineStore('profile', () => {
     const user = ref(null)
 
     //report
+    const report = ref(null)
     const reports = ref([])
 
     const userinfo = async () => {
@@ -60,21 +61,33 @@ export const useProfileStore = defineStore('profile', () => {
             throw err
         }
     }
-    // const reportList = async (params) => {
-    //     try {
-    //         const res = await api.get('/reports/me', { params })
-    //         reports.value = res.data.data
-    //         console.log(res.data.message)
-    //     } catch (err) {
-    //         console.log(err.data.message)
-    //     }
-    // }
+    const reportList = async (params) => {
+        try {
+            const res = await api.get('/reports/me', { params })
+            reports.value = res.data.data
+            console.log(res.data.message)
+            console.log(res.data.data)
+        } catch (err) {
+            console.log(err.data.message)
+        }
+    }
 
+    const resportDetail = async (reportId) => {
+        try {
+            const res = await api.get(`reports/${reportId}`)
+            report.value = res.data.data
+            console.log(res.data.data)
+        } catch (err) {
+            console.log(err.data.message)
+        }
+    }
     return {
         user,
-        // reports,
+        report,
+        reports,
         userinfo,
-        // reportList
-        updateUser
+        reportList,
+        resportDetail,
+        updateUser,
     }
 })
