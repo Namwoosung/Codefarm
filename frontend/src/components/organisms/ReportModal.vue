@@ -1,22 +1,38 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="report-modal-overlay" @click.self="$emit('close')">
+    <div v-if="show" class="report-modal-overlay" @click.self="$emit('close', false)">
       <div class="report-modal-card">
         <div class="report-modal-header">
           <h2 class="report-modal-title">Report</h2>
-          <button type="button" class="report-modal-close" aria-label="모달 닫기" @click="$emit('close')">
+          <button type="button" class="report-modal-close" aria-label="모달 닫기" @click="$emit('close', false)">
             <iconify-icon icon="mdi:close"></iconify-icon>
           </button>
         </div>
-        <p v-if="report?.result" class="report-modal-id"># {{ report.result.resultId }}</p>
-        <!-- FR-CODE-009: 문제 정보 -->
+        <div v-if="reportLoading" class="report-modal-section report-modal-loading">
+          <p class="text-[var(--color-farm-brown)]">불러오는 중...</p>
+        </div>
+        <div v-else-if="reportLoadFailed || !report?.result" class="report-modal-section report-modal-loading">
+          <p class="text-[var(--color-farm-brown)]">불러오지 못했습니다.</p>
+        </div>
+        <template v-else>
+        <!-- 결과 타입 -->
+        <div v-if="report?.result?.resultType" class="report-modal-section">
+          <span class="badge badge-sm" :class="resultTypeBadgeClass(report.result.resultType)">{{ resultTypeLabel(report.result.resultType) }}</span>
+        </div>
+        <!-- 문제 정보 -->
         <div v-if="report?.result?.problem" class="report-modal-section">
           <h4 class="report-modal-section-title">문제 정보</h4>
           <p class="report-modal-problem-title">{{ report.result.problem.title }}</p>
-          <p v-if="report.result.problem.problemId != null" class="report-modal-meta-text">문제 번호 {{ report.result.problem.problemId }}</p>
-          <p v-if="report.result.problem.difficulty" class="report-modal-meta-text">난이도 {{ report.result.problem.difficulty }}</p>
+          <p v-if="report.result.problem.difficulty != null" class="report-modal-meta-text">난이도 {{ formatDifficulty(report.result.problem.difficulty) }}</p>
+          <p v-if="report.result.problem.algorithm" class="report-modal-meta-text">알고리즘 {{ formatAlgorithm(report.result.problem.algorithm) }}</p>
         </div>
-        <!-- FR-CODE-009: 받은 힌트 수, 힌트 내용 -->
+        <!-- 학습 정보 (usedHintCount, failCount) -->
+        <div v-if="report?.result?.learning && (report.result.learning.usedHintCount != null || report.result.learning.failCount != null)" class="report-modal-section">
+          <h4 class="report-modal-section-title">학습 정보</h4>
+          <p v-if="report.result.learning.usedHintCount != null" class="report-modal-meta-text">사용한 힌트 수: {{ report.result.learning.usedHintCount }}개</p>
+          <p v-if="report.result.learning.failCount != null" class="report-modal-meta-text">실패 횟수: {{ report.result.learning.failCount }}회</p>
+        </div>
+        <!-- 힌트 (hintCount/hintContents: 구 API 호환) -->
         <div v-if="report?.result && (report.result.hintCount != null || (Array.isArray(report.result.hintContents) && report.result.hintContents.length))" class="report-modal-section">
           <h4 class="report-modal-section-title">힌트</h4>
           <p v-if="report.result.hintCount != null" class="report-modal-meta-text">받은 힌트 수: {{ report.result.hintCount }}개</p>
@@ -81,7 +97,8 @@
         <div v-else-if="report?.result" class="report-modal-no-grading">
           채점 결과 없음
         </div>
-        <button type="button" class="report-modal-button" @click="$emit('close')">
+        </template>
+        <button type="button" class="report-modal-button" @click="$emit('close', true)">
           메인 화면으로
         </button>
       </div>
@@ -94,7 +111,9 @@ import { computed } from 'vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
-  report: { type: Object, default: null }
+  report: { type: Object, default: null },
+  reportLoading: { type: Boolean, default: false },
+  reportLoadFailed: { type: Boolean, default: false }
 })
 defineEmits(['close'])
 
@@ -123,6 +142,27 @@ function formatDate(iso) {
 function formatLanguage(lang) {
   const map = { PYTHON: 'Python3', JAVA: 'Java', JAVASCRIPT: 'JavaScript', CPP: 'C++' }
   return map[lang] ?? lang ?? '-'
+}
+
+function resultTypeLabel(type) {
+  const map = { SUCCESS: '정답', FAIL: '오답', GIVE_UP: '탈주' }
+  return map[type] ?? type ?? '-'
+}
+
+function resultTypeBadgeClass(type) {
+  const map = { SUCCESS: 'badge-success text-white', FAIL: 'badge-error text-white', GIVE_UP: 'badge-ghost' }
+  return map[type] ?? 'badge-ghost'
+}
+
+function formatDifficulty(d) {
+  if (d == null) return '-'
+  if (typeof d === 'number') return `LEVEL${d}`
+  return String(d)
+}
+
+function formatAlgorithm(algo) {
+  const map = { BRUTEFORCE: '브루트포스', GREEDY: '그리디', DP: '동적 프로그래밍', BFS: 'BFS', DFS: 'DFS', BINARY_SEARCH: '이진 탐색', TWO_POINTER: '투 포인터', SORT: '정렬', GRAPH: '그래프', STRING: '문자열', MATH: '수학', IMPLEMENTATION: '구현' }
+  return map[algo] ?? algo ?? '-'
 }
 </script>
 
@@ -184,6 +224,11 @@ function formatLanguage(lang) {
 
 .report-modal-section {
   margin-bottom: 1rem;
+}
+
+.report-modal-loading {
+  padding: 1.5rem 0;
+  text-align: center;
 }
 
 .report-modal-section-title {

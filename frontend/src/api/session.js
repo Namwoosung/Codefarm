@@ -70,13 +70,12 @@ export const submitCode = (sessionId, { language, code }) => {
 }
 
 /**
- * 포기하기
- * 현재 백엔드에 별도 give-up 엔드포인트가 없어,
- * 일단 일반 세션 종료(close)와 동일하게 처리한다.
+ * 포기하기 (탈주)
  * @param {number} sessionId
+ * @param {{ language: string, code: string }} body
  */
-export const giveUp = (sessionId) => {
-  return api.patch(`/sessions/${sessionId}/close`)
+export const giveUp = (sessionId, { language, code }) => {
+  return api.post(`/sessions/${sessionId}/give-up`, { language, code })
 }
 
 /**

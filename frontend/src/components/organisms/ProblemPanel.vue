@@ -1,53 +1,32 @@
 <template>
-  <div class="flex flex-col h-full min-h-0 bg-[#FFE082] rounded-xl overflow-hidden">
-    <!-- 탭: DaisyUI join -->
-    <div class="join join-horizontal w-full flex-shrink-0 border-b border-base-300 bg-[#FFE082]">
-      <button
-        type="button"
-        class="join-item btn btn-sm flex-1 gap-1.5 rounded-none border-base-300 bg-transparent text-[var(--color-farm-brown)] hover:bg-base-200/50 font-medium"
-        :class="{ 'btn-active border-b-2 border-[var(--color-farm-green)] text-[var(--color-farm-green-dark)]': activeTab === 'problem' }"
-        @click="activeTab = 'problem'"
-      >
-        <iconify-icon icon="mdi:book-open-variant" class="text-lg"></iconify-icon>
-        {{ problem?.title || '문제' }}
-      </button>
-      <button
-        type="button"
-        class="join-item btn btn-sm flex-1 gap-1.5 rounded-none border-base-300 bg-transparent text-[var(--color-farm-brown)] hover:bg-base-200/50 font-medium"
-        :class="{ 'btn-active border-b-2 border-[var(--color-farm-green)] text-[var(--color-farm-green-dark)]': activeTab === 'results' }"
-        @click="activeTab = 'results'; loadResults()"
-      >
-        <iconify-icon icon="mdi:format-list-bulleted" class="text-lg"></iconify-icon>
-        제출 내역
-      </button>
-    </div>
-
+  <div class="flex flex-col h-full min-h-0 bg-[#FFE082] overflow-hidden">
     <!-- 문제 탭 -->
-    <template v-if="activeTab === 'problem'">
+    <template v-if="props.activeTab === 'problem'">
       <div class="flex flex-col flex-1 min-h-0">
-        <div class="flex-1 min-h-0 overflow-y-auto p-4 pl-5 bg-base-100 mx-2 mb-2 rounded-lg shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
-          <div class="mb-4">
-            <span class="text-[0.875rem] font-normal text-[var(--color-farm-brown)]"># {{ problem?.problemId || '로딩 중...' }}</span>
-          </div>
+        <div class="flex-1 min-h-0 overflow-y-auto p-8 bg-base-100 mx-6 mt-3 mb-3 rounded-4xl shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
+          <template v-if="problemLoading">
+            <p class="text-[var(--color-farm-brown)]">불러오는 중...</p>
+          </template>
+          <template v-else>
           <h2 class="text-xl font-bold text-[var(--color-farm-brown-dark)] mb-6">
-            {{ problem?.title || '로딩 중...' }}
+            # {{ problem?.problemId ?? '-' }} {{ problem?.title ?? '-' }}
           </h2>
-          <div class="space-y-3 mb-6">
-            <div class="flex items-center gap-2 text-[var(--color-farm-brown-dark)] text-[0.875rem]">
-              <iconify-icon icon="mdi:chart-line" class="text-xl text-[var(--color-farm-green)]"></iconify-icon>
+          <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 mb-6">
+            <div class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
+              <iconify-icon icon="mdi:chart-line" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
               <span>획득 점수 <span class="font-semibold">{{ getDifficultyScore(problem?.difficulty) }}점</span></span>
             </div>
-            <div class="flex items-center gap-2 text-[var(--color-farm-brown-dark)] text-[0.875rem]">
-              <iconify-icon icon="mdi:clock-outline" class="text-xl text-[var(--color-farm-green)]"></iconify-icon>
-              <span>실행 제한 시간 <span class="font-semibold">{{ problem?.timeLimit || 0 }}초</span></span>
-            </div>
-            <div class="flex items-center gap-2 text-[var(--color-farm-brown-dark)] text-[0.875rem]">
-              <iconify-icon icon="mdi:harddisk" class="text-xl text-[var(--color-farm-green)]"></iconify-icon>
+            <div class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
+              <iconify-icon icon="mdi:harddisk" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
               <span>메모리 제한 <span class="font-semibold">{{ formatMemory(problem?.memoryLimit) }}</span></span>
             </div>
-            <div v-if="problem?.algorithm" class="flex items-center gap-2 text-[var(--color-farm-brown-dark)] text-[0.875rem]">
-              <iconify-icon icon="mdi:tag-multiple" class="text-xl text-[var(--color-farm-green)]"></iconify-icon>
+            <div v-if="problem?.algorithm" class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
+              <iconify-icon icon="mdi:tag-multiple" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
               <span>알고리즘 <span class="font-semibold">{{ formatAlgorithm(problem.algorithm) }}</span></span>
+            </div>
+            <div class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
+              <iconify-icon icon="mdi:clock-outline" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
+              <span>실행 제한 시간 <span class="font-semibold">{{ problem?.timeLimit || 0 }}초</span></span>
             </div>
           </div>
           <div v-if="problem?.concept" class="mb-6">
@@ -58,7 +37,7 @@
           </div>
           <div class="mb-6">
             <div class="text-[var(--color-farm-brown-dark)] whitespace-pre-wrap leading-relaxed text-[0.875rem]">
-              {{ problem?.description || '문제 설명을 불러오는 중...' }}
+              {{ problem?.description ?? '' }}
             </div>
           </div>
           <div v-if="problem?.inputDescription" class="mb-6">
@@ -75,34 +54,69 @@
           </div>
           <div v-if="problem?.exampleInput || problem?.exampleOutput" class="mb-6 space-y-4">
             <div>
-              <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)] mb-2">예제 입력</h3>
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)]">예제 입력</h3>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs gap-1 min-w-[4.5rem] justify-end text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)]"
+                  :title="copiedWhich === 'input' ? '복사되었습니다' : '복사'"
+                  @click="copyToClipboard(problem?.exampleInput ?? '', 'input')"
+                >
+                  <template v-if="copiedWhich === 'input'">
+                    <iconify-icon icon="mdi:check" class="text-sm text-success"></iconify-icon>
+                    <span class="text-success text-xs">복사되었습니다</span>
+                  </template>
+                  <template v-else>
+                    <iconify-icon icon="mdi:content-copy" class="text-sm"></iconify-icon>
+                    복사
+                  </template>
+                </button>
+              </div>
               <div class="bg-base-200 p-4 rounded-lg font-mono text-[0.8125rem] text-[var(--color-farm-brown-dark)] whitespace-pre-wrap">
                 {{ problem.exampleInput }}
               </div>
             </div>
             <div>
-              <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)] mb-2">예제 출력</h3>
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)]">예제 출력</h3>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs gap-1 min-w-[4.5rem] justify-end text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)]"
+                  :title="copiedWhich === 'output' ? '복사되었습니다' : '복사'"
+                  @click="copyToClipboard(problem?.exampleOutput ?? '', 'output')"
+                >
+                  <template v-if="copiedWhich === 'output'">
+                    <iconify-icon icon="mdi:check" class="text-sm text-success"></iconify-icon>
+                    <span class="text-success text-xs">복사되었습니다</span>
+                  </template>
+                  <template v-else>
+                    <iconify-icon icon="mdi:content-copy" class="text-sm"></iconify-icon>
+                    복사
+                  </template>
+                </button>
+              </div>
               <div class="bg-base-200 p-4 rounded-lg font-mono text-[0.8125rem] text-[var(--color-farm-brown-dark)] whitespace-pre-wrap">
                 {{ problem.exampleOutput }}
               </div>
             </div>
           </div>
+          </template>
         </div>
       </div>
     </template>
 
     <!-- 제출 내역 탭 -->
-    <div v-show="activeTab === 'results'" class="flex flex-col flex-1 min-h-0 bg-base-100 text-[var(--color-farm-brown-dark)] p-4">
-      <p class="text-xs text-[var(--color-farm-brown)] mb-2 py-1">현재 표시되는 제출 내역은 임시 데이터이며, 차후 백엔드 API와 연동될 예정입니다.</p>
-      <div class="flex items-center justify-between pb-3 border-b border-base-300 flex-shrink-0">
-        <span class="text-sm text-[var(--color-farm-brown)]">{{ resultsList.length }}개의 제출</span>
-        <button type="button" class="btn btn-ghost btn-sm gap-1.5 text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)] hover:bg-base-200" @click="loadResults" :disabled="resultsLoading">
-          <iconify-icon icon="mdi:refresh" class="text-base" :class="{ 'animate-spin': resultsLoading }"></iconify-icon>
-          새로고침
-        </button>
-      </div>
-      <div class="flex-1 min-h-0 overflow-y-auto mt-2">
-        <table class="table table-pin-rows table-xs">
+    <div v-show="props.activeTab === 'results'" class="flex flex-col flex-1 min-h-0">
+      <div class="flex-1 min-h-0 overflow-y-auto p-8 bg-base-100 mx-6 mt-3 mb-3 rounded-4xl shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
+        <div class="flex items-center justify-between pb-3 border-b border-base-300 flex-shrink-0 mb-3">
+          <span class="text-sm text-[var(--color-farm-brown)]">{{ resultsList.length }}개의 제출</span>
+          <button type="button" class="btn btn-ghost btn-sm gap-1.5 text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)] hover:bg-base-200" @click="loadResults" :disabled="resultsLoading">
+            <iconify-icon icon="mdi:refresh" class="text-base" :class="{ 'animate-spin': resultsLoading }"></iconify-icon>
+            새로고침
+          </button>
+        </div>
+        <div class="overflow-y-auto">
+          <table class="table table-pin-rows table-xs">
           <thead>
             <tr class="bg-base-100 sticky top-0 z-10">
               <th class="text-left font-semibold text-[var(--color-farm-brown)]">제출일시</th>
@@ -115,44 +129,64 @@
               v-for="(row, idx) in resultsList"
               :key="row.resultId ?? idx"
               class="hover:bg-base-200/50"
-              :class="{ 'cursor-pointer': row.hasReport && row.resultId }"
-              @click="row.hasReport && row.resultId ? emit('open-report', row.resultId) : null"
+              :class="{ 'cursor-pointer': row.resultId != null }"
+              @click="row.resultId != null ? emit('open-report', row.resultId) : null"
             >
               <td class="py-2">
-                <span class="mr-1">{{ formatResultDate(row.createdAt) }}</span>
-                <iconify-icon v-if="row.hasReport && row.resultId" icon="mdi:chevron-right" class="inline-block align-middle text-[var(--color-farm-brown)]"></iconify-icon>
+                <span class="mr-1">{{ formatResultDate(row.submittedAt) }}</span>
+                <iconify-icon v-if="row.resultId != null" icon="mdi:chevron-right" class="inline-block align-middle text-[var(--color-farm-brown)]"></iconify-icon>
               </td>
               <td>{{ formatLanguage(row.language) }}</td>
               <td>
                 <span class="inline-flex items-center gap-1 badge badge-sm" :class="resultTypeClass(row.resultType)">
                   <iconify-icon v-if="row.resultType === 'SUCCESS'" icon="mdi:check-circle" class="text-base"></iconify-icon>
-                  {{ resultTypeLabel(row.resultType) }} {{ row.accuracy }} / 100
+                  {{ resultTypeLabel(row.resultType) }}
+                  <span v-if="row.execTime != null" class="text-[0.65rem] opacity-70">({{ row.execTime }}ms)</span>
                 </span>
               </td>
             </tr>
-            <tr v-if="resultsList.length === 0 && !resultsLoading">
+            <tr v-if="resultsLoading">
+              <td colspan="3" class="text-center text-[var(--color-farm-brown)] py-8">불러오는 중...</td>
+            </tr>
+            <tr v-else-if="resultsList.length === 0">
               <td colspan="3" class="text-center text-[var(--color-farm-brown)] py-8">제출 내역이 없습니다.</td>
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProblemDetail } from '@/api/problem'
 import { useIdeStore } from '@/stores/ide'
-import { getSessionResultsList, getMockSessionResults } from '@/api/session'
+import { getSessionResultsList } from '@/api/session'
 
-const emit = defineEmits(['open-report'])
+const props = defineProps({
+  activeTab: { type: String, default: 'problem' }
+})
+const emit = defineEmits(['open-report', 'problem-loaded'])
 const route = useRoute()
 const ideStore = useIdeStore()
 const problem = ref(null)
+const problemLoading = ref(false)
+const copiedWhich = ref(null) // 'input' | 'output' | null
 
-const activeTab = ref('problem')
+function copyToClipboard(text, which) {
+  if (!text) return
+  navigator.clipboard?.writeText(text).then(() => {
+    copiedWhich.value = which
+    setTimeout(() => { copiedWhich.value = null }, 1500)
+  }).catch(() => {})
+}
+
+watch(() => props.activeTab, (tab) => {
+  if (tab === 'results') loadResults()
+})
 const resultsList = ref([])
 const resultsLoading = ref(false)
 
@@ -219,15 +253,15 @@ const formatLanguage = (lang) => {
   return map[lang] ?? lang ?? '-'
 }
 
-// 결과 목록 로드 (API 실패/빈 배열 시 목 데이터 사용)
+// 결과 목록 로드
 const loadResults = async () => {
   const sid = ideStore.sessionId
   resultsLoading.value = true
   try {
     const list = await getSessionResultsList(sid)
-    resultsList.value = list?.length ? list : getMockSessionResults()
+    resultsList.value = list ?? []
   } catch (_) {
-    resultsList.value = getMockSessionResults()
+    resultsList.value = []
   } finally {
     resultsLoading.value = false
   }
@@ -235,12 +269,18 @@ const loadResults = async () => {
 
 // 문제 상세 정보 로드
 const loadProblem = async () => {
+  const problemId = route.params.id
+  if (!problemId) return
+  problemLoading.value = true
   try {
-    const problemId = route.params.id
     const data = await getProblemDetail(problemId)
     problem.value = data.problem
+    emit('problem-loaded', data.problem)
   } catch (error) {
     console.error('문제를 불러오는 중 오류가 발생했습니다:', error)
+    problem.value = null
+  } finally {
+    problemLoading.value = false
   }
 }
 
