@@ -5,12 +5,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
+import com.ssafy.codefarm.session.dto.redis.PreviousJudgementRedisDto;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -23,6 +25,10 @@ public class SessionCodeRedisService {
 
     private String buildKey(Long sessionId) {
         return "app:session:" + sessionId + ":codes";
+    }
+
+    private String buildJudgementKey(Long sessionId) {
+        return "app:session:" + sessionId + ":judgements";
     }
 
     public void initialize(Long sessionId) {
@@ -68,7 +74,74 @@ public class SessionCodeRedisService {
         }
     }
 
+    public List<CodeSnapshotRedisDto> getSnapshots(Long sessionId) {
+
+        String key = buildKey(sessionId);
+
+        List<String> jsonList = redisTemplate.opsForList().range(key, 0, -1);
+
+        if (jsonList == null || jsonList.isEmpty()) {
+            return List.of();
+        }
+
+        return jsonList.stream()
+                .map(json -> {
+                    try {
+                        return objectMapper.readValue(json, CodeSnapshotRedisDto.class);
+                    } catch (JsonProcessingException e) {
+                        throw new CustomException(
+                                "코드 스냅샷 역직렬화 실패",
+                                ErrorCode.INTERNAL_SERVER_ERROR
+                        );
+                    }
+                })
+                .toList();
+    }
+
+    public void appendJudgement(Long sessionId, PreviousJudgementRedisDto judgement) {
+
+        String key = buildJudgementKey(sessionId);
+
+        try {
+            String json = objectMapper.writeValueAsString(judgement);
+
+            redisTemplate.opsForList().rightPush(key, json);
+            redisTemplate.expire(key, TTL);
+
+        } catch (JsonProcessingException e) {
+            throw new CustomException(
+                    "판단 정보 직렬화 실패",
+                    ErrorCode.INTERNAL_SERVER_ERROR
+            );
+        }
+    }
+
+    public List<PreviousJudgementRedisDto> getPreviousJudgements(Long sessionId) {
+
+        String key = buildJudgementKey(sessionId);
+
+        List<String> jsonList = redisTemplate.opsForList().range(key, 0, -1);
+
+        if (jsonList == null || jsonList.isEmpty()) {
+            return List.of();
+        }
+
+        return jsonList.stream()
+                .map(json -> {
+                    try {
+                        return objectMapper.readValue(json, PreviousJudgementRedisDto.class);
+                    } catch (JsonProcessingException e) {
+                        throw new CustomException(
+                                "판단 정보 역직렬화 실패",
+                                ErrorCode.INTERNAL_SERVER_ERROR
+                        );
+                    }
+                })
+                .toList();
+    }
+
     public void delete(Long sessionId) {
         redisTemplate.delete(buildKey(sessionId));
+        redisTemplate.delete(buildJudgementKey(sessionId));
     }
 }

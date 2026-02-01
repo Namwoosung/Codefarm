@@ -1,0 +1,112 @@
+package com.ssafy.codefarm.hint.service;
+
+import com.ssafy.codefarm.hint.entity.Hint;
+import com.ssafy.codefarm.hint.entity.HintType;
+import com.ssafy.codefarm.hint.repository.HintRepository;
+import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
+import com.ssafy.codefarm.session.entity.Session;
+import com.ssafy.codefarm.session.entity.SessionStatus;
+import com.ssafy.codefarm.session.repository.SessionRepository;
+import com.ssafy.codefarm.session.service.SessionCodeRedisService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.TaskScheduler;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AutoHintSchedulerService {
+
+    private final TaskScheduler taskScheduler;
+    private final SessionRepository sessionRepository;
+    private final SessionCodeRedisService sessionCodeRedisService;
+    private final HintRepository hintRepository;
+    private final HintService hintService;
+
+    private final ConcurrentHashMap<Long, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
+
+    private static final Duration INTERVAL = Duration.ofMinutes(5);
+
+    public void start(Long sessionId) {
+
+        ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(
+                () -> process(sessionId),
+                INTERVAL
+        );
+
+        tasks.put(sessionId, future);
+
+        log.info("Auto hint scheduler started. sessionId={}", sessionId);
+    }
+
+    public void stop(Long sessionId) {
+        ScheduledFuture<?> future = tasks.remove(sessionId);
+        if (future != null) {
+            future.cancel(true);
+            log.info("Auto hint scheduler stopped. sessionId={}", sessionId);
+        }
+    }
+
+    @Transactional
+    public void process(Long sessionId) {
+
+        Session session = sessionRepository.findById(sessionId).orElse(null);
+
+        if (session == null || session.getStatus() != SessionStatus.ACTIVE) {
+            stop(sessionId);
+            return;
+        }
+
+        // Redis 데이터 조회
+        List<CodeSnapshotRedisDto> codeHistory = sessionCodeRedisService.getSnapshots(sessionId);
+        var previousJudgement = sessionCodeRedisService.getPreviousJudgements(sessionId);
+
+        // 🔹 2. AI 요청 DTO 구성
+        // AIHintRequest request = buildRequest(...);
+
+        // ====================================
+        // 🔥 AI 호출 부분 (현재는 주석)
+        // AIHintResponse response = feedbackServerClient.requestAutoHint(request);
+        // ====================================
+
+        // 🔹 테스트용 더미 응답
+        String analysis = "아직 코드 작성이 충분하지 않습니다.";
+        String hint = null; // 또는 "입력 처리 순서를 다시 확인해보세요."
+
+        // 🔹 3. judgement는 무조건 Redis 저장
+        sessionCodeRedisService.appendJudgement(sessionId, analysis);
+
+        // 🔹 4. hint가 있을 경우만 처리
+        if (hint == null || hint.isBlank()) {
+            return;
+        }
+
+        Hint hintEntity = Hint.builder()
+                .session(session)
+                .hintType(HintType.AUTO)
+                .content(hint)
+                .build();
+
+        hintRepository.save(hintEntity);
+
+        // 🔹 5. SSE 전송
+        hintService.sendAutoHint(
+                sessionId,
+                Map.of(
+                        "hintId", hintEntity.getId(),
+                        "hintType", hintEntity.getHintType(),
+                        "content", hintEntity.getContent(),
+                        "isViewed", hintEntity.getIsViewed(),
+                        "createdAt", hintEntity.getCreatedAt()
+                )
+        );
+    }
+}
