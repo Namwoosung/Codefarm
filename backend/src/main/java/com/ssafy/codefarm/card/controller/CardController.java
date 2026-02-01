@@ -1,6 +1,7 @@
 package com.ssafy.codefarm.card.controller;
 
 import com.ssafy.codefarm.card.dto.response.CardDetailResponseDto;
+import com.ssafy.codefarm.card.dto.response.CardRankingResponseDto;
 import com.ssafy.codefarm.card.dto.response.DrawCardResponseDto;
 import com.ssafy.codefarm.card.dto.response.MyCardListResponseDto;
 import com.ssafy.codefarm.card.service.CardService;
@@ -58,5 +59,14 @@ public class CardController {
                 "카드 상세 조회 성공",
                 cardDetailResponseDto
         );
+    }
+
+    @GetMapping("/rankings")
+    public SuccessResponse getCardRankings() {
+
+        CardRankingResponseDto response =
+                cardService.getCardRankings();
+
+        return SuccessResponse.success("카드 랭킹 조회 성공", response);
     }
 }

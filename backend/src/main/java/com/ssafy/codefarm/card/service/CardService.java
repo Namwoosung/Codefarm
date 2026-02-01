@@ -1,10 +1,7 @@
 package com.ssafy.codefarm.card.service;
 
 import com.ssafy.codefarm.card.dto.query.MyCardQueryDto;
-import com.ssafy.codefarm.card.dto.response.CardDetailResponseDto;
-import com.ssafy.codefarm.card.dto.response.CardSummaryResponseDto;
-import com.ssafy.codefarm.card.dto.response.DrawCardResponseDto;
-import com.ssafy.codefarm.card.dto.response.MyCardListResponseDto;
+import com.ssafy.codefarm.card.dto.response.*;
 import com.ssafy.codefarm.card.entity.Card;
 import com.ssafy.codefarm.card.entity.CardGrade;
 import com.ssafy.codefarm.card.entity.UserCard;
@@ -105,5 +102,15 @@ public class CardService {
                 cardRepository.findAcquiredHistory(userId, cardId);
 
         return CardDetailResponseDto.from(card, count, history);
+    }
+
+    @Transactional(readOnly = true)
+    public CardRankingResponseDto getCardRankings() {
+
+        return new CardRankingResponseDto(
+                cardRepository.findTopCollectors(5),
+                cardRepository.findAllCollectionMasters(),
+                cardRepository.findTodayRareCollectors()
+        );
     }
 }
