@@ -8,24 +8,15 @@
     </div>
 
     <!-- 툴바 -->
-    <div class="flex items-center justify-between w-full h-14 px-6 flex-shrink-0 bg-[var(--color-farm-paper)] border-b border-[var(--color-farm-cream)]">
-      <div class="flex items-center gap-4">
-        <button type="button" class="btn btn-ghost btn-sm gap-2 text-[var(--color-farm-brown-dark)] hover:text-[var(--color-farm-green)]" @click="handleBack">
-          <i class="pi pi-arrow-left"></i>
-          <span>뒤로가기</span>
-        </button>
-        <span v-if="!isInitializing && (problemStartTime > 0 || timerStoppedAt != null)" class="text-sm font-medium text-[var(--color-farm-brown-dark)]">⏱️ {{ elapsedDisplay }}</span>
-      </div>
-      <div class="flex items-center gap-3">
-        <div class="flex items-center gap-0.5" aria-label="힌트 잔여 횟수">
-          <span v-for="i in 3" :key="i" class="inline-flex transition-all duration-200" :class="{ 'grayscale opacity-55': hintUsed >= i }">
-            <CarrotIcon />
-          </span>
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm btn-square" aria-label="알림">
-          <BellIcon />
-        </button>
-      </div>
+    <div class="flex items-center justify-between w-full h-12 px-5 flex-shrink-0 bg-[var(--color-farm-paper)] border-b border-[var(--color-farm-cream)]">
+      <button
+        type="button"
+        class="ms-auto inline-flex items-center gap-2 bg-transparent border-0 shadow-none outline-none focus:outline-none text-[var(--color-farm-brown-dark)] hover:text-[var(--color-farm-green)] transition-colors"
+        @click="handleBack"
+      >
+        <span class="text-xs font-medium">뒤로가기</span>
+        <iconify-icon icon="mdi:door-open" class="text-2xl"></iconify-icon>
+      </button>
     </div>
 
     <!-- 레이아웃: [힌트 토글 | 힌트 패널? | 문제 | 리사이저 | 에디터+터미널] -->
@@ -86,8 +77,46 @@
 
         <main class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden bg-[var(--color-farm-paper)] ide-panel-right" :style="{ width: (100 - leftPanelWidth) + '%' }">
           <div class="relative flex flex-col flex-1 min-h-0" :class="{ 'pointer-events-none': !isLoggedIn }">
-            <div class="h-10 min-h-10 flex-shrink-0 flex items-center px-3 border-b border-[var(--color-farm-cream)] bg-[var(--color-farm-paper)]">
-              <span class="text-sm font-medium text-[var(--color-farm-brown)]">코드</span>
+            <div class="h-10 min-h-10 flex-shrink-0 flex items-center justify-between px-3 border-b border-[var(--color-farm-cream)] bg-[var(--color-farm-paper)]">
+              <!-- left: timer -->
+              <div
+                v-if="!isInitializing && (problemStartTime > 0 || timerStoppedAt != null)"
+                class="inline-flex items-center gap-2"
+                aria-label="경과 시간"
+              >
+                <iconify-icon icon="mdi:timer-outline" class="text-xl text-[var(--color-farm-brown-dark)]"></iconify-icon>
+                <div class="flex items-center gap-1 font-mono text-sm font-black text-[var(--color-farm-brown-dark)] tabular-nums">
+                  <span class="flex items-center">
+                    <span v-for="(d, idx) in elapsedDigits.h" :key="`codebar-h-${idx}`" class="countdown">
+                      <span :style="{ '--value': d }"></span>
+                    </span>
+                  </span>
+                  <span class="opacity-50">:</span>
+                  <span class="flex items-center">
+                    <span v-for="(d, idx) in elapsedDigits.m" :key="`codebar-m-${idx}`" class="countdown">
+                      <span :style="{ '--value': d }"></span>
+                    </span>
+                  </span>
+                  <span class="opacity-50">:</span>
+                  <span class="flex items-center">
+                    <span v-for="(d, idx) in elapsedDigits.s" :key="`codebar-s-${idx}`" class="countdown">
+                      <span :style="{ '--value': d }"></span>
+                    </span>
+                  </span>
+                </div>
+              </div>
+
+              <!-- right: carrots + bell -->
+              <div class="flex items-center gap-3">
+                <div class="flex items-center gap-0.5" aria-label="힌트 잔여 횟수">
+                  <span v-for="i in 3" :key="`codebar-carrot-${i}`" class="inline-flex transition-all duration-200" :class="{ 'grayscale opacity-55': hintUsed >= i }">
+                    <CarrotIcon />
+                  </span>
+                </div>
+                <button type="button" class="btn btn-ghost btn-xs btn-square" aria-label="알림">
+                  <BellIcon />
+                </button>
+              </div>
             </div>
             <div class="flex-1 min-h-0 relative ide-editor-container" :class="{ 'blur-sm': !isLoggedIn }">
               <MonacoEditor />
@@ -411,6 +440,34 @@ const elapsedDisplay = computed(() => {
   return `${h}:${pad(m)}:${pad(s)}`
 })
 
+// daisyUI countdown에 쓸 "초" 및 시/분/초 파싱
+const elapsedSeconds = computed(() => {
+  const stopped = timerStoppedAt.value
+  if (stopped != null) return Math.max(0, Math.floor(stopped / 1000))
+  const start = problemStartTime.value
+  if (!start) return 0
+  return Math.max(0, Math.floor((lastStatusTick.value - start) / 1000))
+})
+
+const elapsedParts = computed(() => {
+  const sec = elapsedSeconds.value
+  const h = Math.floor(sec / 3600)
+  const m = Math.floor(sec / 60) % 60
+  const s = sec % 60
+  return { h, m, s }
+})
+
+// countdown은 기본적으로 0패딩이 없어서 자릿수로 쪼개서 렌더링
+const elapsedDigits = computed(() => {
+  const toDigits = (n, minLen = 2) =>
+    Array.from(String(Math.max(0, n)).padStart(minLen, '0')).map((ch) => Number(ch))
+  return {
+    h: toDigits(elapsedParts.value.h, 2),
+    m: toDigits(elapsedParts.value.m, 2),
+    s: toDigits(elapsedParts.value.s, 2),
+  }
+})
+
 /** 세션 초기화: 활성 세션 조회 또는 세션 생성 후 최신 코드 로드 (라우트 id = 백엔드 problemId) */
 async function initSession() {
   if (!isLoggedIn.value) return
@@ -612,7 +669,6 @@ watch(() => route.params.id, async (newId, oldId) => {
   }
 })
 
-/** FR-CODE-010: 코드 작성 중 나가기 시 확인 메시지 (뒤로가기/라우트 이탈). 리포트에서 '메인 화면으로' 클릭 시에는 세션이 이미 종료되어 있으므로 확인 생략 */
 onBeforeRouteLeave(async (to, from, next) => {
   if (skipLeaveConfirm.value) {
     skipLeaveConfirm.value = false
