@@ -7,7 +7,6 @@ import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.redis.PreviousJudgementRedisDto;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 

@@ -94,7 +94,7 @@ public class AutoHintSchedulerService {
         // 🔹 테스트용 더미 응답
         String analysis = "아직 코드 작성이 충분하지 않습니다.";
         List<String> mistakeTypes = List.of("NoCode_Early");
-        String hint = "입력 처리 순서를 다시 확인해보세요.";
+        String hintContent = "입력 처리 순서를 다시 확인해보세요.";
 
         // judgement는 무조건 Redis 저장
         sessionCodeRedisService.appendJudgement(
@@ -107,26 +107,26 @@ public class AutoHintSchedulerService {
         );
 
         // hint가 있을 경우만 처리
-        if (hint == null || hint.isBlank()) {
+        if (hintContent == null || hintContent.isBlank()) {
             return;
         }
 
-        Hint hintEntity = Hint.builder()
+        Hint hint = Hint.builder()
                 .session(session)
                 .hintType(HintType.AUTO)
-                .content(hint)
+                .content(hintContent)
                 .build();
 
-        hintRepository.save(hintEntity);
+        hintRepository.save(hint);
 
         hintService.sendAutoHint(
                 sessionId,
                 Map.of(
-                        "hintId", hintEntity.getId(),
-                        "hintType", hintEntity.getHintType(),
-                        "content", hintEntity.getContent(),
-                        "isViewed", hintEntity.getIsViewed(),
-                        "createdAt", hintEntity.getCreatedAt()
+                        "hintId", hint.getId(),
+                        "hintType", hint.getHintType(),
+                        "content", hint.getContent(),
+                        "isViewed", hint.getIsViewed(),
+                        "createdAt", hint.getCreatedAt()
                 )
         );
     }
