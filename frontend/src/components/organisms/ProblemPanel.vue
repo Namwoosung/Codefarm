@@ -71,7 +71,6 @@
     <!-- 제출 내역 탭 -->
     <div v-show="props.activeTab === 'results'" class="flex flex-col flex-1 min-h-0">
       <div class="flex-1 min-h-0 overflow-y-auto p-8 bg-base-100 mx-6 mt-3 mb-3 rounded-4xl shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
-        <p class="text-xs text-[var(--color-farm-brown)] mb-4">현재 표시되는 제출 내역은 임시 데이터이며, 차후 백엔드 API와 연동될 예정입니다.</p>
         <div class="flex items-center justify-between pb-3 border-b border-base-300 flex-shrink-0 mb-3">
           <span class="text-sm text-[var(--color-farm-brown)]">{{ resultsList.length }}개의 제출</span>
           <button type="button" class="btn btn-ghost btn-sm gap-1.5 text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)] hover:bg-base-200" @click="loadResults" :disabled="resultsLoading">
@@ -93,18 +92,19 @@
               v-for="(row, idx) in resultsList"
               :key="row.resultId ?? idx"
               class="hover:bg-base-200/50"
-              :class="{ 'cursor-pointer': row.hasReport && row.resultId }"
-              @click="row.hasReport && row.resultId ? emit('open-report', row.resultId) : null"
+              :class="{ 'cursor-pointer': row.resultId != null }"
+              @click="row.resultId != null ? emit('open-report', row.resultId) : null"
             >
               <td class="py-2">
-                <span class="mr-1">{{ formatResultDate(row.createdAt) }}</span>
-                <iconify-icon v-if="row.hasReport && row.resultId" icon="mdi:chevron-right" class="inline-block align-middle text-[var(--color-farm-brown)]"></iconify-icon>
+                <span class="mr-1">{{ formatResultDate(row.submittedAt) }}</span>
+                <iconify-icon v-if="row.resultId != null" icon="mdi:chevron-right" class="inline-block align-middle text-[var(--color-farm-brown)]"></iconify-icon>
               </td>
               <td>{{ formatLanguage(row.language) }}</td>
               <td>
                 <span class="inline-flex items-center gap-1 badge badge-sm" :class="resultTypeClass(row.resultType)">
                   <iconify-icon v-if="row.resultType === 'SUCCESS'" icon="mdi:check-circle" class="text-base"></iconify-icon>
-                  {{ resultTypeLabel(row.resultType) }} {{ row.accuracy }} / 100
+                  {{ resultTypeLabel(row.resultType) }}
+                  <span v-if="row.execTime != null" class="text-[0.65rem] opacity-70">({{ row.execTime }}ms)</span>
                 </span>
               </td>
             </tr>
@@ -124,7 +124,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProblemDetail } from '@/api/problem'
 import { useIdeStore } from '@/stores/ide'
-import { getSessionResultsList, getMockSessionResults } from '@/api/session'
+import { getSessionResultsList } from '@/api/session'
 
 const props = defineProps({
   activeTab: { type: String, default: 'problem' }
@@ -203,15 +203,15 @@ const formatLanguage = (lang) => {
   return map[lang] ?? lang ?? '-'
 }
 
-// 결과 목록 로드 (API 실패/빈 배열 시 목 데이터 사용)
+// 결과 목록 로드
 const loadResults = async () => {
   const sid = ideStore.sessionId
   resultsLoading.value = true
   try {
     const list = await getSessionResultsList(sid)
-    resultsList.value = list?.length ? list : getMockSessionResults()
+    resultsList.value = list ?? []
   } catch (_) {
-    resultsList.value = getMockSessionResults()
+    resultsList.value = []
   } finally {
     resultsLoading.value = false
   }
