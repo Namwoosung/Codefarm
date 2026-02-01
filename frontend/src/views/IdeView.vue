@@ -139,7 +139,13 @@
       </div>
     </div>
 
-    <ReportModal :show="showReportModal" :report="reportData" @close="onReportModalClose" />
+    <ReportModal
+      :show="showReportModal"
+      :report="reportData"
+      :report-loading="reportDetailLoading"
+      :report-load-failed="reportLoadFailed"
+      @close="onReportModalClose"
+    />
 
     <!-- stdin 입력 모달 -->
     <Teleport to="body">
@@ -205,7 +211,7 @@ import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
 import * as sessionApi from '@/api/session'
-import { getReportDetail, getMockReportData, buildReportFromSubmitResponse } from '@/api/reports'
+import { getReportDetail, buildReportFromSubmitResponse } from '@/api/reports'
 
 const router = useRouter()
 const route = useRoute()
@@ -227,6 +233,8 @@ const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
 const isInitializing = ref(true) // 메인→IDE 진입 시 세션/문제 로드 중
 const showReportModal = ref(false)
 const reportData = ref(null)
+const reportDetailLoading = ref(false)
+const reportLoadFailed = ref(false)
 /** 제출 내역에서 열었을 때 true → 닫을 때 메인으로 이동하지 않음 */
 const reportModalFromHistory = ref(false)
 /** 리포트 '메인 화면으로' 클릭 시 true → 이탈 확인 창 건너뜀 (세션 이미 종료됨) */
@@ -708,11 +716,12 @@ const handleSubmit = async () => {
         terminalPanel.value.write('❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
       }
     }
-    // 1) 제출 성공 시: 세션 닫기 후 리포트 모달 표시 (채점·결과는 submit 응답으로 구성)
+    // 1) 제출 성공 시: 백엔드가 세션을 자동 종료하므로 close API 호출 없이 로컬 상태만 정리 후 리포트 모달 표시
     if (success) {
       timerStoppedAt.value = lastStatusTick.value - problemStartTime.value
       problemStartTime.value = 0
-      await closeSessionOnLeave()
+      justCreatedSessionId.value = null
+      ideStore.clearSession()
       if (snapshotIntervalId) {
         clearInterval(snapshotIntervalId)
         snapshotIntervalId = null
@@ -861,27 +870,37 @@ const handleEscape = async () => {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
   }
-  reportData.value = getMockReportData('문제 풀이 결과', { withGrading: false })
+  reportData.value = { result: { problem: { title: '문제 풀이 결과' }, feedback: '탈주했습니다.' } }
   reportModalFromHistory.value = false
+  reportLoadFailed.value = false
   showReportModal.value = true
 }
 
 /** 제출 내역 탭에서 특정 결과의 리포트 보기 */
 const handleOpenReport = async (resultId) => {
   reportModalFromHistory.value = true
-  try {
-    reportData.value = await getReportDetail(resultId)
-    if (!reportData.value) reportData.value = getMockReportData(`문제 #${route.params.id}`)
-  } catch (_) {
-    reportData.value = getMockReportData(`문제 #${route.params.id}`)
-  }
+  reportData.value = null
+  reportDetailLoading.value = true
+  reportLoadFailed.value = false
   showReportModal.value = true
+  try {
+    const data = await getReportDetail(resultId)
+    reportData.value = data ? { result: data } : null
+    reportLoadFailed.value = !data
+  } catch (_) {
+    reportData.value = null
+    reportLoadFailed.value = true
+  } finally {
+    reportDetailLoading.value = false
+  }
 }
 
-const onReportModalClose = () => {
+const onReportModalClose = (goToMain = false) => {
   showReportModal.value = false
   reportData.value = null
-  if (!reportModalFromHistory.value) {
+  reportDetailLoading.value = false
+  reportLoadFailed.value = false
+  if (goToMain && !reportModalFromHistory.value) {
     skipLeaveConfirm.value = true
     router.push('/')
   }
