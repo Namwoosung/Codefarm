@@ -4,10 +4,12 @@
     <template v-if="props.activeTab === 'problem'">
       <div class="flex flex-col flex-1 min-h-0">
         <div class="flex-1 min-h-0 overflow-y-auto p-8 bg-base-100 mx-6 mt-3 mb-3 rounded-4xl shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
-          <!-- <div class="mb-3">
-          </div> -->
+          <template v-if="problemLoading">
+            <p class="text-[var(--color-farm-brown)]">불러오는 중...</p>
+          </template>
+          <template v-else>
           <h2 class="text-xl font-bold text-[var(--color-farm-brown-dark)] mb-6">
-            # {{ problem?.problemId || '로딩 중...' }} {{ problem?.title || '로딩 중...' }}
+            # {{ problem?.problemId ?? '-' }} {{ problem?.title ?? '-' }}
           </h2>
           <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 mb-6">
             <div class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
@@ -35,7 +37,7 @@
           </div>
           <div class="mb-6">
             <div class="text-[var(--color-farm-brown-dark)] whitespace-pre-wrap leading-relaxed text-[0.875rem]">
-              {{ problem?.description || '문제 설명을 불러오는 중...' }}
+              {{ problem?.description ?? '' }}
             </div>
           </div>
           <div v-if="problem?.inputDescription" class="mb-6">
@@ -52,18 +54,53 @@
           </div>
           <div v-if="problem?.exampleInput || problem?.exampleOutput" class="mb-6 space-y-4">
             <div>
-              <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)] mb-2">예제 입력</h3>
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)]">예제 입력</h3>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs gap-1 min-w-[4.5rem] justify-end text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)]"
+                  :title="copiedWhich === 'input' ? '복사되었습니다' : '복사'"
+                  @click="copyToClipboard(problem?.exampleInput ?? '', 'input')"
+                >
+                  <template v-if="copiedWhich === 'input'">
+                    <iconify-icon icon="mdi:check" class="text-sm text-success"></iconify-icon>
+                    <span class="text-success text-xs">복사되었습니다</span>
+                  </template>
+                  <template v-else>
+                    <iconify-icon icon="mdi:content-copy" class="text-sm"></iconify-icon>
+                    복사
+                  </template>
+                </button>
+              </div>
               <div class="bg-base-200 p-4 rounded-lg font-mono text-[0.8125rem] text-[var(--color-farm-brown-dark)] whitespace-pre-wrap">
                 {{ problem.exampleInput }}
               </div>
             </div>
             <div>
-              <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)] mb-2">예제 출력</h3>
+              <div class="flex items-center justify-between mb-2">
+                <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)]">예제 출력</h3>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs gap-1 min-w-[4.5rem] justify-end text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)]"
+                  :title="copiedWhich === 'output' ? '복사되었습니다' : '복사'"
+                  @click="copyToClipboard(problem?.exampleOutput ?? '', 'output')"
+                >
+                  <template v-if="copiedWhich === 'output'">
+                    <iconify-icon icon="mdi:check" class="text-sm text-success"></iconify-icon>
+                    <span class="text-success text-xs">복사되었습니다</span>
+                  </template>
+                  <template v-else>
+                    <iconify-icon icon="mdi:content-copy" class="text-sm"></iconify-icon>
+                    복사
+                  </template>
+                </button>
+              </div>
               <div class="bg-base-200 p-4 rounded-lg font-mono text-[0.8125rem] text-[var(--color-farm-brown-dark)] whitespace-pre-wrap">
                 {{ problem.exampleOutput }}
               </div>
             </div>
           </div>
+          </template>
         </div>
       </div>
     </template>
@@ -108,7 +145,10 @@
                 </span>
               </td>
             </tr>
-            <tr v-if="resultsList.length === 0 && !resultsLoading">
+            <tr v-if="resultsLoading">
+              <td colspan="3" class="text-center text-[var(--color-farm-brown)] py-8">불러오는 중...</td>
+            </tr>
+            <tr v-else-if="resultsList.length === 0">
               <td colspan="3" class="text-center text-[var(--color-farm-brown)] py-8">제출 내역이 없습니다.</td>
             </tr>
           </tbody>
@@ -133,6 +173,16 @@ const emit = defineEmits(['open-report', 'problem-loaded'])
 const route = useRoute()
 const ideStore = useIdeStore()
 const problem = ref(null)
+const problemLoading = ref(false)
+const copiedWhich = ref(null) // 'input' | 'output' | null
+
+function copyToClipboard(text, which) {
+  if (!text) return
+  navigator.clipboard?.writeText(text).then(() => {
+    copiedWhich.value = which
+    setTimeout(() => { copiedWhich.value = null }, 1500)
+  }).catch(() => {})
+}
 
 watch(() => props.activeTab, (tab) => {
   if (tab === 'results') loadResults()
@@ -219,13 +269,18 @@ const loadResults = async () => {
 
 // 문제 상세 정보 로드
 const loadProblem = async () => {
+  const problemId = route.params.id
+  if (!problemId) return
+  problemLoading.value = true
   try {
-    const problemId = route.params.id
     const data = await getProblemDetail(problemId)
     problem.value = data.problem
     emit('problem-loaded', data.problem)
   } catch (error) {
     console.error('문제를 불러오는 중 오류가 발생했습니다:', error)
+    problem.value = null
+  } finally {
+    problemLoading.value = false
   }
 }
 
