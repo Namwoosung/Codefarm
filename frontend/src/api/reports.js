@@ -19,31 +19,34 @@ export const getReportDetail = async (reportId) => {
 
 /**
  * 제출 API 응답으로 리포트 객체 구성 (채점·결과용 evaluationContext 포함)
- * @param {{ data?: { resultType?, evaluationContext?, submissionContext?, feedback? } }} res - submit 응답
+ * @param {{ data?: { resultId?, resultType?, language?, solveTime?, execTime?, memory?, feedback?, submittedAt?, evaluationContext? } }} res - submit 응답
  * @param {string} [problemTitle] - 문제 제목
  * @returns {{ result: object, evaluationContext?: object, xp?: number }}
  */
 export const buildReportFromSubmitResponse = (res, problemTitle = '문제 풀이 결과') => {
   const d = res?.data ?? {}
-  const sub = d.submissionContext ?? {}
   const evalCtx = d.evaluationContext ?? null
   const result = {
-    resultId: sub.resultId ?? null,
+    resultId: d.resultId ?? null,
     resultType: d.resultType ?? 'SUCCESS',
-    language: 'PYTHON',
+    language: d.language ?? 'PYTHON',
     problem: { problemId: 0, title: problemTitle, difficulty: 'LEVEL1', algorithm: '' },
-    code: sub.code ?? '',
-    solveTime: sub.solveTime ?? 0,
-    execTime: sub.execTime ?? 0,
-    memory: sub.memory ?? 0,
+    code: '',
+    solveTime: d.solveTime ?? 0,
+    execTime: d.execTime ?? 0,
+    memory: d.memory ?? 0,
     feedback: d.feedback ?? '제출이 완료되었습니다.',
-    createdAt: sub.submittedAt ?? new Date().toISOString(),
+    createdAt: d.submittedAt ?? new Date().toISOString(),
     hintCount: null,
     hintContents: [],
     improvementDirection: null
   }
   const report = { result, evaluationContext: evalCtx }
-  if (evalCtx && evalCtx.totalCount != null && evalCtx.totalCount > 0 && evalCtx.passedCount != null) {
+  // 성공 시: xp = 100
+  if (d.resultType === 'SUCCESS') {
+    report.xp = 100
+  } else if (evalCtx && evalCtx.totalCount != null && evalCtx.totalCount > 0 && evalCtx.passedCount != null) {
+    // 실패 시: 통과율 기반 xp
     report.xp = Math.round((evalCtx.passedCount / evalCtx.totalCount) * 100)
   }
   return report
