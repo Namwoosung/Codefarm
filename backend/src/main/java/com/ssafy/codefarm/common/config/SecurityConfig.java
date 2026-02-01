@@ -83,6 +83,9 @@ public class SecurityConfig {
 
                         .requestMatchers("/api/v1/curriculums/lists").permitAll()
 
+                        // 카드 관련 api
+                        .requestMatchers("/api/v1/cards/rankings").permitAll()
+
                         // 개발 단계 테스트
                         .requestMatchers("/test/**").permitAll()
 
