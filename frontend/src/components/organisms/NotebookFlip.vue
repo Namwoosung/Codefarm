@@ -57,6 +57,13 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { PageFlip } from 'page-flip'
+import { useProfileStore } from '@/stores/profile'
+// 리포트 조회
+const profile = useProfileStore()
+
+onMounted(async () => {
+  await profile.reportList()
+})
 
 const bookEl = ref(null)
 const flip = ref(null)
