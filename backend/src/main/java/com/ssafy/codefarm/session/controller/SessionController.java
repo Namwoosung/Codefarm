@@ -5,12 +5,10 @@ import com.ssafy.codefarm.common.dto.SuccessResponse;
 import com.ssafy.codefarm.result.dto.requset.SaveCodeSnapshotRequestDto;
 import com.ssafy.codefarm.result.dto.response.SaveCodeSnapshotResponseDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
+import com.ssafy.codefarm.session.dto.request.GiveUpSessionRequestDto;
 import com.ssafy.codefarm.session.dto.request.RunSessionRequestDto;
 import com.ssafy.codefarm.session.dto.request.SubmitSessionRequestDto;
-import com.ssafy.codefarm.session.dto.response.LatestCodeResponseDto;
-import com.ssafy.codefarm.session.dto.response.RunSessionResponseDto;
-import com.ssafy.codefarm.session.dto.response.SessionResponseDto;
-import com.ssafy.codefarm.session.dto.response.SubmitSessionResponseDto;
+import com.ssafy.codefarm.session.dto.response.*;
 import com.ssafy.codefarm.session.service.SessionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -141,5 +139,23 @@ public class SessionController {
                 : "제출에 실패했습니다.";
 
         return SuccessResponse.success(message, result);
+    }
+
+    @PostMapping("/{sessionId}/give-up")
+    @ResponseStatus(HttpStatus.OK)
+    public SuccessResponse giveUpSession(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable Long sessionId,
+            @RequestBody @Valid GiveUpSessionRequestDto requestDto
+    ) {
+
+        GiveUpSessionResponseDto response =
+                sessionService.giveUpSession(
+                        userDetails.getUserId(),
+                        sessionId,
+                        requestDto
+                );
+
+        return SuccessResponse.success("문제 풀이를 포기했습니다.", response);
     }
 }

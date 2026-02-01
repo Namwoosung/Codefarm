@@ -1,6 +1,7 @@
 package com.ssafy.codefarm.session.dto.feedback;
 
 import com.ssafy.codefarm.problem.entity.Problem;
+import com.ssafy.codefarm.result.entity.ResultType;
 import com.ssafy.codefarm.session.dto.execution.SubmitContext;
 import com.ssafy.codefarm.session.dto.request.SubmitSessionRequestDto;
 import com.ssafy.codefarm.user.entity.User;
@@ -23,6 +24,24 @@ public record FeedbackRequest(
             ProblemInfo.from(context.problem()),
             UserInfo.from(context.session().getUser()),
             CodeInfo.from(dto)
+        );
+    }
+
+    public static FeedbackRequest fromGiveUp(
+            Problem problem,
+            User user,
+            String code,
+            String language // null 허용 가능
+    ) {
+
+        return new FeedbackRequest(
+                UUID.randomUUID().toString(),
+                ProblemInfo.from(problem),
+                UserInfo.from(user),
+                new CodeInfo(
+                        language != null ? language.toLowerCase() : null,
+                        code
+                )
         );
     }
 

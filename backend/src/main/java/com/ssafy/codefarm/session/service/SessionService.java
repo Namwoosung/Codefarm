@@ -12,12 +12,10 @@ import com.ssafy.codefarm.result.repository.ResultRepository;
 import com.ssafy.codefarm.session.dto.execution.*;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
+import com.ssafy.codefarm.session.dto.request.GiveUpSessionRequestDto;
 import com.ssafy.codefarm.session.dto.request.RunSessionRequestDto;
 import com.ssafy.codefarm.session.dto.request.SubmitSessionRequestDto;
-import com.ssafy.codefarm.session.dto.response.LatestCodeResponseDto;
-import com.ssafy.codefarm.session.dto.response.RunSessionResponseDto;
-import com.ssafy.codefarm.session.dto.response.SessionResponseDto;
-import com.ssafy.codefarm.session.dto.response.SubmitSessionResponseDto;
+import com.ssafy.codefarm.session.dto.response.*;
 import com.ssafy.codefarm.session.entity.Session;
 import com.ssafy.codefarm.session.entity.SessionStatus;
 import com.ssafy.codefarm.session.repository.SessionRepository;
@@ -368,5 +366,69 @@ public class SessionService {
                 (int) Duration.between(session.getStartedAt(), LocalDateTime.now()).toSeconds();
 
         return new SubmitContext(session, problem, solveTime);
+    }
+
+    public GiveUpSessionResponseDto giveUpSession(Long userId, Long sessionId, GiveUpSessionRequestDto requestDto) {
+
+        SubmitContext ctx = loadSubmitContext(userId, sessionId);
+
+        return transactionTemplate.execute(status -> {
+
+            // 코드 결정 (우선순위: request → redis → "")
+            String finalCode = requestDto.getCode();
+
+            if (finalCode == null || finalCode.isBlank()) {
+                CodeSnapshotRedisDto latest =
+                        sessionCodeRedisService.getLatestSnapshot(sessionId);
+
+                finalCode = latest != null ? latest.getCode() : "";
+            }
+
+            int solveTime =
+                    (int) Duration.between(ctx.session().getStartedAt(), LocalDateTime.now()).toSeconds();
+
+            Result result = Result.builder()
+                    .session(ctx.session())
+                    .resultType(ResultType.GIVE_UP)
+                    .language(requestDto.getLanguage())
+                    .code(finalCode)
+                    .solveTime(solveTime)
+                    .execTime(null)
+                    .memory(null)
+                    .feedback(null)
+                    .build();
+
+            resultRepository.save(result);
+
+            String feedback;
+            try {
+                feedback = feedbackServerClient.requestGiveUpFeedback(
+                        ctx.problem(),
+                        ctx.session().getUser(),
+                        finalCode,
+                        requestDto.getLanguage().name()
+                );
+            } catch (Exception e) {
+                feedback = "이번 문제는 어려웠군요. 다음에는 힌트를 적극 활용해보세요!";
+            }
+
+            result.updateFeedback(feedback);
+
+            ctx.session().close();
+
+            Long sid = ctx.session().getId();
+
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            sessionCodeRedisService.delete(sid);
+                            log.info("Redis deleted after GIVE_UP commit. sessionId={}", sid);
+                        }
+                    }
+            );
+
+            return GiveUpSessionResponseDto.from(result);
+        });
     }
 }
