@@ -1,0 +1,62 @@
+/* PrimeIcons - CDN 사용 */
+@import url('https://cdn.jsdelivr.net/npm/primeicons@6.0.1/primeicons.css');
+
+/* Fonts */
+@import url('https://static.toss.im/toss-fonts/font.css');
+@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_three@1.0/D2Coding.css');
+
+/* Tailwind v4에서 config(플러그인 포함) 적용 */
+@config "../../tailwind.config.js";
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "D2Coding", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-sans: "Toss Product Sans", sans-serif;
+
+  /* Theme Colors */
+  --color-farm-green-light: #B5D99C;
+  --color-farm-green: #7BAE5F;
+  --color-farm-green-dark: #5E8D48;
+  --color-farm-brown: #7A5C3E;
+  --color-farm-brown-dark: #4E3B2A;
+  --color-farm-yellow: #FFE082;
+  --color-farm-cream: #F5F2E8;
+  --color-farm-paper: #FFFDF5;
+  --color-farm-olive: #4A4A29;
+  --color-farm-point: #E07A5F;
+  /* 문제 패널 다크 영역 (제출 내역 등, 프로그래머스 스타일) */
+  --color-panel-dark-bg: #2d2a26;
+  --color-panel-dark-surface: #38342e;
+  --color-panel-dark-border: #4a4540;
+  --color-panel-dark-text: #e8e4df;
+  --color-panel-dark-text-muted: #a39e96;
+}
+
+:root {
+  font-family: "Toss Product Sans", sans-serif;
+  background-color: var(--color-farm-cream);
+  color: var(--color-farm-brown-dark);
+}
+
+@layer base {
+  /* Global: hide scrollbars but keep scroll */
+  * {
+    -ms-overflow-style: none; /* IE/old Edge */
+    scrollbar-width: none; /* Firefox */
+  }
+  *::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
+@layer utilities {
+  /* Hide horizontal scrollbar (optional) */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}

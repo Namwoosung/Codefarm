@@ -1,189 +1,277 @@
 # Infrastructure Overview
 
 이 문서는 본 프로젝트의 인프라 구성과  
-CI/CD, 배포 및 운영 방식에 대한 **최종 기준 문서**이다.
+CI/CD, 배포 및 운영 방식에 대한 **최종 기준 문서**입니다.
 
-애플리케이션 비즈니스 로직이 아닌,
+본 문서는 애플리케이션 비즈니스 로직이 아닌,
 
 - GitLab CI/CD 파이프라인
-- Docker 이미지 빌드 전략
-- 서버 배포 구조
-- 운영 스크립트 역할 분리
+- Docker 이미지 빌드 및 배포 전략
+- EC2 서버 디렉토리 구조(`/srv/app`)
+- Docker Compose 역할 분리(db/exec/feedback/app)
+- 배포/헬스체크/롤백 스크립트 기준
 
-를 이해하는 것을 목표로 한다.
+을 이해하는 것을 목표로 합니다.
 
-## Directory Structure
-- 추가예정
+## 1. Current Server Directory Structure
 
-## Branch Strategy (Infra Perspective)
+본 프로젝트는 **단일 EC2 인스턴스**에서 모든 서비스를 운영하며,  
+서버 기준 디렉토리는 `/srv/app` 입니다.
 
-본 프로젝트는 **단순화된 Gitflow 전략**을 사용하며,
-CI/CD 및 배포 자동화에 최적화되어 있다.
+```text
+/srv/app
+├── .env
+├── .current_image_tag_dev
+├── .previous_image_tag_dev
+├── .current_image_tag_foundation
+├── .previous_image_tag_foundation
+├── docker/
+│   └── runner/
+│       └── python/
+│           └── Dockerfile
+├── docker-compose.db.yml
+├── docker-compose.exec.yml
+├── docker-compose.feedback.yml
+├── docker-compose.dev.yml
+├── docker-compose.prod.yml
+└── scripts/
+    ├── deploy_foundation.sh
+    ├── deploy_server.sh
+    ├── healthcheck.sh
+    └── rollback.sh
+````
 
-### Branch Roles
+* `.current_image_tag_*`, `.previous_image_tag_*`
 
-* **feature/***
-  기능 개발 브랜치 → develop 병합
+  * **배포 시점의 이미지 태그(커밋 SHA)를 기록**하기 위한 파일입니다.
+  * `rollback.sh`에서 이 값을 사용해 **이전 버전으로 복구**합니다.
+  * 임의 삭제 시 롤백 기능이 깨질 수 있으므로 유지 권장.
 
-* **infra/***
-  CI/CD, Docker, 배포, 서버 설정 변경 → develop 병합
+## 2. Deployment Layer Concept (Foundation vs Application)
 
-* **fix/***
-  개발 환경 버그 수정 → develop 병합
+현재 배포 구조는 **두 레이어로 분리**되어 있습니다.
 
-* **develop**
-  통합 및 검증 브랜치
-  → dev 환경 **자동 배포**
+### 2.1 Foundation Layer (공통 인프라)
 
-* **hotfix/***
-  운영 환경 긴급 수정
-  → main 기준 생성
+* PostgreSQL
+* Redis
+* Execution Server (사용자 제출 코드 실행 서버)
+* Feedback Server (FastAPI + Python)
 
-* **main**
-  운영(Production) 배포 전용 브랜치
-  → **manual 배포**
+**사용 compose 파일**
 
-## CI/CD Pipeline Overview
+* `docker-compose.db.yml`
+* `docker-compose.exec.yml`
+* `docker-compose.feedback.yml`
 
-GitLab CI/CD를 사용하며,
-**빌드와 배포를 명확히 분리**한다.
+**특징**
 
-### Pipeline Stages
+* 자주 변경되지 않음
+* application 배포와 독립
+* 필요 시 **manual 배포**(GitLab job `deploy-foundation`)
 
-1. **build**
+### 2.2 Application Layer (서비스)
 
-   * backend / frontend Docker 이미지 빌드
-   * Docker Hub로 push
-   * 태그 전략: `CI_COMMIT_SHA`
+* Backend (Spring Boot)
+* Web (Vue build + Nginx serve)
 
-2. **test**
+**환경별 compose 파일**
 
-   * feature / infra / fix → fast test
-   * develop / main / hotfix → full test
+* `docker-compose.dev.yml`
+* `docker-compose.prod.yml`
 
-3. **deploy**
+**특징**
 
-   * 서버에서는 **이미지 pull + compose up만 수행**
-   * 소스 코드 git pull ❌
+* CI/CD를 통해 이미지 자동 갱신
+* 환경별 compose 유지
+* Foundation이 사용하는 외부 네트워크(`appnet`)에 연결
 
-## Deployment Strategy
+## 3. Networking Policy
 
-### 핵심 원칙
+* 모든 컨테이너는 공통 외부 네트워크 `appnet`을 사용합니다.
+* 서비스 간 통신은 **컨테이너 DNS 이름**으로 합니다.
 
-* ✅ **CI에서 Docker 이미지를 빌드**
-* ✅ **서버는 실행 환경만 담당**
-* ❌ 서버에서 git pull / build 하지 않음
+  * 예: `http://execution:8088`, `http://feedback:8089`, `postgres:5432`
 
----
+## 4. Environment Variables Policy
 
-### Dev Environment
+### 4.1 `.env`의 역할
 
-* 대상 브랜치: `develop`
-* 배포 방식: **자동 배포**
-* 서버 경로: `/srv/app-dev`
-* 동작 방식:
+`/srv/app/.env`는 서버 운영에 필요한 환경변수를 보관합니다.
 
-  1. CI에서 이미지 빌드 & push
-  2. SSH로 dev 서버 접속
-  3. `deploy.sh dev` 실행
-  4. `docker compose pull && up -d`
+* Compose 파일 내 `${VAR}` 치환에 사용
+* 또한 **컨테이너 런타임 환경변수 주입에는 `env_file:` 또는 `environment:` 설정이 필요**합니다.
 
-### Prod Environment
 
-* 대상 브랜치: `main`, `hotfix/*`
-* 배포 방식: **manual trigger**
-* 서버 경로: `/srv/app-prod`
-* 동작 방식:
 
-  1. CI에서 이미지 빌드 & push
-  2. 승인 후 배포 실행
-  3. `deploy.sh prod`
+예시 (backend/api 서비스):
 
-## Docker Compose Strategy
-
-Compose 파일은 **역할별로 분리**한다.
-
-### docker-compose.base.yml
-
-* 공통 서비스 정의
-
-  * backend(api)
-  * frontend(web)
-  * postgres
-  * redis
-* image, network, volume, healthcheck 정의
-* **단독 실행 불가**
-
-### docker-compose.dev.yml / prod.yml
-
-* 환경별 override 전용
-* ports, container_name 등 환경 차이만 정의
-* 반드시 base와 함께 사용
-
-```bash
-docker compose \
-  -f docker-compose.base.yml \
-  -f docker-compose.dev.yml \
-  --env-file dev.env \
-  up -d
+```yml
+services:
+  api:
+    env_file:
+      - .env
+    environment:
+      # 필요 시 추가 오버라이드 가능
+      EXEC_SERVER_BASE_URL: "http://execution:8088"
 ```
 
----
+### 4.2 필수 환경변수 예시
 
-## Environment Variables
+* DB/Redis 연결
+* JWT, Spring profile
+* 외부 서비스 base url 등
 
-* 실제 값은 **서버에만 존재**
-* 레포에는 `.env.example`만 관리
+특히 아래 값은 backend 구동에 필수일 수 있습니다:
 
-### dev.env / prod.env 포함 항목
+* `EXEC_SERVER_BASE_URL=http://execution:8088`
+* (필요 시) `FEEDBACK_SERVER_BASE_URL=http://feedback:8089`
 
-* Spring profile
-* DB / Redis 접속 정보
-* Docker Hub 사용자명
+## 5. CI/CD Pipeline Summary (`.gitlab-ci.yml`)
 
-❌ `IMAGE_TAG`는 env 파일에 넣지 않음
-→ CI에서 주입
+파이프라인 단계:
 
-## Deployment Scripts
+* **build**: 이미지 빌드 + Docker Hub push
+* **test**: 브랜치 유형별 테스트(현재는 echo placeholder)
+* **deploy**: EC2에서 pull + compose up
 
-모든 배포 로직은 **서버의 스크립트**에서 수행한다.
+### 5.1 Build Jobs
 
-### deploy.sh
+* `build-backend` → `backend/Dockerfile`
+* `build-web` → `infra/nginx/Dockerfile` (멀티스테이지로 dist 빌드 + nginx serve)
+* `build-execution` → `execution/Dockerfile`
+* `build-feedback` → `feedback/Dockerfile`
 
-* dev / prod 공통 배포 스크립트
-* base + env compose 병합 실행
-* 현재/이전 이미지 태그 기록
+태그 정책:
+
+* `IMAGE_TAG = CI_COMMIT_SHA`
+
+빌드/푸시 대상 브랜치:
+
+* `develop`, `main`, `hotfix/*`
+
+### 5.2 Deploy Jobs
+
+* `deploy-dev`
+
+  * develop push 시 자동 실행
+  * `/srv/app/scripts/deploy_server.sh dev`
+
+* `deploy-prod`
+
+  * main/hotfix 에서 **manual**
+  * `/srv/app/scripts/deploy_server.sh prod`
+
+* `deploy-foundation`
+
+  * develop/main/hotfix 에서 **manual**
+  * `/srv/app/scripts/deploy_foundation.sh`
+  * Execution/Feedback + DB/Redis 운영 레이어 담당
+
+## 6. Deployment Scripts
+
+### deploy_foundation.sh
+
+* foundation 레이어 배포 담당
+* 대상 compose:
+
+  * `docker-compose.db.yml`
+  * `docker-compose.exec.yml`
+  * `docker-compose.feedback.yml`
+* 태그 기록:
+
+  * `.current_image_tag_foundation`
+  * `.previous_image_tag_foundation`
+
+### deploy_server.sh
+
+* dev/prod 서비스 배포 담당
+* 대상 compose:
+
+  * `docker-compose.dev.yml` 또는 `docker-compose.prod.yml`
+* 태그 기록:
+
+  * `.current_image_tag_dev|prod`
+  * `.previous_image_tag_dev|prod` (환경에 맞게)
 
 ### healthcheck.sh
 
-* compose 상태 확인
-* backend actuator 기반 health check
-* base + env compose를 반드시 함께 사용
+* dev/prod/foundation 모드 분기
+* backend actuator 기반으로 헬스 체크
+* 컨테이너가 restarting 상태면 `exec`가 실패할 수 있으므로
+
+  * **healthcheck 타임아웃/재시도 정책**을 함께 관리 권장
 
 ### rollback.sh
 
-* `.previous_image_tag` 기준 롤백
-* 이미지 pull 후 compose 재기동
-* 태그 스왑 방식으로 연속 롤백 지원
+* `.previous_image_tag_*` 기준으로 롤백
+* compose 재기동 방식
 
-## Security & Operations
+## 7. Operational Notes / Troubleshooting
 
-* 민감 정보는 GitLab CI/CD Variables로 관리
-* prod 관련 변수는 **Protected** 적용
-* 서버 접근은 SSH key 기반
-* main 브랜치 direct push 금지
+### 7.1 배포 실패(컨테이너 이름 충돌) 대응
 
-## Operational Notes
+에러 예:
 
-* 서버 초기 세팅 시 디렉토리 생성
+* `Conflict. The container name "/redis" is already in use ...`
+
+원인:
+
+* `container_name: redis` 같이 고정 이름을 쓰는 경우
+* 기존 컨테이너가 남아있으면 compose가 새 컨테이너를 만들 수 없음
+
+대응:
+
+* 가능하면 `container_name` 제거 권장
+* 급한 경우 기존 컨테이너만 제거(볼륨은 유지):
 
 ```bash
-mkdir -p /srv/app-dev /srv/app-prod
-chmod +x /srv/app-*/infra/scripts/*.sh
+docker rm -f redis
 ```
 
-* 문제 발생 시 점검 순서
+> ✅ DB 데이터가 날아가는지는 **컨테이너 삭제 여부가 아니라 볼륨 삭제 여부**에 달려 있습니다.
+>
+> * `docker rm -f postgres` → 데이터 유지(볼륨 유지 시)
+> * `docker volume rm ...` 또는 `docker compose down -v` → 데이터 삭제
 
-  1. GitLab CI 로그
-  2. deploy / healthcheck 로그
-  3. docker ps / docker logs
+### 7.2 Backend가 restarting 반복되는 경우
+
+1. `docker logs --tail=200 api-dev`로 원인 확인
+2. 대표 원인:
+
+* 환경변수 누락 (`Could not resolve placeholder ...`)
+* DB 스키마 변경 충돌(DDL 실패)
+* 외부 서버 주소 잘못됨 (execution/feedback base url)
+
+3. 환경변수 누락 시 조치:
+
+* `.env`에 변수 추가
+* `docker-compose.*.yml`의 해당 서비스에 `env_file: [.env]` 또는 `environment:`로 주입
+
+검증:
+
+```bash
+docker exec -it api-dev printenv | grep EXEC_SERVER_BASE_URL
+```
+
+## 8. Why Compose Files Are Split
+
+초기에는 단일 compose에 모든 서비스가 몰리면서,
+
+* 변경 잦은 app 레이어와
+* 거의 고정인 foundation 레이어가
+  서로 배포에 영향을 주는 문제가 있었습니다.
+
+현재 구조는 다음 장점이 있습니다:
+
+* foundation 변경 없이 app만 빠르게 재배포 가능
+* 장애 시 롤백 단위가 명확
+* 신규 온보딩 시 “어디를 만져야 하는지” 명확
+
+## 9. Minimal Rules (Team Agreement)
+
+* 서버 운영 기준 경로는 `/srv/app`
+* app 배포는 develop 자동, main/hotfix 수동
+* foundation은 필요 시에만 수동 배포
+* `.env`는 서버에만 존재하며, 민감정보는 GitLab Variables로 관리
+* 컨테이너 런타임 환경변수는 `env_file` 또는 `environment`로 명시한다

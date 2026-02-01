@@ -1,0 +1,160 @@
+import os, tempfile, time, subprocess, textwrap, uuid, shutil
+import logging
+
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+PY_IMAGE = "codefarm-python:3.11"
+
+def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int, cpu: float):
+    # 호스트의 /tmp를 사용하여 임시 디렉토리 생성 (Docker 볼륨 마운트를 위해)
+    # Docker-in-Docker 환경에서는 호스트의 /tmp가 마운트되어 있어야 함
+    tmp_base = "/tmp"
+    tmp = tempfile.mkdtemp(prefix="codefarm_", dir=tmp_base)
+    try:
+        main_path = os.path.join(tmp, "main.py")
+        
+        # 사용자가 solution() 함수만 정의하고 호출하지 않는 경우를 대비해
+        # 실행 코드를 추가해줌
+        submission_code = code + textwrap.dedent("""
+        
+        # --- Auto-generated execution logic ---
+        if __name__ == "__main__":
+            import resource
+            import time
+            if "solution" in globals() and callable(globals()["solution"]):
+                try:
+                    _start = time.perf_counter()
+                    solution()
+                    _end = time.perf_counter()
+                    _exec_ms = int((_end - _start) * 1000)
+                    print(f"\\nEXEC_TIME: {_exec_ms}")
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+            
+            # Print max RSS memory usage in KB
+            # ru_maxrss is in KB on Linux
+            mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            print(f"\\nMEM_USAGE: {mem}")
+        """)
+
+        with open(main_path, "w", encoding="utf-8") as f:
+            f.write(submission_code)
+
+        os.chmod(tmp, 0o755)
+        os.chmod(main_path, 0o644)
+        
+        # Docker-in-Docker: 호스트 관점의 절대 경로 사용
+        # 실행 컨테이너의 /tmp가 호스트의 /tmp와 마운트되어 있으므로
+        # 여기서 생성한 경로를 그대로 사용
+        tmp_abs = tmp  # 이미 /tmp/codefarm_xxx 형태
+
+        container_name = f"codefarm-run-{uuid.uuid4().hex[:12]}"
+
+        # docker run 옵션(보안/자원제한)
+        cmd = [
+            "docker", "run", "--rm", "-i",       # -i: stdin을 컨테이너로 전달
+            "--name", container_name,
+            "--network", "none",                 # 인터넷 차단
+            "--cpus", str(cpu),                  # CPU 제한
+            "--memory", f"{mem_mb}m",            # 메모리 제한
+            "--pids-limit", "64",                # 프로세스 폭주 방지
+            "--read-only",                       # 컨테이너 루트 FS 읽기 전용
+            "--security-opt", "no-new-privileges",# 권한 상승 방지
+            "-v", f"{tmp_abs}:/workspace:ro",    # 코드 마운트(읽기전용)
+            "-w", "/workspace",
+            PY_IMAGE,
+            "python", "-u", "main.py"            # -u: Unbuffered output
+        ]
+
+        logger.info(f"Executing Docker command: {' '.join(cmd)}")
+        logger.info(f"Code to execute:\n{code}")
+        logger.info(f"Stdin: {stdin}")
+
+        start = time.time()
+
+        # timeout은 호스트에서 1차로 강제
+        timeout_sec = max(0.1, time_limit_ms / 1000.0)
+
+        try:
+            p = subprocess.run(
+                cmd,
+                input=stdin,
+                text=True,
+                capture_output=True,
+                timeout=timeout_sec
+            )
+            is_timeout = False
+            stdout = p.stdout
+            stderr = p.stderr
+            
+            logger.info(f"Docker execution completed. Return code: {p.returncode}")
+            
+            # Check for OOM (Exit Code 137)
+            is_oom = False
+            if p.returncode == 137:
+                is_oom = True
+                stderr = "Memory Limit Exceeded"
+                logger.warning("Container killed by OOM (Exit Code 137)")
+            elif p.returncode != 0 and not stderr:
+                stderr = f"Process exited with code {p.returncode}"
+                
+            logger.info(f"Stdout length: {len(stdout)}, Stderr length: {len(stderr)}")
+            if stdout:
+                logger.info(f"Stdout: {stdout}")
+            else:
+                logger.warning("Stdout is empty!")
+            if stderr:
+                logger.warning(f"Stderr: {stderr}")
+            else:
+                logger.info("Stderr is empty (no errors)")
+                
+        except subprocess.TimeoutExpired:
+            # timeout 발생 시 컨테이너 kill (혹시 남아있을 수 있으니)
+            subprocess.run(["docker", "kill", container_name], capture_output=True, text=True)
+            is_timeout = True
+            is_oom = False
+            stdout = ""
+            stderr = "Time Limit Exceeded"
+            logger.warning(f"Execution timed out after {timeout_sec}s")
+
+        exec_time_ms = int((time.time() - start) * 1000)
+        
+        # Parse output fields (MEM_USAGE, EXEC_TIME)
+        memory_usage = 0
+        internal_exec_time = None
+        
+        if stdout:
+            lines = stdout.splitlines()
+            new_lines = []
+            for line in lines:
+                if line.startswith("MEM_USAGE:"):
+                    try:
+                        memory_usage = int(line.split(":")[1].strip())
+                    except:
+                        pass
+                elif line.startswith("EXEC_TIME:"):
+                    try:
+                        internal_exec_time = int(line.split(":")[1].strip())
+                    except:
+                        pass
+                else:
+                    new_lines.append(line)
+            stdout = "\n".join(new_lines) + ("\n" if lines and not stdout.endswith("\n") else "")
+        
+        # Prefer internal execution time if available (excludes docker overhead)
+        if internal_exec_time is not None:
+            exec_time_ms = internal_exec_time
+            
+        logger.info(f"Total execution time: {exec_time_ms}ms")
+        logger.info(f"Max memory usage: {memory_usage}KB")
+        logger.info(f"Is OOM: {is_oom}")
+        return stdout, stderr, exec_time_ms, memory_usage, is_timeout, is_oom
+    finally:
+        # 임시 디렉토리 정리
+        try:
+            shutil.rmtree(tmp)
+        except:
+            pass

@@ -1,0 +1,13 @@
+package com.ssafy.codefarm.card.dto.query;
+
+import com.ssafy.codefarm.card.entity.CardGrade;
+
+public record MyCardQueryDto(
+        Long cardId,
+        Integer no,
+        String name,
+        CardGrade grade,
+        String image,
+        Long count
+) {
+}

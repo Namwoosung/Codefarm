@@ -1,6 +1,7 @@
 stages:
   - build
   - test
+  - security
   - deploy
 
 workflow:
@@ -9,19 +10,15 @@ workflow:
       when: always
 
 variables:
-  # docker:dind 쓰는 표준 설정
-  DOCKER_TLS_CERTDIR: ""
-
-  # 이미지 태그 전략 (sha 추천)
   IMAGE_TAG: "$CI_COMMIT_SHA"
 
 default:
   before_script:
     - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
-# -----------------------
+########################
 # BUILD (docker build & push)
-# -----------------------
+########################
 .build-template:
   stage: build
   before_script:
@@ -36,7 +33,9 @@ build-backend:
     - docker push "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      # changes:
 
+# web (Vue build + Nginx serve dist) - root Dockerfile
 build-web:
   extends: .build-template
   script:
@@ -45,11 +44,29 @@ build-web:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
-# -----------------------
+# execution server image (사용자 제출 코드 실행 서버)
+build-execution:
+  extends: .build-template
+  script:
+    - docker build -t "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA" -f execution/Dockerfile execution
+    - docker push "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
+# feedback server image (feedback 서버)
+build-feedback:
+  extends: .build-template
+  script:
+    - docker build -t "$DOCKERHUB_USERNAME/feedback:$CI_COMMIT_SHA" -f feedback/Dockerfile feedback
+    - docker push "$DOCKERHUB_USERNAME/feedback:$CI_COMMIT_SHA"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
+########################
 # TEST
-# -----------------------
+########################
 test-fast:
-  tags: 
+  tags:
     - ec2-mono
   stage: test
   script:
@@ -66,42 +83,117 @@ test-full:
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
 
+########################
+# SECURITY SCAN
+########################
+cache:
+  key: trivy-cache
+  paths:
+    - .trivycache/
 
-# -----------------------
+# trivy_scan_images:
+#   tags: [ec2-mono]
+#   needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+#   stage: security
+#   variables:
+#     TRIVY_EXIT_CODE: "1"
+#     TRIVY_SEVERITY: "CRITICAL,HIGH"
+#     TRIVY_USERNAME: "$DOCKERHUB_USERNAME"
+#     TRIVY_PASSWORD: "$DOCKERHUB_TOKEN"
+#   script:
+#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA}
+#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA}
+#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/execution:${CI_COMMIT_SHA}
+#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/feedback:${CI_COMMIT_SHA}
+#   rules:
+#     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+
+
+# 개발단계 임시 패스
+trivy_scan_images:
+  stage: security
+  tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  variables:
+    TRIVY_SEVERITY: "CRITICAL,HIGH"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        TRIVY_EXIT_CODE: "0"   # 발견돼도 통과
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      variables:
+        TRIVY_EXIT_CODE: "1"   # 운영은 차단
+  script:
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/execution:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/feedback:${CI_COMMIT_SHA}
+
+trivy_fs:
+  tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  stage: security
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+  script:
+    - trivy fs --severity HIGH,CRITICAL .
+
+trivy_config:
+  tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  stage: security
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+  script:
+    - trivy config .
+
+########################
 # DEPLOY (EC2에서 docker pull & compose up)
-# -----------------------
+########################
 .deploy-template:
   stage: deploy
   before_script:
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
-deploy-dev:
-  needs: ["build-backend", "build-web"]
+# (선택) foundation은 infra가 자주 바뀌지 않으면 manual로 두는 걸 추천
+deploy-foundation:
+  needs: ["build-execution", "build-feedback"]   # db는 공식 이미지라 빌드 불필요, execution & feedback만 필요
   extends: .deploy-template
   script:
     - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
-    - echo "token_set=$([ -n "${DOCKERHUB_TOKEN:-}" ] && echo yes || echo no)"
-    # SSH_KEY가 "File" 타입 변수면 경로가 들어오므로 chmod 가능
     - chmod 600 "$SSH_KEY"
-    # EC2에서 레지스트리 로그인 + 이미지 pull + compose up
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-dev/infra/scripts/deploy.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
+  rules:
+    # develop/main/hotfix에서만 띄우되, 자주 안 건드리면 manual 추천
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      when: manual
+      allow_failure: true
+
+deploy-dev:
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  extends: .deploy-template
+  script:
+    - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
+    - chmod 600 "$SSH_KEY"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
 
 deploy-prod:
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-prod/infra/scripts/deploy.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh prod"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
       allow_failure: true
 
-# -----------------------
+########################
 # ROLLBACK (manual)
-# -----------------------
+########################
 .rollback-template:
   stage: deploy
   before_script:
@@ -112,7 +204,7 @@ rollback-dev:
   extends: .rollback-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-dev/infra/scripts/rollback.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh dev"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
       when: manual
@@ -122,8 +214,18 @@ rollback-prod:
   extends: .rollback-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app-prod/infra/scripts/rollback.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh prod"
   rules:
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      when: manual
+      allow_failure: true
+
+rollback-foundation:
+  extends: .rollback-template
+  script:
+    - chmod 600 "$SSH_KEY"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh foundation"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
       allow_failure: true
