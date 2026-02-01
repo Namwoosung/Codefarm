@@ -1,4 +1,4 @@
-package com.ssafy.codefarm.result.dto.response;
+package com.ssafy.codefarm.hint.dto.response;
 
 import com.ssafy.codefarm.hint.entity.Hint;
 import com.ssafy.codefarm.hint.entity.HintType;

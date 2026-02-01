@@ -7,7 +7,7 @@ import com.ssafy.codefarm.hint.entity.Hint;
 import com.ssafy.codefarm.hint.entity.HintType;
 import com.ssafy.codefarm.hint.repository.HintRepository;
 import com.ssafy.codefarm.hint.repository.SseEmitterRepository;
-import com.ssafy.codefarm.result.dto.response.ManualHintResponseDto;
+import com.ssafy.codefarm.hint.dto.response.ManualHintResponseDto;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.redis.PreviousJudgementRedisDto;
 import com.ssafy.codefarm.session.entity.Session;

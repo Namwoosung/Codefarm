@@ -2,11 +2,9 @@ package com.ssafy.codefarm.hint.controller;
 
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
 import com.ssafy.codefarm.common.dto.SuccessResponse;
-import com.ssafy.codefarm.common.exception.CustomException;
-import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.hint.dto.requset.ManualHintRequestDto;
+import com.ssafy.codefarm.hint.dto.response.ManualHintResponseDto;
 import com.ssafy.codefarm.hint.service.HintService;
-import com.ssafy.codefarm.result.dto.response.ManualHintResponseDto;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
