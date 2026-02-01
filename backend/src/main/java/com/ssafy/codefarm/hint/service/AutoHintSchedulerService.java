@@ -4,6 +4,7 @@ import com.ssafy.codefarm.hint.entity.Hint;
 import com.ssafy.codefarm.hint.entity.HintType;
 import com.ssafy.codefarm.hint.repository.HintRepository;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
+import com.ssafy.codefarm.session.dto.redis.PreviousJudgementRedisDto;
 import com.ssafy.codefarm.session.entity.Session;
 import com.ssafy.codefarm.session.entity.SessionStatus;
 import com.ssafy.codefarm.session.repository.SessionRepository;
@@ -12,9 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,7 +34,7 @@ public class AutoHintSchedulerService {
 
     private final ConcurrentHashMap<Long, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
 
-    private static final Duration INTERVAL = Duration.ofMinutes(5);
+    private static final Duration INTERVAL = Duration.ofMinutes(1); // test를 위해 1분으로 설정
 
     public void start(Long sessionId) {
 
@@ -55,7 +56,6 @@ public class AutoHintSchedulerService {
         }
     }
 
-    @Transactional
     public void process(Long sessionId) {
 
         Session session = sessionRepository.findById(sessionId).orElse(null);
@@ -66,25 +66,47 @@ public class AutoHintSchedulerService {
         }
 
         // Redis 데이터 조회
-        List<CodeSnapshotRedisDto> codeHistory = sessionCodeRedisService.getSnapshots(sessionId);
-        var previousJudgement = sessionCodeRedisService.getPreviousJudgements(sessionId);
+        List<CodeSnapshotRedisDto> codeHistory =
+                sessionCodeRedisService.getSnapshots(sessionId);
 
-        // 🔹 2. AI 요청 DTO 구성
-        // AIHintRequest request = buildRequest(...);
+        List<PreviousJudgementRedisDto> previousJudgements =
+                sessionCodeRedisService.getPreviousJudgements(sessionId);
+
+        // AI 요청 DTO 구성 (추후 실제 구현)
+        /*
+        AIHintRequest request = AIHintRequest.builder()
+                .startedAt(session.getStartedAt())
+                .observedAt(LocalDateTime.now())
+                .language(extractLanguage(codeHistory))
+                .userInformation(...)
+                .problemInformation(...)
+                .codeHistory(codeHistory)
+                .previousJudgement(previousJudgements)
+                .build();
+        */
 
         // ====================================
-        // 🔥 AI 호출 부분 (현재는 주석)
+        // AI 호출 부분 (현재는 주석)
         // AIHintResponse response = feedbackServerClient.requestAutoHint(request);
         // ====================================
 
+
         // 🔹 테스트용 더미 응답
         String analysis = "아직 코드 작성이 충분하지 않습니다.";
-        String hint = null; // 또는 "입력 처리 순서를 다시 확인해보세요."
+        List<String> mistakeTypes = List.of("NoCode_Early");
+        String hint = "입력 처리 순서를 다시 확인해보세요.";
 
-        // 🔹 3. judgement는 무조건 Redis 저장
-        sessionCodeRedisService.appendJudgement(sessionId, analysis);
+        // judgement는 무조건 Redis 저장
+        sessionCodeRedisService.appendJudgement(
+                sessionId,
+                PreviousJudgementRedisDto.builder()
+                        .analysis(analysis)
+                        .mistakeType(mistakeTypes)
+                        .judgedAt(LocalDateTime.now())
+                        .build()
+        );
 
-        // 🔹 4. hint가 있을 경우만 처리
+        // hint가 있을 경우만 처리
         if (hint == null || hint.isBlank()) {
             return;
         }
@@ -97,7 +119,6 @@ public class AutoHintSchedulerService {
 
         hintRepository.save(hintEntity);
 
-        // 🔹 5. SSE 전송
         hintService.sendAutoHint(
                 sessionId,
                 Map.of(

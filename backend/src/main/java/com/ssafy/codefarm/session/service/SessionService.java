@@ -2,6 +2,8 @@ package com.ssafy.codefarm.session.service;
 
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
+import com.ssafy.codefarm.hint.service.AutoHintSchedulerService;
+import com.ssafy.codefarm.hint.service.HintService;
 import com.ssafy.codefarm.problem.entity.Problem;
 import com.ssafy.codefarm.problem.repository.ProblemRepository;
 import com.ssafy.codefarm.result.dto.requset.SaveCodeSnapshotRequestDto;
@@ -43,6 +45,8 @@ public class SessionService {
     private final ExecutionServerClient executionServerClient;
     private final SessionCodeRedisService sessionCodeRedisService;
     private final FeedbackServerClient feedbackServerClient;
+    private final AutoHintSchedulerService autoHintSchedulerService;
+    private final HintService hintService;
 
     private final SessionRepository sessionRepository;
     private final UserRepository userRepository;
@@ -82,6 +86,8 @@ public class SessionService {
 
         sessionCodeRedisService.initialize(session.getId());
 
+        autoHintSchedulerService.start(session.getId()); // 스케줄러 시작
+
         return SessionResponseDto.from(session);
     }
 
@@ -100,6 +106,9 @@ public class SessionService {
         session.close();
 
         sessionCodeRedisService.delete(sessionId);
+
+        autoHintSchedulerService.stop(sessionId);
+        hintService.clearSession(sessionId);
 
         return SessionResponseDto.from(session);
     }
@@ -288,12 +297,16 @@ public class SessionService {
                             public void afterCommit() {
                                 sessionCodeRedisService.delete(sessionId);
                                 log.info("Redis deleted after DB commit. sessionId={}", sessionId);
+                                autoHintSchedulerService.stop(sessionId);
+                                hintService.clearSession(sessionId);
                             }
                         }
                 );
             } else {
                 // 혹시 동기화가 활성화되지 않은 경우(거의 없음)
                 sessionCodeRedisService.delete(sessionId);
+                autoHintSchedulerService.stop(sessionId);
+                hintService.clearSession(sessionId);
             }
             return SubmitSessionResponseDto.success(
                     SubmissionContext.from(result),
@@ -425,6 +438,8 @@ public class SessionService {
                         public void afterCommit() {
                             sessionCodeRedisService.delete(sid);
                             log.info("Redis deleted after GIVE_UP commit. sessionId={}", sid);
+                            autoHintSchedulerService.stop(sid);
+                            hintService.clearSession(sid);
                         }
                     }
             );
