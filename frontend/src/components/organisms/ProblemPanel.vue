@@ -1,53 +1,30 @@
 <template>
-  <div class="flex flex-col h-full min-h-0 bg-[#FFE082] rounded-xl overflow-hidden">
-    <!-- 탭: DaisyUI join -->
-    <div class="join join-horizontal w-full flex-shrink-0 border-b border-base-300 bg-[#FFE082]">
-      <button
-        type="button"
-        class="join-item btn btn-sm flex-1 gap-1.5 rounded-none border-base-300 bg-transparent text-[var(--color-farm-brown)] hover:bg-base-200/50 font-medium"
-        :class="{ 'btn-active border-b-2 border-[var(--color-farm-green)] text-[var(--color-farm-green-dark)]': activeTab === 'problem' }"
-        @click="activeTab = 'problem'"
-      >
-        <iconify-icon icon="mdi:book-open-variant" class="text-lg"></iconify-icon>
-        {{ problem?.title || '문제' }}
-      </button>
-      <button
-        type="button"
-        class="join-item btn btn-sm flex-1 gap-1.5 rounded-none border-base-300 bg-transparent text-[var(--color-farm-brown)] hover:bg-base-200/50 font-medium"
-        :class="{ 'btn-active border-b-2 border-[var(--color-farm-green)] text-[var(--color-farm-green-dark)]': activeTab === 'results' }"
-        @click="activeTab = 'results'; loadResults()"
-      >
-        <iconify-icon icon="mdi:format-list-bulleted" class="text-lg"></iconify-icon>
-        제출 내역
-      </button>
-    </div>
-
+  <div class="flex flex-col h-full min-h-0 bg-[#FFE082] overflow-hidden">
     <!-- 문제 탭 -->
-    <template v-if="activeTab === 'problem'">
+    <template v-if="props.activeTab === 'problem'">
       <div class="flex flex-col flex-1 min-h-0">
-        <div class="flex-1 min-h-0 overflow-y-auto p-4 pl-5 bg-base-100 mx-2 mb-2 rounded-lg shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
-          <div class="mb-4">
-            <span class="text-[0.875rem] font-normal text-[var(--color-farm-brown)]"># {{ problem?.problemId || '로딩 중...' }}</span>
-          </div>
+        <div class="flex-1 min-h-0 overflow-y-auto p-8 bg-base-100 mx-6 mt-3 mb-3 rounded-4xl shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
+          <!-- <div class="mb-3">
+          </div> -->
           <h2 class="text-xl font-bold text-[var(--color-farm-brown-dark)] mb-6">
-            {{ problem?.title || '로딩 중...' }}
+            # {{ problem?.problemId || '로딩 중...' }} {{ problem?.title || '로딩 중...' }}
           </h2>
-          <div class="space-y-3 mb-6">
-            <div class="flex items-center gap-2 text-[var(--color-farm-brown-dark)] text-[0.875rem]">
-              <iconify-icon icon="mdi:chart-line" class="text-xl text-[var(--color-farm-green)]"></iconify-icon>
+          <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 mb-6">
+            <div class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
+              <iconify-icon icon="mdi:chart-line" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
               <span>획득 점수 <span class="font-semibold">{{ getDifficultyScore(problem?.difficulty) }}점</span></span>
             </div>
-            <div class="flex items-center gap-2 text-[var(--color-farm-brown-dark)] text-[0.875rem]">
-              <iconify-icon icon="mdi:clock-outline" class="text-xl text-[var(--color-farm-green)]"></iconify-icon>
-              <span>실행 제한 시간 <span class="font-semibold">{{ problem?.timeLimit || 0 }}초</span></span>
-            </div>
-            <div class="flex items-center gap-2 text-[var(--color-farm-brown-dark)] text-[0.875rem]">
-              <iconify-icon icon="mdi:harddisk" class="text-xl text-[var(--color-farm-green)]"></iconify-icon>
+            <div class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
+              <iconify-icon icon="mdi:harddisk" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
               <span>메모리 제한 <span class="font-semibold">{{ formatMemory(problem?.memoryLimit) }}</span></span>
             </div>
-            <div v-if="problem?.algorithm" class="flex items-center gap-2 text-[var(--color-farm-brown-dark)] text-[0.875rem]">
-              <iconify-icon icon="mdi:tag-multiple" class="text-xl text-[var(--color-farm-green)]"></iconify-icon>
+            <div v-if="problem?.algorithm" class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
+              <iconify-icon icon="mdi:tag-multiple" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
               <span>알고리즘 <span class="font-semibold">{{ formatAlgorithm(problem.algorithm) }}</span></span>
+            </div>
+            <div class="flex items-center gap-1.5 text-[var(--color-farm-brown-dark)] text-[0.75rem]">
+              <iconify-icon icon="mdi:clock-outline" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
+              <span>실행 제한 시간 <span class="font-semibold">{{ problem?.timeLimit || 0 }}초</span></span>
             </div>
           </div>
           <div v-if="problem?.concept" class="mb-6">
@@ -92,17 +69,18 @@
     </template>
 
     <!-- 제출 내역 탭 -->
-    <div v-show="activeTab === 'results'" class="flex flex-col flex-1 min-h-0 bg-base-100 text-[var(--color-farm-brown-dark)] p-4">
-      <p class="text-xs text-[var(--color-farm-brown)] mb-2 py-1">현재 표시되는 제출 내역은 임시 데이터이며, 차후 백엔드 API와 연동될 예정입니다.</p>
-      <div class="flex items-center justify-between pb-3 border-b border-base-300 flex-shrink-0">
-        <span class="text-sm text-[var(--color-farm-brown)]">{{ resultsList.length }}개의 제출</span>
-        <button type="button" class="btn btn-ghost btn-sm gap-1.5 text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)] hover:bg-base-200" @click="loadResults" :disabled="resultsLoading">
-          <iconify-icon icon="mdi:refresh" class="text-base" :class="{ 'animate-spin': resultsLoading }"></iconify-icon>
-          새로고침
-        </button>
-      </div>
-      <div class="flex-1 min-h-0 overflow-y-auto mt-2">
-        <table class="table table-pin-rows table-xs">
+    <div v-show="props.activeTab === 'results'" class="flex flex-col flex-1 min-h-0">
+      <div class="flex-1 min-h-0 overflow-y-auto p-8 bg-base-100 mx-6 mt-3 mb-3 rounded-4xl shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
+        <p class="text-xs text-[var(--color-farm-brown)] mb-4">현재 표시되는 제출 내역은 임시 데이터이며, 차후 백엔드 API와 연동될 예정입니다.</p>
+        <div class="flex items-center justify-between pb-3 border-b border-base-300 flex-shrink-0 mb-3">
+          <span class="text-sm text-[var(--color-farm-brown)]">{{ resultsList.length }}개의 제출</span>
+          <button type="button" class="btn btn-ghost btn-sm gap-1.5 text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)] hover:bg-base-200" @click="loadResults" :disabled="resultsLoading">
+            <iconify-icon icon="mdi:refresh" class="text-base" :class="{ 'animate-spin': resultsLoading }"></iconify-icon>
+            새로고침
+          </button>
+        </div>
+        <div class="overflow-y-auto">
+          <table class="table table-pin-rows table-xs">
           <thead>
             <tr class="bg-base-100 sticky top-0 z-10">
               <th class="text-left font-semibold text-[var(--color-farm-brown)]">제출일시</th>
@@ -135,24 +113,30 @@
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProblemDetail } from '@/api/problem'
 import { useIdeStore } from '@/stores/ide'
 import { getSessionResultsList, getMockSessionResults } from '@/api/session'
 
-const emit = defineEmits(['open-report'])
+const props = defineProps({
+  activeTab: { type: String, default: 'problem' }
+})
+const emit = defineEmits(['open-report', 'problem-loaded'])
 const route = useRoute()
 const ideStore = useIdeStore()
 const problem = ref(null)
 
-const activeTab = ref('problem')
+watch(() => props.activeTab, (tab) => {
+  if (tab === 'results') loadResults()
+})
 const resultsList = ref([])
 const resultsLoading = ref(false)
 
@@ -239,6 +223,7 @@ const loadProblem = async () => {
     const problemId = route.params.id
     const data = await getProblemDetail(problemId)
     problem.value = data.problem
+    emit('problem-loaded', data.problem)
   } catch (error) {
     console.error('문제를 불러오는 중 오류가 발생했습니다:', error)
   }

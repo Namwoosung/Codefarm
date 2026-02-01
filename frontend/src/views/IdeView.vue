@@ -64,17 +64,40 @@
       </Transition>
 
       <!-- 문제 + 에디터 영역 -->
-      <div class="flex flex-1 min-w-0 min-h-0 overflow-hidden flex-row">
+      <div class="flex flex-1 min-w-0 min-h-0 overflow-hidden flex-row ide-main-wrap">
         <aside class="flex flex-col min-h-0 overflow-hidden border-r border-[var(--color-farm-cream)] flex-shrink-0" :style="{ width: leftPanelWidth + '%' }">
-          <div class="w-full h-full min-h-0 overflow-hidden flex flex-col p-2 sm:p-4">
-            <ProblemPanel @open-report="handleOpenReport" />
+          <div class="w-full h-full min-h-0 overflow-hidden flex flex-col">
+            <div class="join join-horizontal w-full h-10 min-h-10 flex flex-shrink-0 items-stretch bg-[#FFE082]">
+              <button
+                type="button"
+                class="join-item btn btn-sm flex-1 gap-1.5 rounded-none border-base-300 bg-transparent text-[var(--color-farm-brown)] hover:bg-base-200/50 font-medium h-full"
+                :class="{ 'btn-active border-b-2 border-[var(--color-farm-green)] text-[var(--color-farm-green-dark)]': problemPanelActiveTab === 'problem' }"
+                @click="problemPanelActiveTab = 'problem'"
+              >
+                <iconify-icon icon="mdi:book-open-variant" class="text-lg"></iconify-icon>
+                {{ problemTitle }}
+              </button>
+              <button
+                type="button"
+                class="join-item btn btn-sm flex-1 gap-1.5 rounded-none border-base-300 bg-transparent text-[var(--color-farm-brown)] hover:bg-base-200/50 font-medium h-full"
+                :class="{ 'btn-active border-b-2 border-[var(--color-farm-green)] text-[var(--color-farm-green-dark)]': problemPanelActiveTab === 'results' }"
+                @click="problemPanelActiveTab = 'results'"
+              >
+                <iconify-icon icon="mdi:format-list-bulleted" class="text-lg"></iconify-icon>
+                제출 내역
+              </button>
+            </div>
+            <ProblemPanel :active-tab="problemPanelActiveTab" @open-report="handleOpenReport" @problem-loaded="problemTitle = $event?.title ?? '문제'" />
           </div>
         </aside>
 
         <div class="w-1 flex-shrink-0 bg-[var(--color-farm-cream)] hover:bg-[var(--color-farm-green-light)] cursor-col-resize transition-colors ide-resizer-hit" @mousedown="startResize"></div>
 
-        <main class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden bg-[var(--color-farm-paper)]" :style="{ width: (100 - leftPanelWidth) + '%' }">
+        <main class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden bg-[var(--color-farm-paper)] ide-panel-right" :style="{ width: (100 - leftPanelWidth) + '%' }">
           <div class="relative flex flex-col flex-1 min-h-0" :class="{ 'pointer-events-none': !isLoggedIn }">
+            <div class="h-10 min-h-10 flex-shrink-0 flex items-center px-3 border-b border-[var(--color-farm-cream)] bg-[var(--color-farm-paper)]">
+              <span class="text-sm font-medium text-[var(--color-farm-brown)]">코드</span>
+            </div>
             <div class="flex-1 min-h-0 relative ide-editor-container" :class="{ 'blur-sm': !isLoggedIn }">
               <MonacoEditor />
             </div>
@@ -207,7 +230,7 @@ const API_LANGUAGE = 'PYTHON'
 // 패널 리사이저 관련
 const leftPanelWidth = ref(50) // 기본 50%
 const isResizing = ref(false)
-const terminalHeight = ref(280) // 터미널 영역 높이 (px)
+const terminalHeight = ref(210) // 터미널 영역 높이 (px)
 const isResizingVertical = ref(false)
 const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
 const isInitializing = ref(true) // 메인→IDE 진입 시 세션/문제 로드 중
@@ -225,6 +248,9 @@ const hintMax = ref(3)
 const hintRemaining = computed(() => Math.max(0, hintMax.value - hintUsed.value))
 /** 힌트(채팅) 패널 접기/펼치기 */
 const hintPanelOpen = ref(true)
+/** 문제 패널 탭 (problem | results) - 툴바에 표시 */
+const problemPanelActiveTab = ref('problem')
+const problemTitle = ref('문제')
 /** 힌트 차감 토스트 (FR-CODE-010-1) */
 const toastMessage = ref('')
 let toastTimer = null
