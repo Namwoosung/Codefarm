@@ -5,11 +5,11 @@ import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.hint.dto.requset.ManualHintRequestDto;
 import com.ssafy.codefarm.hint.dto.response.HintItemResponseDto;
 import com.ssafy.codefarm.hint.dto.response.HintListResponseDto;
+import com.ssafy.codefarm.hint.dto.response.ManualHintResponseDto;
 import com.ssafy.codefarm.hint.entity.Hint;
 import com.ssafy.codefarm.hint.entity.HintType;
 import com.ssafy.codefarm.hint.repository.HintRepository;
 import com.ssafy.codefarm.hint.repository.SseEmitterRepository;
-import com.ssafy.codefarm.hint.dto.response.ManualHintResponseDto;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.redis.PreviousJudgementRedisDto;
 import com.ssafy.codefarm.session.entity.Session;
@@ -150,6 +150,7 @@ public class HintService {
                 .hintType(HintType.MANUAL)
                 .userQuestion(requestDto.getUserQuestion())
                 .content(hintContent)
+                .isViewed(Boolean.TRUE)
                 .build();
 
         hintRepository.save(hint);
@@ -185,5 +186,36 @@ public class HintService {
                         .toList();
 
         return HintListResponseDto.from(items);
+    }
+
+
+    @Transactional
+    public HintItemResponseDto markAsViewed(Long sessionId, Long hintId, Long userId) {
+
+        Session session = sessionRepository.findById(sessionId)
+                .orElseThrow(() ->
+                        new CustomException("세션을 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND)
+                );
+
+        if (!session.getUser().getId().equals(userId)) {
+            throw new CustomException("해당 세션에 접근할 수 없습니다.", ErrorCode.FORBIDDEN);
+        }
+
+        Hint hint = hintRepository.findById(hintId)
+                .orElseThrow(() ->
+                        new CustomException("힌트를 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND)
+                );
+
+        // 힌트가 해당 세션에 속해있는지 검증
+        if (!hint.getSession().getId().equals(sessionId)) {
+            throw new CustomException("해당 세션의 힌트가 아닙니다.", ErrorCode.FORBIDDEN);
+        }
+
+        // 이미 읽음이면 그냥 반환 (idempotent 처리)
+        if (!hint.getIsViewed()) {
+            hint.markAsViewed();
+        }
+
+        return HintItemResponseDto.from(hint);
     }
 }
