@@ -126,4 +126,29 @@ public class UserController {
         return SuccessResponse.success("유저 정보 수정 성공", userResponseDto);
     }
 
+    @PostMapping("/reissue")
+    @ResponseStatus(HttpStatus.OK)
+    public SuccessResponse reissue(
+            @CookieValue(value = "refreshToken", required = false) String refreshToken,
+            HttpServletResponse response
+    ) {
+
+        LoginTokenResult result = userService.reissueToken(refreshToken);
+
+        // 새로운 Refresh Token을 HttpOnly 쿠키로 설정
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", result.getRefreshToken())
+                .httpOnly(true)
+                .secure(true)
+                .path("/")
+                .sameSite("Strict")
+                .maxAge(jwtTokenProvider.getRefreshTokenValidTime() / 1000)
+                .build();
+
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
+        return SuccessResponse.success(
+                "토큰 재발급에 성공했습니다.",
+                TokenResponseDto.from(result.getAccessToken())
+        );
+    }
 }

@@ -140,4 +140,56 @@ public class UserService {
 
         return getUserProfile(userId);
     }
+
+    public LoginTokenResult reissueToken(String refreshToken) {
+
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new CustomException(
+                    "Refresh Token이 존재하지 않습니다.",
+                    ErrorCode.UNAUTHORIZED
+            );
+        }
+
+        // Refresh Token 유효성 검증 (JWT 서명, 만료 여부)
+        jwtTokenProvider.isValidateToken(refreshToken);
+
+        // Refresh Token에서 userId 추출
+        Long userId = jwtTokenProvider.getUserIdFromToken(refreshToken);
+
+        // Redis에 저장된 토큰과 일치 여부 확인
+        refreshTokenRedisService.validate(userId, refreshToken);
+
+        // User 조회 (인증 객체 생성을 위해)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException("해당 유저가 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        // 인증 객체 생성
+        CustomUserDetails userDetails = new CustomUserDetails(
+                userId,
+                user.getEmail(),
+                null,
+                java.util.Collections.emptyList()
+        );
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                "",
+                java.util.Collections.emptyList()
+        );
+
+        // 새로운 Access Token 생성
+        String newAccessToken = jwtTokenProvider.createAccessToken(authentication);
+
+        // 새로운 Refresh Token 생성
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
+
+        // Redis에 새로운 Refresh Token 저장 (기존 토큰 교체)
+        refreshTokenRedisService.save(
+                userId,
+                newRefreshToken,
+                Duration.ofMillis(jwtTokenProvider.getRefreshTokenValidTime())
+        );
+
+        return new LoginTokenResult(newAccessToken, newRefreshToken, user);
+    }
 }
