@@ -133,6 +133,26 @@
                 </div>
               </div>
             </div>
+            <!-- IDE 진입 시 한 번만: 다른 탭 중복 열기 안내 (X로 닫기) -->
+            <Transition name="dropdown">
+              <div
+                v-if="showDuplicateTabBanner && isLoggedIn && ideStore.sessionId && !isInitializing"
+                class="flex-shrink-0 flex items-center justify-between gap-2 px-3 py-2 bg-[var(--color-farm-cream)]/80 border-b border-[var(--color-farm-cream)] text-xs text-[var(--color-farm-brown-dark)]"
+              >
+                <span class="flex items-center gap-1.5">
+                  <iconify-icon icon="mdi:information-outline" class="text-base text-[var(--color-farm-green)] shrink-0"></iconify-icon>
+                  <span>같은 문제를 다른 탭에서 열면 기존 탭의 세션이 자동으로 종료됩니다.</span>
+                </span>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs btn-square shrink-0 text-[var(--color-farm-brown)] hover:bg-base-200/60"
+                  aria-label="닫기"
+                  @click="showDuplicateTabBanner = false"
+                >
+                  <iconify-icon icon="mdi:close" class="text-base"></iconify-icon>
+                </button>
+              </div>
+            </Transition>
             <div class="flex-1 min-h-0 relative ide-editor-container" :class="{ 'blur-sm': !isLoggedIn }">
               <MonacoEditor />
             </div>
@@ -316,6 +336,8 @@ const hasUnreadAutoHint = ref(false)
 const notificationPanelOpen = ref(false)
 /** 알림 목록 (자동 힌트 도착 등) */
 const notificationItems = ref([])
+/** IDE 진입 시 다른 탭 중복 열기 안내 배너 (X로 닫으면 이번 세션 동안 숨김) */
+const showDuplicateTabBanner = ref(true)
 /** 문제 패널 탭 (problem | results) - 툴바에 표시 */
 const problemPanelActiveTab = ref('problem')
 const problemTitle = ref('문제')
@@ -382,7 +404,7 @@ function onIdleConfirmContinue() {
 function startIdleCheck() {
   if (idleCheckIntervalId) return
   const checkIntervalMs = IDLE_MS === 60 * 1000 ? 15 * 1000 : 60 * 1000 // 테스트(1분)면 15초, 운영(30분)이면 1분
-  idleCheckIntervalId = setInterval(() => {
+  idleCheckIntervalId = setInterval(async () => {
     const sid = ideStore.sessionId
     if (sid == null) return
     const now = Date.now()
@@ -390,15 +412,16 @@ function startIdleCheck() {
       if (idleConfirmShownAt.value != null && now - idleConfirmShownAt.value >= IDLE_MS) {
         showIdleConfirmModal.value = false
         idleConfirmShownAt.value = null
-        closeSessionOnLeave()
+        clearInterval(idleCheckIntervalId)
+        idleCheckIntervalId = null
         if (snapshotIntervalId) {
           clearInterval(snapshotIntervalId)
           snapshotIntervalId = null
         }
         skipLeaveConfirm.value = true
-        router.push({ path: '/', query: { idle_cancel: '1' } })
-        clearInterval(idleCheckIntervalId)
-        idleCheckIntervalId = null
+        await closeSessionOnLeave()
+        await nextTick()
+        router.replace({ path: '/', query: { idle_cancel: '1' } })
       }
     } else {
       const last = lastActivityAt.value ?? now
@@ -579,6 +602,7 @@ async function initSession() {
         return
       }
       ideStore.setSessionId(session.sessionId)
+      ideStore.setSessionStartedAt(session.startedAt ?? Date.now())
       // 방금 이번 진입에서 생성한 세션이면 저장된 코드가 없으므로 latest 호출 생략
       if (session.sessionId === justCreatedSessionId.value) {
         ideStore.setCodeToDefault(problemId)
@@ -600,8 +624,10 @@ async function initSession() {
 
   try {
     const { data: res } = await sessionApi.createSession(problemId)
-    const newSessionId = res?.data?.sessionId ?? null
+    const data = res?.data ?? {}
+    const newSessionId = data.sessionId ?? null
     ideStore.setSessionId(newSessionId)
+    ideStore.setSessionStartedAt(data.startedAt ?? Date.now())
     if (newSessionId) {
       justCreatedSessionId.value = newSessionId
       ideStore.setCodeToDefault(problemId)
@@ -753,15 +779,12 @@ function onUnload() {
   sendCloseOnUnload()
 }
 
-/** 가시성 API: 다른 탭으로 이동·브라우저 최소화 시 세션 종료 */
+/** 가시성 API: 탭 전환/최소화 시에는 세션 종료하지 않음 (close는 페이지 종료·라우트 이탈 시에만) */
 function onVisibilityChange() {
-  if (document.visibilityState !== 'hidden') return
-  sendCloseOnUnload()
-  justCreatedSessionId.value = null
-  ideStore.clearSession()
+  // 탭 전환 시 세션을 닫으면 입장 직후 다른 탭 갔다 오면 세션이 끊겨 유휴 모달·리다이렉트가 동작하지 않음. 따라서 아무 동작 안 함.
 }
 
-/** Broadcast Channel: 같은 세션을 다른 탭에서 열면 기존 탭에 신호 → 세션 종료 및 메인 이동 */
+/** Broadcast Channel: 같은 세션을 다른 탭에서 열면 기존 탭에 신호 → 기존 탭만 세션 종료 후 메인 이동, 새 탭이 세션 유지 */
 let ideChannel = null
 let ideTabId = ''
 let ideOpenTime = 0
