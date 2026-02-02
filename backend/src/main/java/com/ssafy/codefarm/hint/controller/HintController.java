@@ -29,6 +29,7 @@ public class HintController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable Long sessionId
     ) {
+        log.info("SSE subscription request received. sessionId={}, userId={}", sessionId, userDetails.getUserId());
         return hintService.subscribe(sessionId, userDetails.getUserId());
     }
 
