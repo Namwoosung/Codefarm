@@ -4,21 +4,81 @@
     <div class="diary h-full">
       <div class="diary__cover">
         <div class="diary__spine" aria-hidden="true"></div>
-
         <div class="diary__content">
           <!-- Book -->
           <div class="book-shell">
             <div ref="bookEl" class="pageflip" aria-label="다이어리 페이지">
               <div v-for="page in pages" :key="page.key" class="page">
                 <div class="paper">
-                  <template v-if="page.kind === 'info'">
+                  <template v-if="page.kind === 'report-list'">
+                    <div class="h-full flex flex-col min-h-0">
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <h2 class="text-lg font-black text-farm-brown-dark">리포트 목록</h2>
+                          <p class="mt-1 text-xs font-semibold text-farm-brown-dark/70">
+                            총 {{ page.totalElements }}개 중 최신 {{ page.rows.length }}개 표시
+                          </p>
+                        </div>
+                      </div>
+
+                      <div class="mt-4 flex-1 min-h-0 overflow-hidden rounded-xl border border-farm-brown/15 bg-farm-paper/70">
+                        <div class="h-full overflow-x-auto overflow-y-auto">
+                          <table class="table table-pin-rows table-sm">
+                            <thead>
+                              <tr class="bg-base-100 sticky top-0 z-10">
+                                <th class="text-left font-semibold text-[var(--color-farm-brown)]">제출일시</th>
+                                <th class="text-left font-semibold text-[var(--color-farm-brown)]">결과</th>
+                                <th class="text-left font-semibold text-[var(--color-farm-brown)]">문제</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr
+                                v-for="(row, idx) in page.rows"
+                                :key="row?.resultId ?? idx"
+                                class="hover:bg-base-200/50"
+                              >
+                                <td class="py-2">
+                                  <span class="px-1.5 mr-1">{{ formatCreatedDate(row?.createdAt) }}</span>
+                                  <span
+                                    class="status status-sm align-middle"
+                                    :class="resultStatusClass(row?.resultType)"
+                                    :title="resultTypeLabel(row?.resultType)"
+                                    aria-hidden="true"
+                                  ></span>
+                                </td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    class="btn btn-xs bg-farm-olive text-farm-paper hover:brightness-110 active:brightness-95"
+                                    :disabled="row?.resultId == null"
+                                    @click.stop="row?.resultId != null ? openReportModal(row.resultId) : null"
+                                  >
+                                    보기
+                                  </button>
+                                </td>
+                                <td class="max-w-[320px] truncate">
+                                  {{ row?.problem?.title ?? '-' }}
+                                </td>
+                              </tr>
+                              <tr v-if="page.rows.length === 0">
+                                <td colspan="3" class="text-center text-[var(--color-farm-brown)] py-10">
+                                  리포트가 없습니다.
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                  <template v-else-if="page.kind === 'info'">
                     <h1 class="text-xl font-black text-farm-brown-dark">내 정보</h1>
                     <div class="mt-4 space-y-2 text-sm text-farm-brown-dark/85 font-semibold">
                       <p>해결한 문제 수 : <span class="font-black">{{ solvedCount }}</span></p>
                       <p>보유한 카드 수 : <span class="font-black">{{ cardCount }}</span></p>
                     </div>
                     <p class="mt-6 text-sm text-farm-brown-dark/70">
-                      다음 페이지부터 리포트 목록을 확인할 수 있어요.
+                      다음 페이지에서 리포트 목록을 확인할 수 있어요.
                     </p>
                   </template>
                   <template v-else-if="page.kind === 'report'">
@@ -67,6 +127,14 @@
             </div>
           </div>
 
+          <ReportModal
+            :show="showReportModal"
+            :report="reportModalData"
+            :report-loading="reportModalLoading"
+            :report-load-failed="reportModalLoadFailed"
+            @close="onReportModalClose"
+          />
+
           <!-- Index tabs (붙어있는 다이어리 인덱스) -->
           <div class="diary__index" aria-label="다이어리 인덱스">
             <button
@@ -92,12 +160,44 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { PageFlip } from 'page-flip'
 import { useProfileStore } from '@/stores/profile'
 import { useCardStore } from '@/stores/card'
+import ReportModal from '@/components/organisms/ReportModal.vue'
+import { getReportDetail } from '@/api/reports'
 
 // 리포트 조회
 const profile = useProfileStore()
 const cardStore = useCardStore()
 const solvedCount = ref(0)
 const cardCount = ref(0)
+
+const showReportModal = ref(false)
+const reportModalLoading = ref(false)
+const reportModalLoadFailed = ref(false)
+const reportModalData = ref(null)
+
+const openReportModal = async (reportId) => {
+  if (reportId == null) return
+  showReportModal.value = true
+  reportModalLoading.value = true
+  reportModalLoadFailed.value = false
+  reportModalData.value = null
+  try {
+    const detail = await getReportDetail(reportId)
+    reportModalData.value = detail ? { result: detail } : null
+    reportModalLoadFailed.value = !detail
+  } catch (_) {
+    reportModalData.value = null
+    reportModalLoadFailed.value = true
+  } finally {
+    reportModalLoading.value = false
+  }
+}
+
+const onReportModalClose = () => {
+  showReportModal.value = false
+  reportModalLoading.value = false
+  reportModalLoadFailed.value = false
+  reportModalData.value = null
+}
 
 const reportResults = computed(() => {
   const list = profile.reports?.results ?? []
@@ -109,11 +209,9 @@ const reportTotalElements = computed(() => {
   return Number.isFinite(n) && n >= 0 ? n : reportResults.value.length
 })
 
-// 마이페이지(노트북 플립)에서는 최신순 10개까지만 노출
+// (기존 로직 유지) 마이페이지에서는 최신 10개까지만 노출
 const latestReportResults = computed(() => {
   const list = [...reportResults.value]
-
-  // createdAt 최신순 정렬(파싱 불가하면 뒤로)
   list.sort((a, b) => {
     const at = a?.createdAt ? Date.parse(a.createdAt) : NaN
     const bt = b?.createdAt ? Date.parse(b.createdAt) : NaN
@@ -122,9 +220,16 @@ const latestReportResults = computed(() => {
     if (!Number.isFinite(bt)) return -1
     return bt - at
   })
-
   return list.slice(0, 10)
 })
+
+// "목록만 추가": 기존 페이지(내정보/리포트페이지)는 그대로 두고, 목록 페이지를 맨 앞에 추가
+const reportListPage = computed(() => ({
+  key: 'report-list',
+  kind: 'report-list',
+  rows: reportResults.value,
+  totalElements: reportTotalElements.value,
+}))
 
 const reportPages = computed(() => {
   if (latestReportResults.value.length === 0) {
@@ -144,7 +249,6 @@ const reportPages = computed(() => {
     report: r,
   }))
 
-  // 서버에 리포트가 더 많으면 "더보기" 안내 페이지 추가
   if (reportTotalElements.value > latestReportResults.value.length) {
     pages.push({
       key: 'report-more',
@@ -157,26 +261,21 @@ const reportPages = computed(() => {
   return pages
 })
 
-const infoStartPageIndex = computed(() => (isCompact.value ? 0 : 1))
-// "2페이지부터 리포트" 요구사항:
-// - mobile: 0(내정보) 다음인 1부터 리포트
-// - desktop: 0(blank0 더미), 1(내정보) 다음인 2부터 리포트
-const recordStartPageIndex = computed(() => (isCompact.value ? 1 : 2))
+// 페이지 인덱스
+const infoStartPageIndex = computed(() => 0) // 내정보 페이지
+const recordStartPageIndex = computed(() => 1) // 목록 페이지
 
 const getTabIndexForPage = (pageIndex) => {
-  if (pageIndex < recordStartPageIndex.value) return 0
-  return 1
+  // 탭 0: 내 정보, 탭 1: 학습 기록(목록 + 리포트들)
+  return pageIndex === infoStartPageIndex.value ? 0 : 1
 }
 
 onMounted(async () => {
-  // 마이페이지 노트는 최신 10개만 보여주므로 항상 최신순으로 재조회
+  // API로 불러온 리포트 목록을 첫 페이지(목록 페이지)에 노출
   await profile.reportList({ page: 0, size: 10, sort: 'createdAt,DESC' })
   await cardStore.cardList()
-  // 푼 문제 수수
-  solvedCount.value = reportResults.value.filter(
-    (report) => report?.resultType === 'SUCCESS'
-  ).length
 
+  solvedCount.value = reportResults.value.filter((report) => report?.resultType === 'SUCCESS').length
   const cardList = cardStore.cards ?? []
   cardCount.value = (Array.isArray(cardList) ? cardList : []).reduce((sum, c) => {
     const n = Number(c?.count ?? 1)
@@ -207,17 +306,19 @@ const tabs = [
 
 // 페이지 목록록
 const pages = computed(() => {
-  // mobile(1page): 탭 1개당 1페이지
+  // mobile: 0(목록) -> 1(내정보) -> 리포트 페이지들
   if (isCompact.value) {
     return [
       { key: 'm-info', kind: 'info', title: '내 정보', body: '' },
+      reportListPage.value,
       ...reportPages.value,
     ]
   }
 
+  // desktop: 0(내정보) -> 1(목록) -> 리포트 페이지들
   return [
-    { key: 'blank0', kind: 'blank', title: '', body: '' },
     { key: 'p-info', kind: 'info', title: '내 정보', body: '' },
+    reportListPage.value,
     ...reportPages.value,
   ]
 })
@@ -274,13 +375,11 @@ const initIfNeeded = async () => {
 
   flip.value = instance
 
-  // 시작페이지를 1페이지로 설정
-  if (!isCompact.value) {
-    try {
-      instance.turnToPage(1)
-    } catch {
-      // ignore
-    }
+  // 0페이지(내 정보)부터 시작
+  try {
+    instance.turnToPage(0)
+  } catch {
+    // ignore
   }
 }
 
@@ -300,10 +399,7 @@ const refreshPages = async () => {
     flip.value.turnToPage(maxIndex)
   }
 
-  // desktop(스프레드)에서는 0번(blank0)에 머무르지 않게 보정
-  if (!isCompact.value && flip.value.getPageCount() > 1 && flip.value.getCurrentPageIndex() === 0) {
-    flip.value.turnToPage(1)
-  }
+  // 0페이지는 "내 정보"이므로 강제 이동 보정은 하지 않음
 }
 
 const goToTab = (idx) => {
@@ -341,6 +437,42 @@ watch(
     await refreshPages()
   }
 )
+
+function formatCreatedAt(iso) {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+function formatCreatedDate(iso) {
+  if (!iso) return '-'
+  const d = new Date(iso)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+function resultStatusClass(type) {
+  if (type === 'SUCCESS') {
+    // 더 진한 초록
+    return 'status-success saturate-200 brightness-95 shadow-[0_0_10px_rgba(16,185,129,0.95)] ring-1 ring-emerald-300/70'
+  }
+  if (type === 'GIVE_UP') {
+    // 더 어두운 빨강
+    return 'status-error saturate-200 brightness-90 shadow-[0_0_10px_rgba(220,38,38,0.95)] ring-1 ring-red-300/70'
+  }
+  return 'status-neutral opacity-60'
+}
+
+function resultTypeLabel(type) {
+  const map = { SUCCESS: '정답', FAIL: '오답', GIVE_UP: '탈주' }
+  return map[type] ?? type ?? '-'
+}
+
+function resultTypeBadgeClass(type) {
+  const map = { SUCCESS: 'badge-success text-white', FAIL: 'badge-error text-white', GIVE_UP: 'badge-ghost' }
+  return map[type] ?? 'badge-ghost'
+}
 
 // 다른 화면에서 리포트가 추가된 뒤, 다시 마이페이지로 돌아오면 최신 목록을 재조회
 const refreshLatestReports = async () => {

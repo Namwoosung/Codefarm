@@ -18,14 +18,14 @@
         <nav class="hidden md:flex md:items-center h-full gap-2 me-auto mx-4">
           <router-link
             to="/"
-            class="relative px-4 py-2 text-sm font-black text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            class="relative px-4 py-2 text-sm font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('home')"
           >
             메인페이지
           </router-link>
           <router-link
             to="/roadmap"
-            class="relative px-4 py-2 text-sm font-black text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            class="relative px-4 py-2 text-sm font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('roadmap')"
             @click="onCurriculumClick"
           >
@@ -34,7 +34,7 @@
           <router-link
             v-if="isLoggedIn"
             to="/cards"
-            class="relative px-4 py-2 text-sm font-black text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            class="relative px-4 py-2 text-sm font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('cards')"
           >
             카드
@@ -42,7 +42,7 @@
           <router-link
             v-if="isLoggedIn && user && user.userId"
             :to="`/profile/${user.userId}`"
-            class="relative px-4 py-2 text-sm font-black text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            class="relative px-4 py-2 text-sm font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('profile')"
           >
             마이페이지
