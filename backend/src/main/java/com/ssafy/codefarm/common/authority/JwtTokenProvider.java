@@ -158,4 +158,8 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token)
                 .getBody();
     }
+
+    public long getRefreshTokenValidTime() {
+        return refreshTokenValidTime;
+    }
 }

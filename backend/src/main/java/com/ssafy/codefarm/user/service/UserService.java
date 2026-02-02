@@ -2,6 +2,7 @@ package com.ssafy.codefarm.user.service;
 
 import com.ssafy.codefarm.common.authority.JwtTokenProvider;
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
+import com.ssafy.codefarm.common.dto.LoginTokenResult;
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.user.dto.request.*;
@@ -17,16 +18,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+
 @Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
 public class UserService {
-
-    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+
+    private final RefreshTokenRedisService refreshTokenRedisService;
+
+    private final UserRepository userRepository;
 
     public UserResponseDto signup(UserSignupRequestDto userSignupRequestDto) {
         if (userRepository.existsByEmail(userSignupRequestDto.getEmail())) {
@@ -69,7 +74,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public LoginResponseDto login(LoginRequestDto loginRequestDto) {
+    public LoginTokenResult login(LoginRequestDto loginRequestDto) {
         //인증을 위한 UsernamePasswordAuthenticationToken을 생성
         UsernamePasswordAuthenticationToken authenticate
                 = new UsernamePasswordAuthenticationToken(loginRequestDto.getEmail(), loginRequestDto.getPassword());
@@ -86,25 +91,25 @@ public class UserService {
             );
         }
 
-        //인증받은 Authentication을 통해 token을 발급 받음
-        String accessToken = jwtTokenProvider.createAccessToken(authentication);
-
         CustomUserDetails userDetails =
                 (CustomUserDetails) authentication.getPrincipal();
 
-        User user = userRepository.findById(userDetails.getUserId())
-                        .orElseThrow(() -> new CustomException(
-                                        "해당 유저가 존재하지 않습니다.",
-                                        ErrorCode.RESOURCE_NOT_FOUND
-                                ));
+        Long userId = userDetails.getUserId();
 
-        return LoginResponseDto.from(
-                UserResponseDto.from(user),
-                TokenResponseDto.from(accessToken)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException("해당 유저가 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        //인증받은 Authentication을 통해 token을 발급 받음
+        String accessToken = jwtTokenProvider.createAccessToken(authentication);
+        String refreshToken = jwtTokenProvider.createRefreshToken(userId);
+
+        refreshTokenRedisService.save(
+                userId,
+                refreshToken,
+                Duration.ofMillis(jwtTokenProvider.getRefreshTokenValidTime())
         );
 
-
-
+        return new LoginTokenResult(accessToken, refreshToken, user);
     }
 
     @Transactional(readOnly = true)
