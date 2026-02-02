@@ -1,11 +1,12 @@
 <template>
-  <div class="min-h-screen p-10">
-    <div class="max-w-7xl mx-auto">
-      <div class="text-center mb-10">
-        <h1 class="text-3xl font-bold text-farm-brown-dark mb-2">CODE FARM 문제 목록</h1>
-        <p class="text-farm-brown">
-          문제를 선택하면 IDE 화면으로 이동해 풀 수 있어요.
-        </p>
+  <div class="min-h-screen bg-farm-cream/20">
+    <!-- 최상단 배너: 전체 화면 폭 -->
+    <MainHeroBanner :top3="top3" />
+
+    <div class="max-w-7xl mx-auto px-12 py-10">
+      <div class="mb-4">
+        <h2 class="text-2xl font-bold text-farm-brown-dark"> 모든 문제</h2>
+        <p class="text-sm text-farm-brown/80">필터로 원하는 유형/난이도를 빠르게 골라보세요.</p>
       </div>
  
       <!-- 필터 / 정렬 UI -->
@@ -224,6 +225,14 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { getProblemList } from '@/api/problem'
+import { useCardStore } from '@/stores/card'
+import MainHeroBanner from '@/components/organisms/MainHeroBanner.vue'
+onMounted(() => {
+  cardStore.ranking()
+})
+const cardStore = useCardStore()
+const rankingList = computed(() => cardStore.rankingList)
+const top3 = computed(() => (rankingList.value ?? []).slice(0, 3))
 
 // 원본(전체) 문제 목록 + 화면에 보여줄(필터/페이지 적용) 목록
 const problems = ref([])

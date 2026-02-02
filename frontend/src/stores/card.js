@@ -9,6 +9,9 @@ export const useCardStore = defineStore('card', () => {
   const newcard = ref([])
   const drawMessage = ref('')
 
+  //랭킹리스트
+  const rankingList = ref([])
+
   const normalizeCard = (item) => {
     const c = item?.card && typeof item.card === 'object' ? item.card : item
     if (!c) return null
@@ -70,11 +73,22 @@ export const useCardStore = defineStore('card', () => {
     }
   }
 
+  const ranking = async () => {
+    try {
+      const res = await api.get('/cards/rankings')
+      rankingList.value = res.data.data?.topCollectors
+    } catch (err) {
+      console.warn('[card.ranking] failed:', err?.response?.status, err?.response?.data ?? err)
+    }
+  }
+
   return {
     cards,
     newcard,
     drawMessage,
+    rankingList,
     cardList,
     cardDraw,
+    ranking,
   }
 })
