@@ -75,3 +75,78 @@ export function getMockManualHintResponse(userQuestion) {
 export function resetMockHintQuota() {
   mockUsedHint = 0
 }
+
+/**
+ * 자동 힌트 구독 (SSE)
+ * GET /api/v1/sessions/{session_id}/hints/subscribe
+ * ERR_INCOMPLETE_CHUNKED_ENCODING 등 연결 끊김 시 onError 호출 (호출부에서 재연결 가능).
+ * @param {number} sessionId
+ * @param {{ onConnected?: (data: object) => void, onAutoHint?: (data: object) => void, onError?: () => void }} callbacks
+ * @returns {() => void} 구독 해제 함수
+ */
+export function subscribeHintSSE(sessionId, callbacks = {}) {
+  if (sessionId == null || sessionId === '') return () => {}
+
+  const baseURL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
+  const url = `${baseURL}/sessions/${sessionId}/hints/subscribe`
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+  const headers = { Accept: 'text/event-stream' }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const ac = new AbortController()
+  let buffer = ''
+  let currentEvent = ''
+  let currentData = ''
+  const reportError = () => {
+    if (ac.signal.aborted) return
+    try { callbacks.onError?.() } catch (_) {}
+  }
+
+  fetch(url, { signal: ac.signal, headers })
+    .then((res) => {
+      if (!res.ok) {
+        reportError()
+        return
+      }
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      const processLine = (line) => {
+        if (line.startsWith('event:')) {
+          currentEvent = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          const payload = line.slice(5).trim()
+          currentData = currentData ? currentData + '\n' + payload : payload
+        } else if (line === '') {
+          if (currentEvent && currentData) {
+            try {
+              const parsed = JSON.parse(currentData)
+              if (currentEvent === 'CONNECTED' && callbacks.onConnected) {
+                callbacks.onConnected(parsed)
+              } else if (currentEvent === 'AUTO_HINT' && callbacks.onAutoHint) {
+                callbacks.onAutoHint(parsed)
+              }
+            } catch (_) {}
+          }
+          currentEvent = ''
+          currentData = ''
+        }
+      }
+      const read = () => {
+        reader.read()
+          .then(({ done, value }) => {
+            if (ac.signal.aborted) return
+            if (done) return
+            buffer += decoder.decode(value, { stream: true })
+            const lines = buffer.split(/\r?\n/)
+            buffer = lines.pop() ?? ''
+            lines.forEach(processLine)
+            read()
+          })
+          .catch(() => reportError())
+      }
+      read()
+    })
+    .catch(() => reportError())
+
+  return () => ac.abort()
+}
