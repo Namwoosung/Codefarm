@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useIdeStore } from '@/stores/ide'
 import * as hintApi from '@/api/hint'
@@ -117,6 +117,112 @@ const ideStore = useIdeStore()
 const chatInput = ref('')
 const chatMessages = ref([])
 const hintLoading = ref(false)
+/** SSE 구독 해제 함수 */
+let unsubscribeSSE = () => {}
+
+/** 힌트 목록을 채팅 메시지 형태로 변환 (과거순). AUTO는 세션 생성 이후 것만 표시 */
+function hintsToMessages(hints) {
+  const list = Array.isArray(hints) ? [...hints].reverse() : []
+  const sessionStart = ideStore.sessionStartedAt ?? 0
+  const messages = []
+  for (const h of list) {
+    if (h.hintType === 'MANUAL') {
+      if (h.userQuestion) {
+        messages.push({ role: 'user', text: h.userQuestion, createdAt: h.createdAt, hintId: h.hintId })
+      }
+      messages.push({ role: 'assistant', text: h.content ?? '', createdAt: h.createdAt ?? '', hintId: h.hintId })
+    } else if (h.hintType === 'AUTO') {
+      const at = h.createdAt ? new Date(h.createdAt).getTime() : 0
+      if (at >= sessionStart) {
+        messages.push({ role: 'assistant', text: h.content ?? '', createdAt: h.createdAt ?? '', hintId: h.hintId })
+      }
+    }
+  }
+  return messages
+}
+
+/** 힌트 목록 로드 후 채팅에 반영, 미열람 힌트는 열람 처리 */
+async function loadHintList() {
+  const sid = ideStore.sessionId
+  if (sid == null) return
+  try {
+    const hints = await hintApi.getHintList(sid)
+    chatMessages.value = hintsToMessages(hints)
+    for (const h of hints) {
+      if (h.hintId != null && h.isViewed === false) {
+        hintApi.markHintViewed(sid, h.hintId).catch(() => {})
+      }
+    }
+  } catch (_) {
+    chatMessages.value = []
+  }
+}
+
+/** SSE 자동 힌트 수신 시: 알림 + pending 말풍선 (볼게요/괜찮아요) */
+function handleAutoHint(data) {
+  if (!data?.content) return
+  emit('auto-hint-arrived')
+  chatMessages.value.push({
+    role: 'assistant',
+    type: 'pending_auto_hint',
+    content: data.content,
+    hintId: data.hintId,
+    createdAt: data.createdAt ?? new Date().toISOString(),
+    viewed: false,
+    dismissed: false
+  })
+}
+
+/** pending 자동 힌트 "볼게요" 클릭: 내용 표시 + 열람 처리 */
+function viewPendingHint(idx) {
+  const msg = chatMessages.value[idx]
+  if (!msg || msg.type !== 'pending_auto_hint' || msg.viewed || msg.dismissed) return
+  msg.viewed = true
+  const sid = ideStore.sessionId
+  if (sid != null && msg.hintId != null) {
+    hintApi.markHintViewed(sid, msg.hintId).catch(() => {})
+  }
+}
+
+/** pending 자동 힌트 "괜찮아요" 클릭: 비활성화 + 토스트 */
+function dismissPendingHint(idx) {
+  const msg = chatMessages.value[idx]
+  if (!msg || msg.type !== 'pending_auto_hint' || msg.dismissed) return
+  msg.dismissed = true
+  emit('dismiss-hint-toast')
+}
+
+function startSSE() {
+  const sid = ideStore.sessionId
+  if (sid == null) return
+  unsubscribeSSE()
+  unsubscribeSSE = hintApi.subscribeHintSSE(sid, {
+    onAutoHint: handleAutoHint
+  })
+}
+
+function stopSSE() {
+  unsubscribeSSE()
+  unsubscribeSSE = () => {}
+}
+
+watch(
+  () => ideStore.sessionId,
+  (sid) => {
+    if (sid != null) {
+      loadHintList()
+      startSSE()
+    } else {
+      chatMessages.value = []
+      stopSSE()
+    }
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => {
+  stopSSE()
+})
 
 /** 힌트 목록을 채팅 메시지 형태로 변환 (과거순). AUTO는 세션 생성 이후 것만 표시 */
 function hintsToMessages(hints) {
