@@ -55,7 +55,7 @@ public class UserService {
                 .nickname(userSignupRequestDto.getNickname())
                 .age(userSignupRequestDto.getAge())
                 .codingLevel(userSignupRequestDto.getCodingLevel())
-                .point(0)
+                .point(300)
                 .build();
 
         userRepository.save(user);
