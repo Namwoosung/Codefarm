@@ -120,15 +120,23 @@ const hintLoading = ref(false)
 /** SSE 구독 해제 함수 */
 let unsubscribeSSE = () => {}
 
-/** 힌트 목록을 채팅 메시지 형태로 변환 (과거순) */
+/** 힌트 목록을 채팅 메시지 형태로 변환 (과거순). AUTO는 세션 생성 이후 것만 표시 */
 function hintsToMessages(hints) {
   const list = Array.isArray(hints) ? [...hints].reverse() : []
+  const sessionStart = ideStore.sessionStartedAt ?? 0
   const messages = []
   for (const h of list) {
-    if (h.hintType === 'MANUAL' && h.userQuestion) {
-      messages.push({ role: 'user', text: h.userQuestion, createdAt: h.createdAt, hintId: h.hintId })
+    if (h.hintType === 'MANUAL') {
+      if (h.userQuestion) {
+        messages.push({ role: 'user', text: h.userQuestion, createdAt: h.createdAt, hintId: h.hintId })
+      }
+      messages.push({ role: 'assistant', text: h.content ?? '', createdAt: h.createdAt ?? '', hintId: h.hintId })
+    } else if (h.hintType === 'AUTO') {
+      const at = h.createdAt ? new Date(h.createdAt).getTime() : 0
+      if (at >= sessionStart) {
+        messages.push({ role: 'assistant', text: h.content ?? '', createdAt: h.createdAt ?? '', hintId: h.hintId })
+      }
     }
-    messages.push({ role: 'assistant', text: h.content ?? '', createdAt: h.createdAt ?? '', hintId: h.hintId })
   }
   return messages
 }
