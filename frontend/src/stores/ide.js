@@ -10,6 +10,8 @@ export const useIdeStore = defineStore('ide', () => {
 
   // 현재 세션 ID (로그인 후 IDE 진입 시 생성/조회된 세션)
   const sessionId = ref(null)
+  // 세션 생성 시각 (ms). AUTO 힌트는 이 시각 이후 것만 채팅에 표시
+  const sessionStartedAt = ref(null)
 
   // 마지막 키보드 입력 시각 (10초 저장: 첫 입력 후 10초마다 저장, 30초 무입력 시 중단)
   const lastCodeInputAt = ref(null)
@@ -41,9 +43,15 @@ export const useIdeStore = defineStore('ide', () => {
     sessionId.value = id
   }
 
+  /** 세션 시작 시각 설정 (AUTO 힌트 필터링용). startedAt: ISO 문자열 또는 ms */
+  const setSessionStartedAt = (startedAt) => {
+    sessionStartedAt.value = startedAt != null ? (typeof startedAt === 'number' ? startedAt : new Date(startedAt).getTime()) : null
+  }
+
   // 세션 초기화 (이탈 시)
   const clearSession = () => {
     sessionId.value = null
+    sessionStartedAt.value = null
   }
 
   // 메인/커리큘럼 → IDE 진입 시 전역 로딩 오버레이용
@@ -52,6 +60,7 @@ export const useIdeStore = defineStore('ide', () => {
   return {
     codeByProblemId,
     sessionId,
+    sessionStartedAt,
     lastCodeInputAt,
     ideRouteLoading,
     touchCodeInput,
@@ -59,6 +68,7 @@ export const useIdeStore = defineStore('ide', () => {
     updateCode,
     setCodeToDefault,
     setSessionId,
+    setSessionStartedAt,
     clearSession
   }
 }, {
