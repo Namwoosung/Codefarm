@@ -229,3 +229,37 @@ rollback-foundation:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
       allow_failure: true
+
+########################
+# INFERENCE STAGE
+########################
+inference-deploy:
+  stage: inference
+  tags: [elice-container]
+  variagles:
+    GIT_STRATEGY: "none"
+    INF_DIR: "inference"
+  ruls:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      changes:
+        - inference/**
+  script:
+    - echo "Deploying inference service..."
+    - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
+
+    - rm -rf repo
+    - mkdir -p repo
+    - cd repo
+
+    - git init
+    - git remote add origin "$CI_REPOSITORY_URL"
+    - git fetch --depth 1 origin "$CI_COMMIT_SHA"
+
+    - git sparse-checkout init --cone
+    - git sparse-checkout set "$INF_DIR"
+    - git checkout -f FETCH_HEAD
+
+    - ls -la
+    - ls -la "$INF_DIR"
+
+    - rsync -a --delete "$INF_DIR/" /srv/app/
