@@ -58,17 +58,17 @@
                 <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)]">예제 입력</h3>
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs gap-1 min-w-[4.5rem] justify-end text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)]"
-                  :title="copiedWhich === 'input' ? '복사되었습니다' : '복사'"
+                  class="btn btn-ghost btn-xs gap-1 w-fit min-w-0 shrink-0 text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)] hover:bg-base-200/60 rounded-md px-2 py-1.5"
+                  :title="copiedWhich === 'input' ? '복사되었습니다' : '예제 입력 복사'"
                   @click="copyToClipboard(problem?.exampleInput ?? '', 'input')"
                 >
                   <template v-if="copiedWhich === 'input'">
-                    <iconify-icon icon="mdi:check" class="text-sm text-success"></iconify-icon>
-                    <span class="text-success text-xs">복사되었습니다</span>
+                    <iconify-icon icon="mdi:check" class="text-sm text-success shrink-0"></iconify-icon>
+                    <span class="text-success text-xs whitespace-nowrap">복사되었습니다</span>
                   </template>
                   <template v-else>
-                    <iconify-icon icon="mdi:content-copy" class="text-sm"></iconify-icon>
-                    복사
+                    <iconify-icon icon="mdi:content-copy" class="text-sm shrink-0"></iconify-icon>
+                    <span class="whitespace-nowrap">복사</span>
                   </template>
                 </button>
               </div>
@@ -81,17 +81,17 @@
                 <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)]">예제 출력</h3>
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs gap-1 min-w-[4.5rem] justify-end text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)]"
-                  :title="copiedWhich === 'output' ? '복사되었습니다' : '복사'"
+                  class="btn btn-ghost btn-xs gap-1 w-fit min-w-0 shrink-0 text-[var(--color-farm-brown)] hover:text-[var(--color-farm-brown-dark)] hover:bg-base-200/60 rounded-md px-2 py-1.5"
+                  :title="copiedWhich === 'output' ? '복사되었습니다' : '예제 출력 복사'"
                   @click="copyToClipboard(problem?.exampleOutput ?? '', 'output')"
                 >
                   <template v-if="copiedWhich === 'output'">
-                    <iconify-icon icon="mdi:check" class="text-sm text-success"></iconify-icon>
-                    <span class="text-success text-xs">복사되었습니다</span>
+                    <iconify-icon icon="mdi:check" class="text-sm text-success shrink-0"></iconify-icon>
+                    <span class="text-success text-xs whitespace-nowrap">복사되었습니다</span>
                   </template>
                   <template v-else>
-                    <iconify-icon icon="mdi:content-copy" class="text-sm"></iconify-icon>
-                    복사
+                    <iconify-icon icon="mdi:content-copy" class="text-sm shrink-0"></iconify-icon>
+                    <span class="whitespace-nowrap">복사</span>
                   </template>
                 </button>
               </div>
@@ -253,12 +253,12 @@ const formatLanguage = (lang) => {
   return map[lang] ?? lang ?? '-'
 }
 
-// 결과 목록 로드
+// 결과 목록 로드 (새로고침 시 cacheBust로 항상 새 요청)
 const loadResults = async () => {
   const sid = ideStore.sessionId
   resultsLoading.value = true
   try {
-    const list = await getSessionResultsList(sid)
+    const list = await getSessionResultsList(sid, { cacheBust: true })
     resultsList.value = list ?? []
   } catch (_) {
     resultsList.value = []
