@@ -141,7 +141,7 @@
               >
                 <span class="flex items-center gap-1.5">
                   <iconify-icon icon="mdi:information-outline" class="text-base text-[var(--color-farm-green)] shrink-0"></iconify-icon>
-                  <span>같은 문제를 다른 탭에서 열면 기존 탭의 세션이 자동으로 종료됩니다.</span>
+                  <span>다른 탭에서 어떤 문제를 열어도 기존 탭의 세션이 자동으로 종료됩니다.</span>
                 </span>
                 <button
                   type="button"
@@ -784,32 +784,50 @@ function onVisibilityChange() {
   // 탭 전환 시 세션을 닫으면 입장 직후 다른 탭 갔다 오면 세션이 끊겨 유휴 모달·리다이렉트가 동작하지 않음. 따라서 아무 동작 안 함.
 }
 
-/** Broadcast Channel: 같은 세션을 다른 탭에서 열면 기존 탭에 신호 → 기존 탭만 세션 종료 후 메인 이동, 새 탭이 세션 유지 */
+/** Broadcast Channel: 다른 탭/창에서 어떤 문제를 열어도 기존 IDE 탭은 세션 종료 후 메인 이동 (전역 채널 1개) */
+const IDE_BROADCAST_CHANNEL_NAME = 'codefarm-ide-opened'
 let ideChannel = null
 let ideTabId = ''
 let ideOpenTime = 0
-function setupIdeBroadcastChannel(sessionId) {
-  if (typeof BroadcastChannel === 'undefined' || sessionId == null) return
+let ideChannelResendTimeoutId = null
+function setupIdeBroadcastChannel() {
+  if (typeof BroadcastChannel === 'undefined') return
   try {
+    if (ideChannelResendTimeoutId) {
+      clearTimeout(ideChannelResendTimeoutId)
+      ideChannelResendTimeoutId = null
+    }
     ideChannel?.close()
-    ideChannel = new BroadcastChannel(`ide-session-${sessionId}`)
+    ideChannel = new BroadcastChannel(IDE_BROADCAST_CHANNEL_NAME)
     ideTabId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`
     ideOpenTime = Date.now()
-    ideChannel.postMessage({ type: 'opened', tabId: ideTabId, timestamp: ideOpenTime })
+    const payload = { type: 'opened', tabId: ideTabId, timestamp: ideOpenTime }
+    ideChannel.postMessage(payload)
+    ideChannelResendTimeoutId = setTimeout(() => {
+      ideChannelResendTimeoutId = null
+      try {
+        if (ideChannel) ideChannel.postMessage(payload)
+      } catch (_) {}
+    }, 300)
     ideChannel.onmessage = (e) => {
       const msg = e?.data
       if (msg?.type !== 'opened' || msg?.tabId === ideTabId) return
+      // 나보다 나중에 연 탭이 보낸 메시지일 때만 닫기 (같은/다른 문제 무관)
       if (msg.timestamp > ideOpenTime) {
         closeSessionOnLeave()
-        showToast('다른 탭에서 이 문제를 열었습니다. 이 탭의 세션을 종료합니다.')
+        showToast('다른 탭에서 문제를 열었습니다. 이 탭의 세션을 종료합니다.')
         skipLeaveConfirm.value = true
-        router.push('/')
+        router.replace('/')
       }
     }
   } catch (_) {}
 }
 function closeIdeBroadcastChannel() {
   try {
+    if (ideChannelResendTimeoutId) {
+      clearTimeout(ideChannelResendTimeoutId)
+      ideChannelResendTimeoutId = null
+    }
     ideChannel?.close()
     ideChannel = null
   } catch (_) {}
@@ -870,16 +888,17 @@ watch(() => route.params.id, async (newId, oldId) => {
       }
     } finally {
       isInitializing.value = false
+      ideStore.ideRouteLoading = false
     }
   }
 })
 
-// Broadcast Channel: 세션 ID가 바뀔 때마다 채널 재구독 (다른 탭 중복 열기 감지)
+// Broadcast Channel: IDE 진입 시 전역 채널 구독 → 다른 탭에서 어떤 문제를 열어도 이 탭은 세션 종료 후 메인으로
 watch(
   () => ideStore.sessionId,
   (sid) => {
     if (sid != null) {
-      setupIdeBroadcastChannel(sid)
+      setupIdeBroadcastChannel()
     } else {
       closeIdeBroadcastChannel()
     }
