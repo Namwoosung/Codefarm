@@ -48,6 +48,7 @@ export const getProblemList = async (queryParams = {}) => {
     return { ...p, userStatus: item?.userStatus, statistics: item?.statistics }
   })
   const total = inner?.page?.totalElements ?? inner?.totalElements ?? inner?.total ?? items.length
+  console.log(items)
   return { data: items, total }
 }
 
