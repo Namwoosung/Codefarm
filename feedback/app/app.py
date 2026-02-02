@@ -82,7 +82,7 @@ class Result(BaseModel):
     solveTime: Optional[int] = Field(None, ge=0)
     execTime: Optional[int] = Field(None, ge=0)
     memory: Optional[int] = Field(None, ge=0)
-    failReason: Optional[str] = None
+
 
 
 class FeedbackRequest(BaseModel):
@@ -349,7 +349,7 @@ def make_cache_key(req: FeedbackRequest) -> str:
         "p": {"title": req.problem.title, "difficulty": req.problem.difficulty, "algo": req.problem.algorithm},
         "u": {"lvl": req.user.coding_level, "age": req.user.age},
         "c": (req.code.content or "")[:800],
-        "r": {"type": req.result.resultType, "reason": req.result.failReason},
+        "r": {"type": req.result.resultType},
         "pj": [{"t": pj.judged_at, "m": pj.mistake_type} for pj in req.previous_judgement[-PREV_LIMIT:]],
     }
     s = json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -475,7 +475,7 @@ async def feedback(
 
     # result 축약(FAIL이면 성능지표 제외)
     if req.result.resultType == "FAIL":
-        result_payload = {"resultType": "FAIL", "failReason": req.result.failReason}
+        result_payload = {"resultType": "FAIL"}
     else:
         result_payload = {
             "resultType": "SUCCESS",
