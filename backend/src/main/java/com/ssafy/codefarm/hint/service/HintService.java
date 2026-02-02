@@ -57,16 +57,22 @@ public class HintService {
             throw new CustomException("종료된 세션에는 코드를 저장할 수 없습니다.", ErrorCode.BAD_REQUEST);
         }
 
+        log.info("Creating new SseEmitter for sessionId={}, userId={}", sessionId, userId);
         SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT);
 
         emitterRepository.save(sessionId, emitter);
 
-        emitter.onCompletion(() -> emitterRepository.remove(sessionId, emitter));
+        emitter.onCompletion(() -> {
+            log.info("SseEmitter completed. sessionId={}", sessionId);
+            emitterRepository.remove(sessionId, emitter);
+        });
         emitter.onTimeout(() -> {
+            log.warn("SseEmitter timed out. sessionId={}", sessionId);
             emitter.complete();
             emitterRepository.remove(sessionId, emitter);
         });
         emitter.onError(e -> {
+            log.error("SseEmitter error. sessionId={}, error={}", sessionId, e.getMessage());
             emitter.completeWithError(e);
             emitterRepository.remove(sessionId, emitter);
         });
