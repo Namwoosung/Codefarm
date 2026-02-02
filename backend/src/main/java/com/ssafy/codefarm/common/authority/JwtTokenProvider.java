@@ -28,13 +28,21 @@ public class JwtTokenProvider {
 
     private final Key key;
     private final long accessTokenValidTime;
+    private final long refreshTokenValidTime;
+
+    private static final String CLAIM_AUTH = "auth";
+    private static final String CLAIM_TYPE = "type";
+    private static final String TOKEN_TYPE_ACCESS = "access";
+    private static final String TOKEN_TYPE_REFRESH = "refresh";
 
     public JwtTokenProvider(
             @Value("${jwt.secret-key}") String secretKey,
-            @Value("${jwt.access-expiration}") long accessTokenValidTime
+            @Value("${jwt.access-expiration}") long accessTokenValidTime,
+            @Value("${jwt.refresh-expiration}") long refreshTokenValidTime
     ) {
         this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(secretKey));
         this.accessTokenValidTime = accessTokenValidTime;
+        this.refreshTokenValidTime = refreshTokenValidTime;
     }
 
     public String createAccessToken(Authentication authentication) {
@@ -57,7 +65,22 @@ public class JwtTokenProvider {
 
         return Jwts.builder()
                 .setSubject(String.valueOf(userId))
-                .claim("auth", authorities)
+                .claim(CLAIM_AUTH, authorities)
+                .claim(CLAIM_TYPE, TOKEN_TYPE_ACCESS)
+                .setIssuedAt(now)
+                .setExpiration(expiry)
+                .signWith(key, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String createRefreshToken(Long userId) {
+
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + refreshTokenValidTime);
+
+        return Jwts.builder()
+                .setSubject(String.valueOf(userId))
+                .claim(CLAIM_TYPE, TOKEN_TYPE_REFRESH)
                 .setIssuedAt(now)
                 .setExpiration(expiry)
                 .signWith(key, SignatureAlgorithm.HS256)
@@ -87,6 +110,12 @@ public class JwtTokenProvider {
 
         Claims claims = getClaims(token);
 
+        String type = claims.get(CLAIM_TYPE, String.class);
+
+        if (TOKEN_TYPE_REFRESH.equals(type)) {
+            throw new CustomException("Refresh Token으로 인증할 수 없습니다.", ErrorCode.INVALID_TOKEN);
+        }
+
         Long userId = Long.parseLong(claims.getSubject());
 
         String auth = claims.get("auth", String.class);
@@ -108,6 +137,19 @@ public class JwtTokenProvider {
         );
     }
 
+    public Long getUserIdFromToken(String token) {
+
+        Claims claims = getClaims(token);
+
+        String type = claims.get(CLAIM_TYPE, String.class);
+
+        if (!TOKEN_TYPE_REFRESH.equals(type)) {
+            throw new CustomException("Refresh Token이 아닙니다.", ErrorCode.INVALID_TOKEN);
+        }
+
+        return Long.parseLong(claims.getSubject());
+    }
+
 
     private Claims getClaims(String token) {
         return Jwts.parserBuilder()
@@ -115,5 +157,9 @@ public class JwtTokenProvider {
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
+    }
+
+    public long getRefreshTokenValidTime() {
+        return refreshTokenValidTime;
     }
 }
