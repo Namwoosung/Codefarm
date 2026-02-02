@@ -52,6 +52,8 @@ public class RefreshTokenRedisService {
         }
 
         if (!savedToken.equals(refreshToken)) {
+            // 탈취 의심 시 해당 사용자의 저장된 토큰 정보 삭제
+            delete(userId);
             throw new CustomException(
                     "유효하지 않은 Refresh Token입니다.",
                     ErrorCode.INVALID_TOKEN
