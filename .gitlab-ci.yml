@@ -237,10 +237,10 @@ rollback-foundation:
 inference-deploy:
   stage: inference
   tags: [elice-container]
-  variagles:
+  variables:
     GIT_STRATEGY: "none"
     INF_DIR: "inference"
-  ruls:
+  rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       changes:
         - inference/**
