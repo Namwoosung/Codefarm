@@ -1,5 +1,24 @@
 <template>
   <div class="min-h-screen p-10">
+    <!-- 30분 무입력 강제 종료 후 메인 진입 시 안내 모달 (X로 닫기) -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showIdleCancelModal" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]">
+          <div class="card bg-base-100 shadow-2xl rounded-xl p-6 min-w-[320px] max-w-[90vw] border border-base-300 relative">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm btn-square absolute top-3 right-3 text-[var(--color-farm-brown)]"
+              aria-label="닫기"
+              @click="closeIdleCancelModal"
+            >
+              <iconify-icon icon="mdi:close" class="text-xl"></iconify-icon>
+            </button>
+            <p class="text-lg font-semibold text-[var(--color-farm-brown-dark)] pr-8">문제를 장시간동안 풀지 않아 자동으로 문제풀기가 취소되었습니다.</p>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <div class="max-w-7xl mx-auto">
       <div class="text-center mb-10">
         <h1 class="text-3xl font-bold text-farm-brown-dark mb-2">CODE FARM 문제 목록</h1>
@@ -39,12 +58,21 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { getProblemList } from '@/api/problem'
 
+const route = useRoute()
+const router = useRouter()
 const problems = ref([])
 const loading = ref(true)
 const error = ref(null)
+
+const showIdleCancelModal = computed(() => route.query.idle_cancel === '1')
+
+function closeIdleCancelModal() {
+  router.replace({ path: '/', query: {} })
+}
 
 onMounted(async () => {
   try {
