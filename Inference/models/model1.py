@@ -9,13 +9,55 @@ import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from torch.nn.functional import sigmoid
 
+from utils.labels import dedup_labels
+
 # ============================================================
 # Model1 (Label classifier) - local HF model in ./label_model
 # ============================================================
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../AI_server
 DEFAULT_MODEL_DIR = os.path.join(BASE_DIR, "label_model")
-MODEL_DIR = os.getenv("LABEL_MODEL_DIR", DEFAULT_MODEL_DIR)
+MODEL_DIR_ENV = os.getenv("LABEL_MODEL_DIR", "").strip()
+LABEL_MODEL_ROOT = os.getenv("LABEL_MODEL_ROOT", DEFAULT_MODEL_DIR).strip()
+LABEL_MODEL_FOLD = os.getenv("LABEL_MODEL_FOLD", "").strip()  # e.g. "1".."5"
+
+def _resolve_label_model_dir() -> str:
+    # 1) explicit dir wins
+    if MODEL_DIR_ENV:
+        p = Path(MODEL_DIR_ENV)
+        return str(p if p.is_absolute() else (Path(BASE_DIR) / p).resolve())
+
+    root = Path(LABEL_MODEL_ROOT)
+    root = root if root.is_absolute() else (Path(BASE_DIR) / root).resolve()
+
+    # 2) if fold is set and exists under root, use it
+    if LABEL_MODEL_FOLD:
+        try:
+            k = int(LABEL_MODEL_FOLD)
+        except Exception:
+            raise ValueError(f"LABEL_MODEL_FOLD must be integer (1..). got={LABEL_MODEL_FOLD}")
+        candidates = [root / f"fold{k}", root / f"fold_{k}"]
+        for c in candidates:
+            if c.is_dir():
+                return str(c.resolve())
+        raise FileNotFoundError(f"fold dir not found under {root}. tried: {candidates}")
+
+    # 3) if root itself looks like a HF model dir, use it
+    if (root / "config.json").exists():
+        return str(root)
+
+    # 4) auto-pick: prefer fold1 if present, else first fold*
+    for c in [root / "fold1", root / "fold_1"]:
+        if c.is_dir():
+            return str(c.resolve())
+    folds = sorted([p for p in root.iterdir() if p.is_dir() and p.name.lower().startswith("fold")])
+    if folds:
+        return str(folds[0].resolve())
+
+    # 5) fallback
+    return str(root)
+
+MODEL_DIR = _resolve_label_model_dir()
 
 # Inference params
 DEFAULT_THRESHOLD = float(os.getenv("MODEL1_THRESHOLD", "0.5"))
@@ -141,9 +183,6 @@ async def run_model1(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     preds, _topk = predict_payload(payload)
     mistake_types = [label for label, _prob in preds]
-
-    # Fallback: if nothing passes threshold, return No_Issue
-    if not mistake_types:
-        mistake_types = ["No_Issue"]
+    mistake_types = dedup_labels(mistake_types)
 
     return {"mistake_type": mistake_types}
