@@ -11,7 +11,7 @@
         <div v-if="reportLoading" class="report-modal-section report-modal-loading">
           <p class="text-[var(--color-farm-brown)]">불러오는 중...</p>
         </div>
-        <div v-else-if="reportLoadFailed || !report?.result" class="report-modal-section report-modal-loading">
+        <div v-else-if="!report?.result" class="report-modal-section report-modal-loading">
           <p class="text-[var(--color-farm-brown)]">불러오지 못했습니다.</p>
         </div>
         <template v-else>
@@ -112,8 +112,7 @@ import { computed } from 'vue'
 const props = defineProps({
   show: { type: Boolean, default: false },
   report: { type: Object, default: null },
-  reportLoading: { type: Boolean, default: false },
-  reportLoadFailed: { type: Boolean, default: false }
+  reportLoading: { type: Boolean, default: false }
 })
 defineEmits(['close'])
 
