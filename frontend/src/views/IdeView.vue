@@ -97,40 +97,6 @@
                     <CarrotIcon />
                   </span>
                 </div>
-                <div ref="notificationContainerRef" class="relative inline-block">
-                  <button
-                    type="button"
-                    class="btn btn-ghost btn-xs btn-square relative"
-                    aria-label="알림"
-                    @click="toggleNotificationPanel"
-                  >
-                    <BellIcon />
-                    <span
-                      v-if="hasUnreadAutoHint"
-                      class="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-red-500"
-                      aria-hidden="true"
-                    ></span>
-                  </button>
-                  <!-- 알림 탭 -->
-                  <Transition name="dropdown">
-                    <div
-                      v-if="notificationPanelOpen"
-                      class="absolute right-0 top-full mt-1 z-50 min-w-[200px] max-w-[280px] rounded-lg border border-base-300 bg-base-100 shadow-lg py-2"
-                      @click.stop
-                    >
-                      <p class="px-3 py-1.5 text-xs font-medium text-[var(--color-farm-brown)] border-b border-base-200">알림</p>
-                      <div v-if="notificationItems.length === 0" class="px-3 py-4 text-xs text-[var(--color-farm-brown)]">알림이 없습니다.</div>
-                      <div
-                        v-for="item in notificationItems"
-                        :key="item.id"
-                        class="flex items-center gap-2 px-3 py-2 text-xs text-[var(--color-farm-brown-dark)]"
-                      >
-                        <iconify-icon icon="mdi:message-text-outline" class="text-base text-[var(--color-farm-green)] shrink-0"></iconify-icon>
-                        <span>{{ item.text }}</span>
-                      </div>
-                    </div>
-                  </Transition>
-                </div>
               </div>
             </div>
             <!-- IDE 진입 시 한 번만: 다른 탭 중복 열기 안내 (X로 닫기) -->
@@ -289,7 +255,6 @@ import ReportModal from '@/components/organisms/ReportModal.vue'
 import HintModal from '@/components/organisms/HintModal.vue'
 import ConfirmModal from '@/components/organisms/ConfirmModal.vue'
 import CarrotIcon from '@/components/atoms/CarrotIcon.vue'
-import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
@@ -299,7 +264,6 @@ import { getReportDetail, buildReportFromSubmitResponse } from '@/api/reports'
 const router = useRouter()
 const route = useRoute()
 const terminalPanel = ref(null)
-const notificationContainerRef = ref(null)
 const authStore = useAuthStore()
 const ideStore = useIdeStore()
 // 스토어 로그인 상태를 computed로 참조해 로그아웃 시에도 블러/오버레이 즉시 반영
@@ -330,12 +294,6 @@ const hintMax = ref(3)
 const hintRemaining = computed(() => Math.max(0, hintMax.value - hintUsed.value))
 /** 힌트(채팅) 패널 접기/펼치기 */
 const hintPanelOpen = ref(true)
-/** 자동 힌트 미확인 시 종 아이콘 빨간 점 */
-const hasUnreadAutoHint = ref(false)
-/** 알림 탭 열림 */
-const notificationPanelOpen = ref(false)
-/** 알림 목록 (자동 힌트 도착 등) */
-const notificationItems = ref([])
 /** IDE 진입 시 다른 탭 중복 열기 안내 배너 (X로 닫으면 이번 세션 동안 숨김) */
 const showDuplicateTabBanner = ref(true)
 /** 문제 패널 탭 (problem | results) - 툴바에 표시 */
@@ -803,6 +761,7 @@ function setupIdeBroadcastChannel() {
     ideOpenTime = Date.now()
     const payload = { type: 'opened', tabId: ideTabId, timestamp: ideOpenTime }
     ideChannel.postMessage(payload)
+    // 새로 연 탭이 채널 구독 전에 첫 메시지를 놓치는 경우를 방지하기 위해 300ms 후 한 번 더 전송
     ideChannelResendTimeoutId = setTimeout(() => {
       ideChannelResendTimeoutId = null
       try {
@@ -1219,38 +1178,13 @@ function onHintUsedFromPanel({ usedHint, maxHint }) {
   showToast(`힌트가 차감되었습니다. (잔여: ${(maxHint ?? 3) - (usedHint ?? 0)}/${maxHint ?? 3})`)
 }
 
-/** 자동 힌트 도착 시 종 빨간 점 + 알림 목록에 추가 */
-function onAutoHintArrived() {
-  hasUnreadAutoHint.value = true
-  notificationItems.value.push({
-    id: Date.now(),
-    text: '자동 힌트가 왔습니다.',
-    type: 'auto_hint'
-  })
-}
+/** 자동 힌트 도착 시 (알림 패널 제거로 현재는 no-op, HintPanel 이벤트 수신용) */
+function onAutoHintArrived() {}
 
 /** 힌트 "괜찮아요" 클릭 시 토스트 */
 function onDismissHintToast() {
   showToast('대단해요!')
 }
-
-function toggleNotificationPanel() {
-  notificationPanelOpen.value = !notificationPanelOpen.value
-  if (notificationPanelOpen.value) hasUnreadAutoHint.value = false
-}
-
-/** 알림 탭 열렸을 때 바깥 클릭 시 닫기 */
-watch(notificationPanelOpen, (open) => {
-  if (!open) return
-  nextTick(() => {
-    const close = (e) => {
-      if (notificationContainerRef.value?.contains(e.target)) return
-      notificationPanelOpen.value = false
-      document.removeEventListener('click', close)
-    }
-    setTimeout(() => document.addEventListener('click', close), 0)
-  })
-})
 
 function showToast(msg) {
   toastMessage.value = msg

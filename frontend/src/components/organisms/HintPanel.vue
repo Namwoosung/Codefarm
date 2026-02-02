@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useIdeStore } from '@/stores/ide'
 import * as hintApi from '@/api/hint'
@@ -117,8 +117,6 @@ const ideStore = useIdeStore()
 const chatInput = ref('')
 const chatMessages = ref([])
 const hintLoading = ref(false)
-/** SSE 구독 해제 함수 */
-let unsubscribeSSE = () => {}
 
 /** 힌트 목록을 채팅 메시지 형태로 변환 (과거순). AUTO는 세션 생성 이후 것만 표시 */
 function hintsToMessages(hints) {
@@ -192,37 +190,17 @@ function dismissPendingHint(idx) {
   emit('dismiss-hint-toast')
 }
 
-function startSSE() {
-  const sid = ideStore.sessionId
-  if (sid == null) return
-  unsubscribeSSE()
-  unsubscribeSSE = hintApi.subscribeHintSSE(sid, {
-    onAutoHint: handleAutoHint
-  })
-}
-
-function stopSSE() {
-  unsubscribeSSE()
-  unsubscribeSSE = () => {}
-}
-
 watch(
   () => ideStore.sessionId,
   (sid) => {
     if (sid != null) {
       loadHintList()
-      startSSE()
     } else {
       chatMessages.value = []
-      stopSSE()
     }
   },
   { immediate: true }
 )
-
-onUnmounted(() => {
-  stopSSE()
-})
 
 async function sendHint() {
   const q = chatInput.value?.trim()
