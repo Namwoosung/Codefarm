@@ -12,6 +12,7 @@ import com.ssafy.codefarm.result.entity.Result;
 import com.ssafy.codefarm.result.entity.ResultType;
 import com.ssafy.codefarm.result.repository.ResultRepository;
 import com.ssafy.codefarm.session.dto.execution.*;
+import com.ssafy.codefarm.session.dto.feedback.FeedbackRequest;
 import com.ssafy.codefarm.session.dto.redis.CodeSnapshotRedisDto;
 import com.ssafy.codefarm.session.dto.request.CreateSessionRequestDto;
 import com.ssafy.codefarm.session.dto.request.GiveUpSessionRequestDto;
@@ -279,7 +280,20 @@ public class SessionService {
 
             String feedback;
             try {
-                feedback = feedbackServerClient.requestFeedback(submitContext, submitSessionRequestDto);
+                // Redis에서 이전 판정 기록 조회
+                List<FeedbackRequest.PreviousJudgement> previousJudgements =
+                        FeedbackRequest.PreviousJudgement.fromList(
+                                sessionCodeRedisService.getPreviousJudgements(submitContext.session().getId())
+                        );
+
+                // FeedbackRequest 생성 및 요청
+                FeedbackRequest feedbackRequest =
+                        FeedbackRequest.of(
+                                result,
+                                previousJudgements
+                        );
+
+                feedback = feedbackServerClient.requestFeedback(feedbackRequest);
             } catch (Exception e) {
                 feedback = "정답입니다! 수고했어요.";
             }
@@ -416,12 +430,20 @@ public class SessionService {
 
             String feedback;
             try {
-                feedback = feedbackServerClient.requestGiveUpFeedback(
-                        ctx.problem(),
-                        ctx.session().getUser(),
-                        finalCode,
-                        requestDto.getLanguage().name()
-                );
+                // Redis에서 이전 판정 기록 조회
+                List<FeedbackRequest.PreviousJudgement> previousJudgements =
+                       FeedbackRequest.PreviousJudgement.fromList(
+                                sessionCodeRedisService.getPreviousJudgements(sessionId)
+                        );
+
+                // FeedbackRequest 생성 및 요청
+                FeedbackRequest feedbackRequest =
+                        FeedbackRequest.of(
+                                result,
+                                previousJudgements
+                        );
+
+                feedback = feedbackServerClient.requestFeedback(feedbackRequest);
             } catch (Exception e) {
                 feedback = "이번 문제는 어려웠군요. 다음에는 힌트를 적극 활용해보세요!";
             }

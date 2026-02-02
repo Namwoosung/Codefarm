@@ -1,10 +1,7 @@
 import json
 from typing import Any, Dict, List
 
-BANNED_TERMS = [
-    "브루트포스", "최적화", "투포인터", "로직", "정의",
-    "시간복잡도", "빅오", "자료구조", "알고리즘"
-]
+from utils.constants import BANNED_TERMS
 
 def parse_json(text: str) -> Dict[str, Any]:
     text = (text or "").strip()

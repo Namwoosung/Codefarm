@@ -78,11 +78,11 @@ class PreviousJudgement(BaseModel):
 
 
 class Result(BaseModel):
-    resultType: Literal["SUCCESS", "FAIL"]
+    resultType: Literal["SUCCESS", "GIVE_UP"]
     solveTime: Optional[int] = Field(None, ge=0)
     execTime: Optional[int] = Field(None, ge=0)
     memory: Optional[int] = Field(None, ge=0)
-    failReason: Optional[str] = None
+
 
 
 class FeedbackRequest(BaseModel):
@@ -103,7 +103,7 @@ class FeedbackResponse(BaseModel):
 # Label mapping (학생 친화 번역)
 # =========================
 # 1) 기본 내부 필드명/상수
-INTERNAL_TOKENS_BASE = ["SUCCESS", "FAIL", "resultType", "mistake_type"]
+INTERNAL_TOKENS_BASE = ["SUCCESS", "GIVE_UP", "resultType", "mistake_type"]
 
 LABEL_MAP: Dict[str, str] = {
     # Algorithm / Approach
@@ -220,7 +220,7 @@ Answer in Korean.
 You are a kind and patient teacher speaking directly to a student.
 
 CRITICAL RULES (must follow):
-- NEVER mention internal field names or labels (e.g., SUCCESS, FAIL, resultType, mistake_type, or any label codes).
+- NEVER mention internal field names or labels (e.g., SUCCESS, GIVE_UP, resultType, mistake_type, or any label codes).
 - NEVER expose programmatic or system terms.
 - ALWAYS translate evidence into student-friendly language.
 
@@ -260,11 +260,11 @@ def sanitize_llm_text(text: str) -> str:
 def _strip_forbidden_terms(text: str) -> str:
     # 1) 치환(의미만 남기기)
     text = text.replace("SUCCESS", "정답으로 통과")
-    text = text.replace("FAIL", "오류가 발생")
+    text = text.replace("GIVE_UP", "오류가 발생")
 
     # 2) 내부 토큰/라벨 제거
     for tok in FORBIDDEN_TOKENS:
-        if tok in ("SUCCESS", "FAIL"):
+        if tok in ("SUCCESS", "GIVE_UP"):
             continue
         text = text.replace(tok, "")
 
@@ -330,7 +330,7 @@ def _result_type_korean(rt: str) -> str:
 
 def fallback_feedback(req: FeedbackRequest) -> str:
     gap = req.problem.difficulty - req.user.coding_level
-    if req.result.resultType == "FAIL":
+    if req.result.resultType == "GIVE_UP":
         base = "괜찮아, 이런 실수는 누구나 해! "
         if gap >= 2:
             return base + "문제가 너의 현재 수준보다 조금 어려울 수 있으니, 입력/변수/조건을 차근차근 점검하고 작은 예제로 한 줄씩 확인해보자."
@@ -349,7 +349,7 @@ def make_cache_key(req: FeedbackRequest) -> str:
         "p": {"title": req.problem.title, "difficulty": req.problem.difficulty, "algo": req.problem.algorithm},
         "u": {"lvl": req.user.coding_level, "age": req.user.age},
         "c": (req.code.content or "")[:800],
-        "r": {"type": req.result.resultType, "reason": req.result.failReason},
+        "r": {"type": req.result.resultType},
         "pj": [{"t": pj.judged_at, "m": pj.mistake_type} for pj in req.previous_judgement[-PREV_LIMIT:]],
     }
     s = json.dumps(payload, ensure_ascii=False, sort_keys=True)
@@ -473,9 +473,9 @@ async def feedback(
         for pj in recent_prev
     ]
 
-    # result 축약(FAIL이면 성능지표 제외)
-    if req.result.resultType == "FAIL":
-        result_payload = {"resultType": "FAIL", "failReason": req.result.failReason}
+    # result 축약(GIVE_UP이면 성능지표 제외)
+    if req.result.resultType == "GIVE_UP":
+        result_payload = {"resultType": "GIVE_UP"}
     else:
         result_payload = {
             "resultType": "SUCCESS",

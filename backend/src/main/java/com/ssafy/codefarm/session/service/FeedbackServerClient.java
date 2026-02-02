@@ -24,12 +24,13 @@ public class FeedbackServerClient {
     @Value("${feedback.token}")
     private String reportServerToken;
 
-    public String requestFeedback(
-        SubmitContext context,
-        SubmitSessionRequestDto requestDto
-    ) {
-
-        FeedbackRequest request = FeedbackRequest.from(context, requestDto);
+    /**
+     * 피드백 요청 (Submit/GiveUp 통합)
+     * 
+     * @param request FeedbackRequest
+     * @return 피드백 메시지
+     */
+    public String requestFeedback(FeedbackRequest request) {
 
         try {
             FeedbackResponse response = feedbackRestClient.post()
@@ -48,40 +49,6 @@ public class FeedbackServerClient {
             String feedback = response != null ? response.feedback() : null;
             log.info("Feedback received: {}", feedback);
             return feedback;
-        } catch (Exception e) {
-            throw new CustomException(
-                    "피드백 서버 통신 실패: " + e.getMessage(),
-                    ErrorCode.EXTERNAL_API_ERROR
-            );
-        }
-    }
-
-    public String requestGiveUpFeedback(
-            Problem problem,
-            User user,
-            String code,
-            String language
-    ) {
-
-        FeedbackRequest request =
-                FeedbackRequest.fromGiveUp(problem, user, code, language);
-
-        try {
-            FeedbackResponse response = feedbackRestClient.post()
-                    .uri("/api/v1/reports/give-up-feedback")
-                    .header("X-REPORT-SERVER-TOKEN", reportServerToken)
-                    .body(request)
-                    .retrieve()
-                    .onStatus(status -> status.isError(), (req, res) -> {
-                        throw new CustomException(
-                                "피드백 서버 오류",
-                                ErrorCode.EXTERNAL_API_ERROR
-                        );
-                    })
-                    .body(FeedbackResponse.class);
-
-            return response != null ? response.feedback() : null;
-
         } catch (Exception e) {
             throw new CustomException(
                     "피드백 서버 통신 실패: " + e.getMessage(),
