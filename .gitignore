@@ -1,3 +1,4 @@
 # IDE
 .idea
 docker-compose.backend.yml
+.env.*

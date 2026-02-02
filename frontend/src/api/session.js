@@ -82,21 +82,24 @@ export const giveUp = (sessionId, { language, code }) => {
  * 결과 목록 조회
  * GET /api/v1/sessions/{session_id}/results
  * @param {number} sessionId
- * @returns {Promise<{ data: { results: Array<{ resultId?: number|null, resultType: string, language: string, accuracy: number, solveTime: number, createdAt: string, hasReport: boolean }> } }>}
+ * @param {{ _t?: number }} [params] - 쿼리 파라미터 (예: _t로 캐시 우회)
+ * @returns {Promise<{ data: { results: Array } }>}
  */
-export const getResults = (sessionId) => {
-  return api.get(`/sessions/${sessionId}/results`)
+export const getResults = (sessionId, params) => {
+  return api.get(`/sessions/${sessionId}/results`, { params: params ?? undefined })
 }
 
 /**
  * 결과 목록 조회 — 배열만 반환. 404(SESSION_NOT_FOUND)/403(ACCESS_DENIED) 시 빈 배열.
  * @param {number} sessionId
- * @returns {Promise<Array<{ resultId?: number|null, resultType: string, language: string, accuracy: number, solveTime: number, createdAt: string, hasReport: boolean }>>}
+ * @param {{ cacheBust?: boolean }} [options] - cacheBust: true면 매번 새 요청(캐시 우회)
+ * @returns {Promise<Array>}
  */
-export const getSessionResultsList = async (sessionId) => {
+export const getSessionResultsList = async (sessionId, options) => {
   if (sessionId == null) return []
+  const params = options?.cacheBust ? { _t: Date.now() } : undefined
   try {
-    const { data: res } = await getResults(sessionId)
+    const { data: res } = await getResults(sessionId, params)
     return res?.data?.results ?? []
   } catch (err) {
     if (err.response?.status === 404 || err.response?.status === 403) return []

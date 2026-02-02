@@ -172,7 +172,6 @@
       :show="showReportModal"
       :report="reportData"
       :report-loading="reportDetailLoading"
-      :report-load-failed="reportLoadFailed"
       @close="onReportModalClose"
     />
 
@@ -263,7 +262,6 @@ const isInitializing = ref(true) // 메인→IDE 진입 시 세션/문제 로드
 const showReportModal = ref(false)
 const reportData = ref(null)
 const reportDetailLoading = ref(false)
-const reportLoadFailed = ref(false)
 /** 제출 내역에서 열었을 때 true → 닫을 때 메인으로 이동하지 않음 */
 const reportModalFromHistory = ref(false)
 /** 리포트 '메인 화면으로' 클릭 시 true → 이탈 확인 창 건너뜀 (세션 이미 종료됨) */
@@ -908,27 +906,38 @@ const handleEscape = async () => {
   if (!ok) return
   const sid = ideStore.sessionId
   justCreatedSessionId.value = null
+  let giveUpRes = null
   if (sid && isLoggedIn.value) {
     const code = ideStore.getCode(route.params.id)
+    let giveUpSucceeded = false
     try {
-      // 1. give-up API 호출 (language, code 필요). 404 등 실패 시에도 close는 호출
-      await sessionApi.giveUp(sid, { language: API_LANGUAGE, code })
+      // 1. give-up API 호출 (성공 시 백엔드가 세션을 종료하므로 close 호출하지 않음)
+      const res = await sessionApi.giveUp(sid, { language: API_LANGUAGE, code })
+      giveUpSucceeded = true
+      giveUpRes = res
     } catch (_) {
-      // give-up 미구현(404) 등 실패해도 무시
+      // give-up 미구현(404) 등 실패 시에만 close 시도
     }
-    try {
-      // 2. 세션 종료는 항상 호출 (give-up 실패해도 세션이 닫혀야 다음 진입 시 새 세션 생성)
-      await sessionApi.closeSession(sid)
-    } catch (_) {}
+    if (!giveUpSucceeded) {
+      try {
+        await sessionApi.closeSession(sid)
+      } catch (_) {}
+    }
     ideStore.clearSession()
   }
   if (snapshotIntervalId) {
     clearInterval(snapshotIntervalId)
     snapshotIntervalId = null
   }
-  reportData.value = { result: { problem: { title: '문제 풀이 결과' }, feedback: '탈주했습니다.' } }
+  // give-up API 응답({ message, data: { resultId, resultType, feedback, ... } })으로 리포트 구성
+  if (giveUpRes?.data?.data) {
+    reportData.value = buildReportFromSubmitResponse({ data: giveUpRes.data.data }, problemTitle.value)
+  } else if (giveUpRes?.data) {
+    reportData.value = buildReportFromSubmitResponse(giveUpRes, problemTitle.value)
+  } else {
+    reportData.value = { result: { problem: { title: problemTitle.value }, resultType: 'GIVE_UP', feedback: '탈주했습니다.' } }
+  }
   reportModalFromHistory.value = false
-  reportLoadFailed.value = false
   showReportModal.value = true
 }
 
@@ -937,15 +946,12 @@ const handleOpenReport = async (resultId) => {
   reportModalFromHistory.value = true
   reportData.value = null
   reportDetailLoading.value = true
-  reportLoadFailed.value = false
   showReportModal.value = true
   try {
     const data = await getReportDetail(resultId)
     reportData.value = data ? { result: data } : null
-    reportLoadFailed.value = !data
   } catch (_) {
     reportData.value = null
-    reportLoadFailed.value = true
   } finally {
     reportDetailLoading.value = false
   }
@@ -955,7 +961,6 @@ const onReportModalClose = (goToMain = false) => {
   showReportModal.value = false
   reportData.value = null
   reportDetailLoading.value = false
-  reportLoadFailed.value = false
   if (goToMain && !reportModalFromHistory.value) {
     skipLeaveConfirm.value = true
     router.push('/')
