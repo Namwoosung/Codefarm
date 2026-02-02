@@ -24,7 +24,7 @@
         <div class="absolute inset-0 bg-[#EAD7B5]/85 rounded-[100%] border-b-4 border-[#D7C4A3] shadow-lg group-hover:bg-[#EAD7B5] group-active:border-b-0 group-active:translate-y-0.5 transition-all"></div>
         
         <!-- 숫자 텍스트 -->
-        <span class="relative font-black text-[#4E3B2A] text-xl drop-shadow-[0_1px_0_rgba(255,255,255,0.4)]">
+        <span class="relative font-dnf text-[#4E3B2A] text-xl drop-shadow-[0_1px_0_rgba(255,255,255,0.4)]">
           {{ level.id }}
         </span>
       </div>
@@ -45,7 +45,7 @@ const props = defineProps({
       { id: 2, style: { top: '31%', left: '46%' } },
       { id: 3, style: { top: '48%', left: '48%' } },
       { id: 4, style: { top: '65%', left: '47%' } },
-      { id: 5, style: { top: '78%', left: '58%' } }
+      { id: 5, style: { top: '78%', left: '55%' } }
     ]
   }
 })
