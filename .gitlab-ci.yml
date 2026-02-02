@@ -3,6 +3,7 @@ stages:
   - test
   - security
   - deploy
+  - inference
 
 workflow:
   rules:
