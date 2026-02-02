@@ -240,6 +240,7 @@ inference-deploy:
   variables:
     GIT_STRATEGY: "none"
     INF_DIR: "inference"
+    DEPLOY_DIR: "/srv/app/app"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       changes:
@@ -263,4 +264,8 @@ inference-deploy:
     - ls -la
     - ls -la "$INF_DIR"
 
-    - rsync -a --delete "$INF_DIR/" /srv/app/
+    - rsync -a --delete "$INF_DIR/" "$DEPLOY_DIR/"
+
+    - cd "$DEPLOY_DIR"
+    - pyenv activate venv
+    - pip install -r "$DEPLOY_DIR/requirements.txt"
