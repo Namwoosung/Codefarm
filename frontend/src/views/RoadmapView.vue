@@ -289,6 +289,36 @@
         </div>
       </div>
     </div>
+
+    <!-- 풀고 있는 문제가 있을 때 다른 문제 클릭 시 확인 모달 -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showActiveSessionModal && activeSessionPayload" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]">
+          <div class="card bg-base-100 shadow-2xl rounded-xl p-6 min-w-[320px] max-w-[90vw] border border-base-300">
+            <p class="text-lg font-semibold text-[var(--color-farm-brown-dark)] mb-4">
+              풀고 있는 문제가 있습니다. (현재 {{ activeSessionPayload.otherProblemId }}번 문제)
+            </p>
+            <div class="flex justify-end gap-3">
+              <button
+                type="button"
+                class="btn btn-sm btn-ghost border border-base-300"
+                @click="goToExistingProblem"
+              >
+                기존 문제로
+              </button>
+              <button
+                type="button"
+                class="btn btn-sm bg-[var(--color-farm-green)] text-white border-none hover:bg-[var(--color-farm-green-dark)]"
+                :disabled="activeSessionLoading"
+                @click="goToNewProblem"
+              >
+                {{ activeSessionLoading ? '처리 중...' : '이 문제로 풀기' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -307,6 +337,7 @@ import roadmapImage5 from '@/assets/cowshed.png'
 import woodPanel1 from '@/assets/wood_panel_1.png'
 import RoadmapMap from '@/components/organisms/RoadmapMap.vue'
 import api from '@/api'
+import * as sessionApi from '@/api/session'
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -616,12 +647,51 @@ function closeModal() {
   modalContext.value = null
 }
 
-function goToIdeFromModal() {
-  const problemId = modalProblemId.value
+/** 풀고 있는 문제가 있을 때 다른 문제 클릭 시 모달 */
+const showActiveSessionModal = ref(false)
+const activeSessionPayload = ref(null)
+const activeSessionLoading = ref(false)
+
+async function goToIdeFromModal() {
+  const problemId = modalProblemId.value != null ? Number(modalProblemId.value) : null
+  if (problemId == null) return
+  try {
+    const { data: res } = await sessionApi.getActiveSession()
+    const session = res?.data
+    if (session && session.problemId !== problemId) {
+      closeModal()
+      activeSessionPayload.value = {
+        otherSessionId: session.sessionId,
+        otherProblemId: session.problemId,
+        targetProblemId: problemId,
+      }
+      showActiveSessionModal.value = true
+      return
+    }
+  } catch (_) {}
   closeModal()
-  if (problemId != null) {
-    router.push({ name: 'ide', params: { id: String(problemId) } })
-  }
+  router.push({ name: 'ide', params: { id: String(problemId) } })
+}
+
+function goToExistingProblem() {
+  const payload = activeSessionPayload.value
+  if (!payload) return
+  showActiveSessionModal.value = false
+  activeSessionPayload.value = null
+  router.push({ name: 'ide', params: { id: String(payload.otherProblemId) } })
+}
+
+async function goToNewProblem() {
+  const payload = activeSessionPayload.value
+  if (!payload || activeSessionLoading.value) return
+  activeSessionLoading.value = true
+  try {
+    await sessionApi.closeSession(payload.otherSessionId)
+  } catch (_) {}
+  showActiveSessionModal.value = false
+  activeSessionPayload.value = null
+  activeSessionLoading.value = false
+  router.push({ name: 'ide', params: { id: String(payload.targetProblemId) } })
 }
 </script>
 
