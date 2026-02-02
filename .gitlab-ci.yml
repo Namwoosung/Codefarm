@@ -264,3 +264,5 @@ inference-deploy:
     - ls -la "$INF_DIR"
 
     - rsync -a --delete "$INF_DIR/" /srv/app/
+
+    - pip install -r /srv/app/requirements.txt
