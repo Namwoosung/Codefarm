@@ -1,7 +1,10 @@
 package com.ssafy.codefarm.common.authority;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
+import com.ssafy.codefarm.common.dto.ErrorResponse;
 import com.ssafy.codefarm.common.exception.CustomException;
+import com.ssafy.codefarm.common.exception.ErrorCode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,8 +69,30 @@ public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
             SecurityContextHolder.clearContext();
             log.warn("JWT authentication failed: {}", e.getMessage());
 
-            // 여기서 즉시 401을 확정하지 말고 그냥 통과
-            filterChain.doFilter(request, response);
+
+            // 만룍 토큰은 만료로 response
+            if (e.getErrorCode() == ErrorCode.EXPIRED_TOKEN) {
+
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.setCharacterEncoding("UTF-8");
+
+                ErrorResponse errorResponse =
+                        new ErrorResponse("ACCESS_TOKEN_EXPIRED", "Access Token이 만료되었습니다.");
+
+                response.getWriter()
+                        .write(new ObjectMapper().writeValueAsString(errorResponse));
+
+                return;
+
+            }
+
+            // 나머지는 그냥 인증 실패 처리
+            authenticationEntryPoint.commence(
+                    request,
+                    response,
+                    new InsufficientAuthenticationException("Invalid Token")
+            );
             return;
         }
 

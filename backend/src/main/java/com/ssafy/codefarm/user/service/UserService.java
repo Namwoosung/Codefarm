@@ -2,6 +2,7 @@ package com.ssafy.codefarm.user.service;
 
 import com.ssafy.codefarm.common.authority.JwtTokenProvider;
 import com.ssafy.codefarm.common.dto.CustomUserDetails;
+import com.ssafy.codefarm.common.dto.LoginTokenResult;
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
 import com.ssafy.codefarm.user.dto.request.*;
@@ -17,16 +18,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+
 @Slf4j
 @Service
 @Transactional
 @RequiredArgsConstructor
 public class UserService {
-
-    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
+
+    private final RefreshTokenRedisService refreshTokenRedisService;
+
+    private final UserRepository userRepository;
 
     public UserResponseDto signup(UserSignupRequestDto userSignupRequestDto) {
         if (userRepository.existsByEmail(userSignupRequestDto.getEmail())) {
@@ -69,7 +74,7 @@ public class UserService {
     }
 
     @Transactional(readOnly = true)
-    public LoginResponseDto login(LoginRequestDto loginRequestDto) {
+    public LoginTokenResult login(LoginRequestDto loginRequestDto) {
         //인증을 위한 UsernamePasswordAuthenticationToken을 생성
         UsernamePasswordAuthenticationToken authenticate
                 = new UsernamePasswordAuthenticationToken(loginRequestDto.getEmail(), loginRequestDto.getPassword());
@@ -86,25 +91,25 @@ public class UserService {
             );
         }
 
-        //인증받은 Authentication을 통해 token을 발급 받음
-        String accessToken = jwtTokenProvider.createAccessToken(authentication);
-
         CustomUserDetails userDetails =
                 (CustomUserDetails) authentication.getPrincipal();
 
-        User user = userRepository.findById(userDetails.getUserId())
-                        .orElseThrow(() -> new CustomException(
-                                        "해당 유저가 존재하지 않습니다.",
-                                        ErrorCode.RESOURCE_NOT_FOUND
-                                ));
+        Long userId = userDetails.getUserId();
 
-        return LoginResponseDto.from(
-                UserResponseDto.from(user),
-                TokenResponseDto.from(accessToken)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException("해당 유저가 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        //인증받은 Authentication을 통해 token을 발급 받음
+        String accessToken = jwtTokenProvider.createAccessToken(authentication);
+        String refreshToken = jwtTokenProvider.createRefreshToken(userId);
+
+        refreshTokenRedisService.save(
+                userId,
+                refreshToken,
+                Duration.ofMillis(jwtTokenProvider.getRefreshTokenValidTime())
         );
 
-
-
+        return new LoginTokenResult(accessToken, refreshToken, user);
     }
 
     @Transactional(readOnly = true)
@@ -134,5 +139,57 @@ public class UserService {
         );
 
         return getUserProfile(userId);
+    }
+
+    public LoginTokenResult reissueToken(String refreshToken) {
+
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new CustomException(
+                    "Refresh Token이 존재하지 않습니다.",
+                    ErrorCode.UNAUTHORIZED
+            );
+        }
+
+        // Refresh Token 유효성 검증 (JWT 서명, 만료 여부)
+        jwtTokenProvider.isValidateToken(refreshToken);
+
+        // Refresh Token에서 userId 추출
+        Long userId = jwtTokenProvider.getUserIdFromToken(refreshToken);
+
+        // Redis에 저장된 토큰과 일치 여부 확인
+        refreshTokenRedisService.validate(userId, refreshToken);
+
+        // User 조회 (인증 객체 생성을 위해)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException("해당 유저가 존재하지 않습니다.", ErrorCode.RESOURCE_NOT_FOUND));
+
+        // 인증 객체 생성
+        CustomUserDetails userDetails = new CustomUserDetails(
+                userId,
+                user.getEmail(),
+                null,
+                java.util.Collections.emptyList()
+        );
+
+        Authentication authentication = new UsernamePasswordAuthenticationToken(
+                userDetails,
+                "",
+                java.util.Collections.emptyList()
+        );
+
+        // 새로운 Access Token 생성
+        String newAccessToken = jwtTokenProvider.createAccessToken(authentication);
+
+        // 새로운 Refresh Token 생성
+        String newRefreshToken = jwtTokenProvider.createRefreshToken(userId);
+
+        // Redis에 새로운 Refresh Token 저장 (기존 토큰 교체)
+        refreshTokenRedisService.save(
+                userId,
+                newRefreshToken,
+                Duration.ofMillis(jwtTokenProvider.getRefreshTokenValidTime())
+        );
+
+        return new LoginTokenResult(newAccessToken, newRefreshToken, user);
     }
 }
