@@ -270,7 +270,40 @@ public class SessionService {
                     .feedback(null)
                     .build();
 
+            boolean isFirstSolve = false;
+            if (resultType == ResultType.SUCCESS) {
+                if (!resultRepository.existsBySessionUserIdAndSessionProblemIdAndResultType(
+                        submitContext.session().getUser().getId(),
+                        submitContext.session().getProblem().getId(),
+                        ResultType.SUCCESS
+                )) {
+                    isFirstSolve = true;
+                }
+            }
+
             resultRepository.save(result);
+
+            if (isFirstSolve) {
+                int basePoint = 0;
+                Integer difficulty = submitContext.problem().getDifficulty();
+                if (difficulty != null) {
+                    switch (difficulty) {
+                        case 1 -> basePoint = 30;
+                        case 2 -> basePoint = 50;
+                        case 3 -> basePoint = 80;
+                        case 4 -> basePoint = 100;
+                        case 5 -> basePoint = 150;
+                    }
+                }
+
+                if (basePoint > 0) {
+                    int usedHint = submitContext.session().getUsedHint();
+                    int penalty = (int) (basePoint * 0.1 * usedHint);
+                    int finalPoint = Math.max(0, basePoint - penalty);
+
+                    submitContext.session().getUser().increasePoint(finalPoint);
+                }
+            }
 
             if (resultType == ResultType.FAIL) {
                 return SubmitSessionResponseDto.fail(
