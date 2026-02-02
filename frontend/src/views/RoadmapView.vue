@@ -955,8 +955,9 @@ function goToIdeFromModal() {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(4px);
-  border: 2px solid #4A4A29; /* 갈색(#7a5c3e)에서 올리브색으로 변경 */
-  box-shadow: 0 4px 0 #4A4A29; /* 갈색(#7a5c3e)에서 올리브색으로 변경 */
+  /* 버튼/포인트 올리브 톤을 조금 더 연하게 */
+  border: 2px solid #6B6B3A;
+  box-shadow: 0 4px 0 #6B6B3A;
   width: 220px;
   text-align: center;
   z-index: 10;
@@ -1002,24 +1003,29 @@ function goToIdeFromModal() {
 .cf-modal {
   width: 100%;
   max-width: 26rem;
-  background: #fff9e9;
-  border: 4px solid #4A4A29; /* 올리브색으로 변경 */
+  /* 크림 배경 + 살짝 투명 */
+  background: rgba(245, 242, 232, 0.92);
+  /* 테두리 두께 줄임 */
+  border: 2px solid rgba(74, 74, 41, 0.55);
   border-radius: 24px;
-  box-shadow: 0 12px 0 rgba(74, 74, 41, 0.15); /* 올리브색 계열 그림자 */
+  /* 배경이 투명하므로 블러로 유리 느낌 */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 0 rgba(74, 74, 41, 0.10); /* 올리브색 계열 그림자 */
   cursor: default;
   overflow: hidden;
   position: relative;
 }
 .cf-modal-header {
   padding: 1.5rem 1.5rem 1rem;
-  background: #fdf4e3;
-  border-bottom: 3px solid #e8e0d0;
+  background: rgba(245, 242, 232, 0.65);
+  border-bottom: 1px solid rgba(122, 92, 62, 0.18);
 }
 .cf-modal-label {
   display: inline-block;
   font-size: 0.75rem;
   font-weight: 900;
-  color: #4A4A29; /* 올리브색으로 변경 */
+  color: #6B6B3A;
   background: #e8e0d0;
   padding: 0.2rem 0.5rem;
   border-radius: 6px;
@@ -1071,13 +1077,13 @@ function goToIdeFromModal() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #fdf4e3;
-  border: 2px solid #d7c4a3;
+  background: rgba(245, 242, 232, 0.55);
+  border: 1px solid rgba(122, 92, 62, 0.18);
 }
 .cf-modal-status-label {
   font-size: 0.85rem;
   font-weight: 900;
-  color: #4A4A29; /* 올리브색으로 변경 */
+  color: #6B6B3A;
 }
 .cf-modal-status-value {
   font-size: 0.85rem;
@@ -1093,8 +1099,8 @@ function goToIdeFromModal() {
   padding: 1rem 1.5rem 1.5rem;
   display: flex;
   gap: 0.75rem;
-  background: #fdf4e3;
-  border-top: 3px solid #e8e0d0;
+  background: rgba(245, 242, 232, 0.65);
+  border-top: 1px solid rgba(122, 92, 62, 0.18);
 }
 .cf-modal-btn {
   flex: 1;
@@ -1111,28 +1117,28 @@ function goToIdeFromModal() {
 }
 .cf-modal-btn-close {
   background: #ffffff;
-  color: #4A4A29; /* 올리브색으로 변경 */
-  border: 2px solid #4A4A29; /* 올리브색으로 변경 */
-  box-shadow: 0 3px 0 #4A4A29; /* 올리브색으로 변경 */
+  color: #6B6B3A;
+  border: 2px solid #6B6B3A;
+  box-shadow: 0 3px 0 #6B6B3A;
 }
 .cf-modal-btn-close:hover {
   background: #fdf4e3;
   transform: translateY(-1px);
-  box-shadow: 0 4px 0 #4A4A29;
+  box-shadow: 0 4px 0 #6B6B3A;
 }
 .cf-modal-btn-ide {
-  background: #4A4A29; /* 올리브색으로 변경 */
+  background: #6B6B3A;
   color: white;
   border: none;
-  box-shadow: 0 4px 0 #2D2D18; /* 더 어두운 올리브색 그림자 */
+  box-shadow: 0 4px 0 #4A4A29;
 }
 .cf-modal-btn-ide:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 5px 0 #2D2D18;
+  box-shadow: 0 5px 0 #4A4A29;
 }
 .cf-modal-btn-ide:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: 0 1px 0 #2D2D18;
+  box-shadow: 0 1px 0 #4A4A29;
 }
 .cf-modal-btn:disabled {
   opacity: 0.5;

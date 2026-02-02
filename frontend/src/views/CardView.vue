@@ -140,21 +140,7 @@
                       ]"
                     >
                       <div v-if="slotCard" class="w-full flex flex-col items-center">
-                        <!-- count > 1: daisyUI stack으로 카드 쌓기 -->
-                        <div v-if="getCardCount(slotCard) > 1" class="stack w-full">
-                          <CardDetail
-                            :card="slotCard"
-                            class="w-full z-30"
-                            @showcard="openCardModal"
-                          />
-                          <CardDetail
-                            v-if="getStackLayerCount(slotCard) >= 2"
-                            :card="slotCard"
-                            class="w-full pointer-events-none opacity-95 z-20"
-                            aria-hidden="true"
-                          />
-                        </div>
-                        <CardDetail v-else class="w-full" :card="slotCard" @showcard="openCardModal" />
+                        <CardDetail class="w-full" :card="slotCard" @showcard="openCardModal" />
 
                         <!-- 카드 아래 count 표시 -->
                         <div
@@ -230,14 +216,6 @@
               loading="lazy"
             />
           </figure>
-          <div></div>
-          <div></div>
-          <div></div>
-          <div></div>
-          <div></div>
-          <div></div>
-          <div></div>
-          <div></div>
         </div>
       </Transition>
     </div>
@@ -249,7 +227,6 @@ import { useProfileStore } from '@/stores/profile'
 import { useCardStore } from '@/stores/card'
 import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
-import PageTitle from '@/components/atoms/PageTitle.vue'
 import CardDetail from '@/components/organisms/CardDetail.vue'
 import cardListBg from '@/assets/cardlist.png'
 import gachaImg from '@/assets/Gacha.png'
@@ -261,18 +238,8 @@ const { cards, drawMessage } = storeToRefs(cardStore)
 
 const points = computed(() => Number(user.value?.point ?? 0))
 
-// Draw: 유저 카드 총 보유 개수(중복 count 포함)
-const totalOwnedCards = computed(() => {
-  const list = cards.value ?? []
-  return list.reduce((sum, c) => {
-    const n = Number(c?.count ?? 1)
-    const count = Number.isFinite(n) && n > 0 ? n : 1
-    return sum + count
-  }, 0)
-})
-
-// Charge: 50P 기준(0~100%), 50P 이상이면 100%
-const chargeProgress = computed(() => Math.min(1, Math.max(0, points.value / 50)))
+// Charge: 100P 기준(0~100%), 100P 이상이면 100%
+const chargeProgress = computed(() => Math.min(1, Math.max(0, points.value / 100)))
 
 onMounted(async () => {
   try {
@@ -289,7 +256,7 @@ onBeforeUnmount(() => {
 
 // 카드 뽑기
 const gachaCard = async () => {
-  if ((user.value?.point ?? 0) < 50) {
+  if ((user.value?.point ?? 0) < 100) {
     alert('포인트가 부족합니다.')
     return
   } else {
@@ -414,9 +381,6 @@ const getCardCount = (card) => {
   const n = Number(card?.count)
   return Number.isFinite(n) && n > 0 ? n : 1
 }
-
-// stack은 최대 2장까지만 표현 (2장 이상이어도 2장으로 고정)
-const getStackLayerCount = (card) => Math.min(2, getCardCount(card))
 
 const modalCardEl = ref(null)
 const modalPointerPos = ref({ x: 0, y: 0 })

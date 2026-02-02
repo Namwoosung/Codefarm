@@ -28,7 +28,12 @@
           <button type="button" class="btn" @click="emitCancel">
             {{ cancelText }}
           </button>
-          <button type="button" class="btn btn-primary" :disabled="confirmDisabled" @click="emitConfirm">
+          <button
+            type="button"
+            class="btn bg-[#6B6B3A] text-farm-paper border-none hover:brightness-110 active:brightness-95"
+            :disabled="confirmDisabled"
+            @click="emitConfirm"
+          >
             {{ confirmText }}
           </button>
         </div>

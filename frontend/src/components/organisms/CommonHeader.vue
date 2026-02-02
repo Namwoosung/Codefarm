@@ -1,7 +1,7 @@
 <template>
   <header class="bg-farm-paper border-b border-farm-cream shadow-sm sticky top-0 z-50 overflow-visible">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+      <div class="flex items-center justify-between gap-4 h-16">
         <!-- 로고 영역 -->
         <div class="flex-shrink-0">
           <router-link to="/" class="block">
@@ -15,49 +15,37 @@
         </div>
 
         <!-- 네비게이션 메뉴 (데스크톱) -->
-        <nav class="hidden md:flex md:items-center md:space-x-8">
+        <nav class="hidden md:flex md:items-center h-full gap-2 me-auto mx-4">
           <router-link
             to="/"
-            class="relative px-3 py-2 text-sm font-medium text-farm-brown-dark hover:text-farm-green transition-colors"
+            class="relative px-4 py-2 text-sm font-black text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            :class="navLinkClass('home')"
           >
             메인페이지
-            <span
-              class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5E8D48] transition-opacity opacity-0"
-              :class="{ 'opacity-100': isActiveRoute('/') }"
-            ></span>
           </router-link>
           <router-link
             to="/roadmap"
-            class="relative px-3 py-2 text-sm font-medium text-farm-brown-dark hover:text-farm-green transition-colors"
+            class="relative px-4 py-2 text-sm font-black text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            :class="navLinkClass('roadmap')"
             @click="onCurriculumClick"
           >
             커리큘럼
-            <span
-              class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5E8D48] transition-opacity opacity-0"
-              :class="{ 'opacity-100': isActiveRoute('/roadmap') }"
-            ></span>
           </router-link>
           <router-link
             v-if="isLoggedIn"
             to="/cards"
-            class="relative px-3 py-2 text-sm font-medium text-farm-brown-dark hover:text-farm-green transition-colors"
+            class="relative px-4 py-2 text-sm font-black text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            :class="navLinkClass('cards')"
           >
             카드
-            <span
-              class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5E8D48] transition-opacity opacity-0"
-              :class="{ 'opacity-100': isActiveRoute('/cards') }"
-            ></span>
           </router-link>
           <router-link
             v-if="isLoggedIn && user && user.userId"
             :to="`/profile/${user.userId}`"
-            class="relative px-3 py-2 text-sm font-medium text-farm-brown-dark hover:text-farm-green transition-colors"
+            class="relative px-4 py-2 text-sm font-black text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            :class="navLinkClass('profile')"
           >
             마이페이지
-            <span
-              class="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5E8D48] transition-opacity opacity-0"
-              :class="{ 'opacity-100': route.path.startsWith('/profile/') }"
-            ></span>
           </router-link>
         </nav>
 
@@ -154,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import logoUrl from '@/assets/logo.png'
@@ -168,9 +156,17 @@ const user = computed(() => authStore.user)
 
 const showMobileMenu = ref(false)
 
-const isActiveRoute = (path) => {
-  // 정확히 해당 경로일 때만 활성화
-  return route.path === path
+const isActiveKey = (key) => {
+  if (key === 'profile') return route.path.startsWith('/profile/')
+  if (key === 'home') return route.path === '/'
+  if (key === 'roadmap') return route.path === '/roadmap'
+  if (key === 'cards') return route.path === '/cards'
+  return false
+}
+
+const navLinkClass = (key) => {
+  // 이전 상태로: 효과 없이 "활성 글자색만" 변경
+  return isActiveKey(key) ? 'text-farm-olive' : ''
 }
 
 const toggleMobileMenu = () => {

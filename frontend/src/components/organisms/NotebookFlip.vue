@@ -5,23 +5,56 @@
       <div class="diary__cover">
         <div class="diary__spine" aria-hidden="true"></div>
 
-        <!-- <div class="diary__title">
-          <div class="diary__badge">MY DIARY</div>
-          <div class="diary__subtitle">프로필</div>
-        </div> -->
-
         <div class="diary__content">
           <!-- Book -->
           <div class="book-shell">
             <div ref="bookEl" class="pageflip" aria-label="다이어리 페이지">
               <div v-for="page in pages" :key="page.key" class="page">
                 <div class="paper">
-                  <template v-if="page.key === 'blank0'">
-                    <h1>info</h1>
-                    <!-- 2페이지 스프레드에서 첫 펼침의 "왼쪽 페이지"를 쓰기 위한 더미 페이지 -->
+                  <template v-if="page.kind === 'info'">
+                    <h1 class="text-xl font-black text-farm-brown-dark">내 정보</h1>
+                    <div class="mt-4 space-y-2 text-sm text-farm-brown-dark/85 font-semibold">
+                      <p>해결한 문제 수 : <span class="font-black">{{ solvedCount }}</span></p>
+                      <p>보유한 카드 수 : <span class="font-black">{{ cardCount }}</span></p>
+                    </div>
+                    <p class="mt-6 text-sm text-farm-brown-dark/70">
+                      다음 페이지부터 리포트 목록을 확인할 수 있어요.
+                    </p>
                   </template>
-                  <template v-else-if="page.key === 'p1' || page.key === 'm1'">
-                    
+                  <template v-else-if="page.kind === 'report'">
+                    <div class="flex items-start justify-between gap-3">
+                      <h2 class="text-lg font-black text-farm-brown-dark">
+                        {{ page.report?.problem?.title ?? '리포트' }}
+                      </h2>
+                      <span class="text-xs font-black text-farm-brown-dark/70">
+                        #{{ page.report?.resultId }}
+                      </span>
+                    </div>
+
+                    <div class="mt-3 space-y-1.5 text-sm text-farm-brown-dark/85 font-semibold">
+                      <p>
+                        결과: <span class="font-black">{{ page.report?.resultType }}</span>
+                      </p>
+                      <p>
+                        언어: <span class="font-black">{{ page.report?.language }}</span>
+                      </p>
+                      <p v-if="page.report?.solveTime != null">
+                        풀이 시간: <span class="font-black">{{ page.report.solveTime }}s</span>
+                      </p>
+                      <p v-if="page.report?.execTime != null">
+                        실행 시간: <span class="font-black">{{ page.report.execTime }}ms</span>
+                      </p>
+                      <p v-if="page.report?.createdAt">
+                        제출: <span class="font-black">{{ page.report.createdAt }}</span>
+                      </p>
+                    </div>
+
+                    <div v-if="page.report?.feedback" class="mt-4 rounded-xl border border-farm-brown/15 bg-farm-cream/40 p-3">
+                      <p class="text-sm font-black text-farm-brown-dark mb-1">피드백</p>
+                      <p class="text-sm text-farm-brown-dark/80 leading-relaxed">
+                        {{ page.report.feedback }}
+                      </p>
+                    </div>
                   </template>
                   <template v-else>
                     <h2 class="text-lg font-bold text-farm-brown-dark">{{ page.title }}</h2>
@@ -55,14 +88,104 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { PageFlip } from 'page-flip'
 import { useProfileStore } from '@/stores/profile'
+import { useCardStore } from '@/stores/card'
+
 // 리포트 조회
 const profile = useProfileStore()
+const cardStore = useCardStore()
+const solvedCount = ref(0)
+const cardCount = ref(0)
+
+const reportResults = computed(() => {
+  const list = profile.reports?.results ?? []
+  return Array.isArray(list) ? list : []
+})
+
+const reportTotalElements = computed(() => {
+  const n = Number(profile.reports?.page?.totalElements ?? reportResults.value.length)
+  return Number.isFinite(n) && n >= 0 ? n : reportResults.value.length
+})
+
+// 마이페이지(노트북 플립)에서는 최신순 10개까지만 노출
+const latestReportResults = computed(() => {
+  const list = [...reportResults.value]
+
+  // createdAt 최신순 정렬(파싱 불가하면 뒤로)
+  list.sort((a, b) => {
+    const at = a?.createdAt ? Date.parse(a.createdAt) : NaN
+    const bt = b?.createdAt ? Date.parse(b.createdAt) : NaN
+    if (!Number.isFinite(at) && !Number.isFinite(bt)) return 0
+    if (!Number.isFinite(at)) return 1
+    if (!Number.isFinite(bt)) return -1
+    return bt - at
+  })
+
+  return list.slice(0, 10)
+})
+
+const reportPages = computed(() => {
+  if (latestReportResults.value.length === 0) {
+    return [
+      {
+        key: 'report-empty',
+        kind: 'report-empty',
+        title: '학습 기록',
+        body: '아직 리포트가 없어요. 문제를 풀고 리포트를 만들어보세요!',
+      },
+    ]
+  }
+
+  const pages = latestReportResults.value.map((r) => ({
+    key: `report-${r?.resultId ?? Math.random().toString(16).slice(2)}`,
+    kind: 'report',
+    report: r,
+  }))
+
+  // 서버에 리포트가 더 많으면 "더보기" 안내 페이지 추가
+  if (reportTotalElements.value > latestReportResults.value.length) {
+    pages.push({
+      key: 'report-more',
+      kind: 'report-more',
+      title: '리포트 더보기',
+      body: '마이페이지에서는 최신 10개만 표시됩니다. 전체 리포트 목록에서 확인해 주세요.',
+    })
+  }
+
+  return pages
+})
+
+const infoStartPageIndex = computed(() => (isCompact.value ? 0 : 1))
+// "2페이지부터 리포트" 요구사항:
+// - mobile: 0(내정보) 다음인 1부터 리포트
+// - desktop: 0(blank0 더미), 1(내정보) 다음인 2부터 리포트
+const recordStartPageIndex = computed(() => (isCompact.value ? 1 : 2))
+
+const getTabIndexForPage = (pageIndex) => {
+  if (pageIndex < recordStartPageIndex.value) return 0
+  return 1
+}
 
 onMounted(async () => {
-  await profile.reportList()
+  // 마이페이지 노트는 최신 10개만 보여주므로 항상 최신순으로 재조회
+  await profile.reportList({ page: 0, size: 10, sort: 'createdAt,DESC' })
+  await cardStore.cardList()
+  // 푼 문제 수수
+  solvedCount.value = reportResults.value.filter(
+    (report) => report?.resultType === 'SUCCESS'
+  ).length
+
+  const cardList = cardStore.cards ?? []
+  cardCount.value = (Array.isArray(cardList) ? cardList : []).reduce((sum, c) => {
+    const n = Number(c?.count ?? 1)
+    const cnt = Number.isFinite(n) && n > 0 ? n : 1
+    return sum + cnt
+  }, 0)
+
+  // 리포트/카드 로딩 후 페이지 수가 바뀌므로 PageFlip에 반영
+  await refreshPages()
 })
 
 const bookEl = ref(null)
@@ -78,34 +201,24 @@ const onMqlChange = ref(null)
 
 // 탭 1개당 '스프레드(좌/우 2페이지)'로 가정
 const tabs = [
-  { key: 'info', label: '학습 기록' },
+  { key: 'info', label: '내 정보' },
   { key: 'record', label: '학습 기록' },
-  // { key: 'settings', label: '설정' },
 ]
 
-// PageFlip은 넓은 화면에서 2페이지 스프레드가 자연스럽고,
-// 좁은 화면(포트레이트 모드)에서는 1페이지씩 넘기는 UX가 자연스럽습니다.
+// 페이지 목록록
 const pages = computed(() => {
   // mobile(1page): 탭 1개당 1페이지
   if (isCompact.value) {
     return [
-      { key: 'm1', title: '내 정보', body: '닉네임/레벨/뱃지 등 프로필 정보를 여기에 배치' },
-      { key: 'm2', title: '학습 기록', body: '최근 푼 문제, 성공률, streak 등을 타임라인처럼' },
-      { key: 'm3', title: '설정', body: '테마, 알림, 계정 관리 등 설정 항목' },
+      { key: 'm-info', kind: 'info', title: '내 정보', body: '' },
+      ...reportPages.value,
     ]
   }
 
-  // desktop(2page spread):
-  // PageFlip(showCover:false)에서는 "첫 펼침의 왼쪽"이 비어보이는 것이 정상입니다.
-  // (첫 페이지가 오른쪽에만 놓임) → 더미 1장을 앞에 끼워서 p1이 왼쪽에 오도록 맞춥니다.
   return [
-    { key: 'blank0', title: '', body: '' },
-    { key: 'p1', title: '내 정보', body: '닉네임/레벨/뱃지 등 프로필 정보를 여기에 배치' },
-    { key: 'p2', title: '내 정보(2)', body: '자기소개/관심 알고리즘/링크 등을 종이 레이아웃으로' },
-    { key: 'p3', title: '학습 기록', body: '최근 푼 문제, 성공률, streak 등을 타임라인처럼' },
-    { key: 'p4', title: '학습 기록(2)', body: '언어별 통계/난이도 분포 등을 차트/표로' },
-    { key: 'p5', title: '설정', body: '테마, 알림, 계정 관리 등 설정 항목' },
-    { key: 'p6', title: '설정(2)', body: '로그아웃/탈퇴 같은 위험 액션은 하단에' },
+    { key: 'blank0', kind: 'blank', title: '', body: '' },
+    { key: 'p-info', kind: 'info', title: '내 정보', body: '' },
+    ...reportPages.value,
   ]
 })
 
@@ -130,14 +243,12 @@ const initIfNeeded = async () => {
   await nextTick()
   if (!bookEl.value) return
 
-  // 이미 인스턴스가 있으면 resize는 update()로만 처리 (destroy 금지: destroy가 root DOM을 제거함)
   if (flip.value) {
     scheduleUpdate()
     return
   }
 
   const instance = new PageFlip(bookEl.value, {
-    // 첫 렌더링에서 한 화면에 들어오도록 살짝 축소
     width: 400,
     height: 520,
     size: 'stretch',
@@ -158,13 +269,12 @@ const initIfNeeded = async () => {
 
   instance.on('flip', (e) => {
     const pageIndex = typeof e?.data === 'number' ? e.data : instance.getCurrentPageIndex()
-    // desktop은 blank0(0번)을 끼워 넣었으므로 탭 매핑에 오프셋 반영
-    activeTabIndex.value = isCompact.value ? pageIndex : Math.max(0, Math.floor((pageIndex - 1) / 2))
+    activeTabIndex.value = getTabIndexForPage(pageIndex)
   })
 
   flip.value = instance
 
-  // desktop(스프레드)에서는 p1이 왼쪽에 오도록 1번 페이지에서 시작
+  // 시작페이지를 1페이지로 설정
   if (!isCompact.value) {
     try {
       instance.turnToPage(1)
@@ -198,9 +308,7 @@ const refreshPages = async () => {
 
 const goToTab = (idx) => {
   activeTabIndex.value = idx
-  // 넓은 화면: 스프레드(2p) 기준, 좁은 화면: 1p 기준
-  // desktop은 blank0(0번) 때문에 1번이 첫 탭 시작점
-  const pageIndex = isCompact.value ? idx : idx * 2 + 1
+  const pageIndex = idx === 0 ? infoStartPageIndex.value : recordStartPageIndex.value
   if (flip.value) flip.value.flip(pageIndex)
 }
 
@@ -224,6 +332,38 @@ onMounted(() => {
   // 단순 resize(같은 모드 내)는 update()만 호출해서 접힘 방지
   onResize.value = () => scheduleUpdate()
   window.addEventListener('resize', onResize.value, { passive: true })
+})
+
+// 리포트가 늘어나면 페이지 수가 늘어나도록 PageFlip 갱신
+watch(
+  () => reportResults.value.length,
+  async () => {
+    await refreshPages()
+  }
+)
+
+// 다른 화면에서 리포트가 추가된 뒤, 다시 마이페이지로 돌아오면 최신 목록을 재조회
+const refreshLatestReports = async () => {
+  try {
+    await profile.reportList({ page: 0, size: 10, sort: 'createdAt,DESC' })
+  } catch (_) {
+    // ignore
+  }
+}
+
+const onVisibilityChange = () => {
+  if (document.visibilityState === 'visible') refreshLatestReports()
+}
+const onWindowFocus = () => refreshLatestReports()
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('focus', onWindowFocus)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('focus', onWindowFocus)
 })
 
 onBeforeUnmount(() => {
