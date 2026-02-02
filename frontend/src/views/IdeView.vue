@@ -40,6 +40,8 @@
             :hint-remaining="hintRemaining"
             :hint-max="hintMax"
             @hint-used="onHintUsedFromPanel"
+            @auto-hint-arrived="onAutoHintArrived"
+            @dismiss-hint-toast="onDismissHintToast"
             @close="hintPanelOpen = false"
           />
         </div>
@@ -85,25 +87,7 @@
                 aria-label="경과 시간"
               >
                 <iconify-icon icon="mdi:timer-outline" class="text-xl text-[var(--color-farm-brown-dark)]"></iconify-icon>
-                <div class="flex items-center gap-1 font-mono text-sm font-black text-[var(--color-farm-brown-dark)] tabular-nums">
-                  <span class="flex items-center">
-                    <span v-for="(d, idx) in elapsedDigits.h" :key="`codebar-h-${idx}`" class="countdown">
-                      <span :style="{ '--value': d }"></span>
-                    </span>
-                  </span>
-                  <span class="opacity-50">:</span>
-                  <span class="flex items-center">
-                    <span v-for="(d, idx) in elapsedDigits.m" :key="`codebar-m-${idx}`" class="countdown">
-                      <span :style="{ '--value': d }"></span>
-                    </span>
-                  </span>
-                  <span class="opacity-50">:</span>
-                  <span class="flex items-center">
-                    <span v-for="(d, idx) in elapsedDigits.s" :key="`codebar-s-${idx}`" class="countdown">
-                      <span :style="{ '--value': d }"></span>
-                    </span>
-                  </span>
-                </div>
+                <span class="font-mono text-sm font-black text-[var(--color-farm-brown-dark)] tabular-nums">{{ elapsedDisplay }}</span>
               </div>
 
               <!-- right: carrots + bell -->
@@ -113,9 +97,40 @@
                     <CarrotIcon />
                   </span>
                 </div>
-                <button type="button" class="btn btn-ghost btn-xs btn-square" aria-label="알림">
-                  <BellIcon />
-                </button>
+                <div ref="notificationContainerRef" class="relative inline-block">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs btn-square relative"
+                    aria-label="알림"
+                    @click="toggleNotificationPanel"
+                  >
+                    <BellIcon />
+                    <span
+                      v-if="hasUnreadAutoHint"
+                      class="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-red-500"
+                      aria-hidden="true"
+                    ></span>
+                  </button>
+                  <!-- 알림 탭 -->
+                  <Transition name="dropdown">
+                    <div
+                      v-if="notificationPanelOpen"
+                      class="absolute right-0 top-full mt-1 z-50 min-w-[200px] max-w-[280px] rounded-lg border border-base-300 bg-base-100 shadow-lg py-2"
+                      @click.stop
+                    >
+                      <p class="px-3 py-1.5 text-xs font-medium text-[var(--color-farm-brown)] border-b border-base-200">알림</p>
+                      <div v-if="notificationItems.length === 0" class="px-3 py-4 text-xs text-[var(--color-farm-brown)]">알림이 없습니다.</div>
+                      <div
+                        v-for="item in notificationItems"
+                        :key="item.id"
+                        class="flex items-center gap-2 px-3 py-2 text-xs text-[var(--color-farm-brown-dark)]"
+                      >
+                        <iconify-icon icon="mdi:message-text-outline" class="text-base text-[var(--color-farm-green)] shrink-0"></iconify-icon>
+                        <span>{{ item.text }}</span>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
               </div>
             </div>
             <div class="flex-1 min-h-0 relative ide-editor-container" :class="{ 'blur-sm': !isLoggedIn }">
@@ -209,6 +224,26 @@
       @cancel="onConfirmModalCancel"
     />
 
+    <!-- 30분 무입력 시: 현재 문제를 풀고 있나요? -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showIdleConfirmModal" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]">
+          <div class="card bg-base-100 shadow-2xl rounded-xl p-6 min-w-[320px] max-w-[90vw] border border-base-300">
+            <p class="text-lg font-semibold text-[var(--color-farm-brown-dark)] mb-4">현재 문제를 풀고 있나요?</p>
+            <div class="flex justify-end">
+              <button
+                type="button"
+                class="btn btn-sm bg-[var(--color-farm-green)] text-white border-none hover:bg-[var(--color-farm-green-dark)]"
+                @click="onIdleConfirmContinue"
+              >
+                예(계속하기)
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- 힌트 차감 토스트 -->
     <Transition name="toast">
       <div v-if="toastMessage" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100] w-[min(520px,calc(100vw-2rem))]">
@@ -224,7 +259,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import HintPanel from '@/components/organisms/HintPanel.vue'
@@ -244,6 +279,7 @@ import { getReportDetail, buildReportFromSubmitResponse } from '@/api/reports'
 const router = useRouter()
 const route = useRoute()
 const terminalPanel = ref(null)
+const notificationContainerRef = ref(null)
 const authStore = useAuthStore()
 const ideStore = useIdeStore()
 // 스토어 로그인 상태를 computed로 참조해 로그아웃 시에도 블러/오버레이 즉시 반영
@@ -274,11 +310,26 @@ const hintMax = ref(3)
 const hintRemaining = computed(() => Math.max(0, hintMax.value - hintUsed.value))
 /** 힌트(채팅) 패널 접기/펼치기 */
 const hintPanelOpen = ref(true)
+/** 자동 힌트 미확인 시 종 아이콘 빨간 점 */
+const hasUnreadAutoHint = ref(false)
+/** 알림 탭 열림 */
+const notificationPanelOpen = ref(false)
+/** 알림 목록 (자동 힌트 도착 등) */
+const notificationItems = ref([])
 /** 문제 패널 탭 (problem | results) - 툴바에 표시 */
 const problemPanelActiveTab = ref('problem')
 const problemTitle = ref('문제')
 /** 이번 진입에서 방금 생성한 세션 ID (getLatestCode 호출 생략용) */
 const justCreatedSessionId = ref(null)
+/** 30분 무입력 시 확인 모달: 마지막 활동 시각 (코드 입력 또는 "예(계속하기)" 클릭) */
+const lastActivityAt = ref(null)
+/** 무입력 확인 모달 표시 여부 */
+const showIdleConfirmModal = ref(false)
+/** 확인 모달을 띄운 시각 (모달 표시 후 IDLE_MS 경과 시 강제 종료용) */
+const idleConfirmShownAt = ref(null)
+// const IDLE_MS = 30 * 60 * 1000 // 30분(운영)
+const IDLE_MS = 1 * 60 * 1000 // 1분(테스트: 1분 무입력 → 모달, 그로부터 1분 → 메인 취소 안내)
+let idleCheckIntervalId = null
 /** 힌트 차감 토스트 (FR-CODE-010-1) */
 const toastMessage = ref('')
 let toastTimer = null
@@ -319,6 +370,53 @@ function onConfirmModalConfirm() {
 function onConfirmModalCancel() {
   closeConfirm(false)
 }
+
+/** 30분 무입력 확인 모달 "예(계속하기)" 클릭: 활동 시각 갱신 후 모달 닫기 */
+function onIdleConfirmContinue() {
+  showIdleConfirmModal.value = false
+  idleConfirmShownAt.value = null
+  lastActivityAt.value = Date.now()
+}
+
+/** 무입력 체크 interval (테스트 시 15초마다 확인해 1분 타이밍에 가깝게 동작) */
+function startIdleCheck() {
+  if (idleCheckIntervalId) return
+  const checkIntervalMs = IDLE_MS === 60 * 1000 ? 15 * 1000 : 60 * 1000 // 테스트(1분)면 15초, 운영(30분)이면 1분
+  idleCheckIntervalId = setInterval(() => {
+    const sid = ideStore.sessionId
+    if (sid == null) return
+    const now = Date.now()
+    if (showIdleConfirmModal.value) {
+      if (idleConfirmShownAt.value != null && now - idleConfirmShownAt.value >= IDLE_MS) {
+        showIdleConfirmModal.value = false
+        idleConfirmShownAt.value = null
+        closeSessionOnLeave()
+        if (snapshotIntervalId) {
+          clearInterval(snapshotIntervalId)
+          snapshotIntervalId = null
+        }
+        skipLeaveConfirm.value = true
+        router.push({ path: '/', query: { idle_cancel: '1' } })
+        clearInterval(idleCheckIntervalId)
+        idleCheckIntervalId = null
+      }
+    } else {
+      const last = lastActivityAt.value ?? now
+      if (now - last >= IDLE_MS) {
+        showIdleConfirmModal.value = true
+        idleConfirmShownAt.value = now
+      }
+    }
+  }, checkIntervalMs)
+}
+
+function clearIdleCheck() {
+  if (idleCheckIntervalId) {
+    clearInterval(idleCheckIntervalId)
+    idleCheckIntervalId = null
+  }
+}
+
 // FR-CODE-002-1: 저장 상태 표시
 const lastSavedAt = ref(null)
 const isSaveInProgress = ref(false)
@@ -628,12 +726,82 @@ function onBeforeUnload(e) {
   }
 }
 
+/** unload/pagehide 시 세션 종료 1회만 전송 (fetch keepalive, sendBeacon은 POST 전용이라 백엔드 PATCH와 호환 불가) */
+let sessionCloseSentForUnload = false
+function sendCloseOnUnload() {
+  if (sessionCloseSentForUnload) return
+  const sid = ideStore.sessionId
+  if (sid == null) return
+  sessionCloseSentForUnload = true
+  const baseURL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+  const url = `${baseURL}/sessions/${sid}/close`
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  try {
+    fetch(url, { method: 'PATCH', headers, keepalive: true })
+  } catch (_) {}
+}
+
+/** 탭/브라우저 종료·새로고침 시 (pagehide) */
+function onPageHide() {
+  sendCloseOnUnload()
+}
+
+/** 탭/브라우저 종료·새로고침 시 (unload, 문서 기준) */
+function onUnload() {
+  sendCloseOnUnload()
+}
+
+/** 가시성 API: 다른 탭으로 이동·브라우저 최소화 시 세션 종료 */
+function onVisibilityChange() {
+  if (document.visibilityState !== 'hidden') return
+  sendCloseOnUnload()
+  justCreatedSessionId.value = null
+  ideStore.clearSession()
+}
+
+/** Broadcast Channel: 같은 세션을 다른 탭에서 열면 기존 탭에 신호 → 세션 종료 및 메인 이동 */
+let ideChannel = null
+let ideTabId = ''
+let ideOpenTime = 0
+function setupIdeBroadcastChannel(sessionId) {
+  if (typeof BroadcastChannel === 'undefined' || sessionId == null) return
+  try {
+    ideChannel?.close()
+    ideChannel = new BroadcastChannel(`ide-session-${sessionId}`)
+    ideTabId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    ideOpenTime = Date.now()
+    ideChannel.postMessage({ type: 'opened', tabId: ideTabId, timestamp: ideOpenTime })
+    ideChannel.onmessage = (e) => {
+      const msg = e?.data
+      if (msg?.type !== 'opened' || msg?.tabId === ideTabId) return
+      if (msg.timestamp > ideOpenTime) {
+        closeSessionOnLeave()
+        showToast('다른 탭에서 이 문제를 열었습니다. 이 탭의 세션을 종료합니다.')
+        skipLeaveConfirm.value = true
+        router.push('/')
+      }
+    }
+  } catch (_) {}
+}
+function closeIdeBroadcastChannel() {
+  try {
+    ideChannel?.close()
+    ideChannel = null
+  } catch (_) {}
+}
+
 onMounted(async () => {
   isInitializing.value = true
   try {
     await initSession()
     problemStartTime.value = Date.now()
     timerStoppedAt.value = null
+    if (ideStore.sessionId != null) {
+      lastActivityAt.value = Date.now()
+      startIdleCheck()
+    }
   } finally {
     isInitializing.value = false
     ideStore.ideRouteLoading = false
@@ -646,12 +814,24 @@ onMounted(async () => {
   window.addEventListener('online', onOnline)
   window.addEventListener('offline', onOffline)
   window.addEventListener('beforeunload', onBeforeUnload)
+  window.addEventListener('pagehide', onPageHide)
+  window.addEventListener('unload', onUnload)
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 // 첫 입력(또는 30초 idle 후 재입력) 시 10초 스냅샷 interval 시작
 watch(() => ideStore.lastCodeInputAt, () => {
   if (ideStore.lastCodeInputAt && !snapshotIntervalId) startSnapshotInterval()
 }, { deep: true })
+
+// 30분 무입력 체크: 코드 입력 시 마지막 활동 시각 갱신
+watch(
+  () => ideStore.lastCodeInputAt,
+  (v) => {
+    if (v != null) lastActivityAt.value = v
+  },
+  { immediate: true }
+)
 
 // 같은 IDE 페이지에서 문제 ID만 바뀐 경우 세션 재초기화 (interval은 입력 시 다시 시작)
 watch(() => route.params.id, async (newId, oldId) => {
@@ -661,11 +841,28 @@ watch(() => route.params.id, async (newId, oldId) => {
       await initSession()
       problemStartTime.value = Date.now()
       timerStoppedAt.value = null
+      if (ideStore.sessionId != null) {
+        lastActivityAt.value = Date.now()
+        if (!idleCheckIntervalId) startIdleCheck()
+      }
     } finally {
       isInitializing.value = false
     }
   }
 })
+
+// Broadcast Channel: 세션 ID가 바뀔 때마다 채널 재구독 (다른 탭 중복 열기 감지)
+watch(
+  () => ideStore.sessionId,
+  (sid) => {
+    if (sid != null) {
+      setupIdeBroadcastChannel(sid)
+    } else {
+      closeIdeBroadcastChannel()
+    }
+  },
+  { immediate: true }
+)
 
 onBeforeRouteLeave(async (to, from, next) => {
   if (skipLeaveConfirm.value) {
@@ -718,6 +915,11 @@ onUnmounted(() => {
   window.removeEventListener('online', onOnline)
   window.removeEventListener('offline', onOffline)
   window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener('pagehide', onPageHide)
+  window.removeEventListener('unload', onUnload)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  closeIdeBroadcastChannel()
+  clearIdleCheck()
 
   // confirm 대기 중이면 안전하게 취소 처리
   if (confirmResolver) closeConfirm(false)
@@ -975,6 +1177,39 @@ function onHintUsedFromPanel({ usedHint, maxHint }) {
   showToast(`힌트가 차감되었습니다. (잔여: ${(maxHint ?? 3) - (usedHint ?? 0)}/${maxHint ?? 3})`)
 }
 
+/** 자동 힌트 도착 시 종 빨간 점 + 알림 목록에 추가 */
+function onAutoHintArrived() {
+  hasUnreadAutoHint.value = true
+  notificationItems.value.push({
+    id: Date.now(),
+    text: '자동 힌트가 왔습니다.',
+    type: 'auto_hint'
+  })
+}
+
+/** 힌트 "괜찮아요" 클릭 시 토스트 */
+function onDismissHintToast() {
+  showToast('대단해요!')
+}
+
+function toggleNotificationPanel() {
+  notificationPanelOpen.value = !notificationPanelOpen.value
+  if (notificationPanelOpen.value) hasUnreadAutoHint.value = false
+}
+
+/** 알림 탭 열렸을 때 바깥 클릭 시 닫기 */
+watch(notificationPanelOpen, (open) => {
+  if (!open) return
+  nextTick(() => {
+    const close = (e) => {
+      if (notificationContainerRef.value?.contains(e.target)) return
+      notificationPanelOpen.value = false
+      document.removeEventListener('click', close)
+    }
+    setTimeout(() => document.addEventListener('click', close), 0)
+  })
+})
+
 function showToast(msg) {
   toastMessage.value = msg
   if (toastTimer) clearTimeout(toastTimer)
@@ -1020,6 +1255,15 @@ function showToast(msg) {
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 /* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */
