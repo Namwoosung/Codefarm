@@ -74,7 +74,8 @@ public class SecurityConfig {
                                 "/api/v1/users/login",
                                 "/api/v1/users/signup",
                                 "/api/v1/users/check/emails",
-                                "/api/v1/users/check/nicknames"
+                                "/api/v1/users/check/nicknames",
+                                "/api/v1/users/reissue"
                         ).permitAll()
 
                         // 문제관련 api
