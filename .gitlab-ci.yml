@@ -10,10 +10,8 @@ stages:
 ########################
 workflow:
   rules:
-    # MR 생성/업데이트 시 파이프라인 생성
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: always
-    # 일반 push 파이프라인
     - if: '$CI_COMMIT_BRANCH'
       when: always
     - when: never
@@ -26,7 +24,7 @@ default:
     - echo "source=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
 ########################
-# BUILD (push 후, protected 브랜치만)
+# BUILD (develop/main은 항상 빌드)
 ########################
 .build-template:
   stage: build
@@ -45,9 +43,6 @@ build-backend:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
-      changes:
-        - backend/**
-        - .gitlab-ci.yml
 
 build-web:
   extends: .build-template
@@ -58,10 +53,6 @@ build-web:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
-      changes:
-        - frontend/**
-        - infra/nginx/**
-        - .gitlab-ci.yml
 
 build-execution:
   extends: .build-template
@@ -72,9 +63,6 @@ build-execution:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
-      changes:
-        - execution/**
-        - .gitlab-ci.yml
 
 build-feedback:
   extends: .build-template
@@ -85,12 +73,9 @@ build-feedback:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
-      changes:
-        - feedback/**
-        - .gitlab-ci.yml
 
 ########################
-# TEST (MR + feature 브랜치)
+# TEST
 ########################
 test:
   stage: test
@@ -119,7 +104,7 @@ trivy_fs:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
 
 ########################
-# DEPLOY (push 후 only)
+# DEPLOY
 ########################
 .deploy-template:
   stage: deploy
@@ -131,7 +116,9 @@ deploy-dev:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" \
+        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' \
+         bash /srv/app/scripts/deploy_server.sh dev"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
@@ -141,8 +128,9 @@ deploy-prod:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh prod"
-
+    - ssh -i "$SSH_KEY" "$USER@$HOST" \
+        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' \
+         bash /srv/app/scripts/deploy_server.sh prod"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
@@ -150,7 +138,7 @@ deploy-prod:
       when: manual
 
 ########################
-# INFERENCE (push 후 only)
+# INFERENCE
 ########################
 inference-deploy:
   stage: inference
