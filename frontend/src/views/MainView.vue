@@ -1,4 +1,12 @@
 <template>
+  <div class="min-h-screen bg-farm-cream/20">
+    <!-- 최상단 배너: 전체 화면 폭 -->
+    <MainHeroBanner :top3="top3" />
+
+    <div class="max-w-7xl mx-auto px-12 py-10">
+      <div class="mb-4">
+        <h2 class="text-2xl font-bold text-farm-brown-dark"> 모든 문제</h2>
+        <p class="text-sm text-farm-brown/80">필터로 원하는 유형/난이도를 빠르게 골라보세요.</p>
   <div class="min-h-screen p-10">
     <!-- 30분 무입력 강제 종료 후 메인 진입 시 안내 모달 (X로 닫기) -->
     <Teleport to="body">
@@ -277,7 +285,18 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProblemList } from '@/api/problem'
+<<<<<<< frontend/src/views/MainView.vue
+import { useCardStore } from '@/stores/card'
+import MainHeroBanner from '@/components/organisms/MainHeroBanner.vue'
+onMounted(() => {
+  cardStore.ranking()
+})
+const cardStore = useCardStore()
+const rankingList = computed(() => cardStore.rankingList)
+const top3 = computed(() => (rankingList.value ?? []).slice(0, 3))
+=======
 import * as sessionApi from '@/api/session'
+>>>>>>> frontend/src/views/MainView.vue
 
 const route = useRoute()
 const router = useRouter()
