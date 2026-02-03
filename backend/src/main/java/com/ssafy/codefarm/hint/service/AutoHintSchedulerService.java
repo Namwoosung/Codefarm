@@ -15,6 +15,7 @@ import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -46,6 +47,7 @@ public class AutoHintSchedulerService {
 
         ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(
                 () -> process(sessionId),
+                Instant.now().plus(INTERVAL),
                 INTERVAL
         );
 
