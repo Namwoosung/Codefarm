@@ -143,6 +143,7 @@ public class AutoHintSchedulerService {
                         .analysis(analysis)
                         .mistakeType(mistakeTypes)
                         .judgedAt(LocalDateTime.now())
+                        .hint(hintContent)
                         .build()
         );
 

@@ -13,4 +13,5 @@ public class PreviousJudgementRedisDto {
     private String analysis;
     private LocalDateTime judgedAt;
     private List<String> mistakeType;
+    private String hint;
 }
