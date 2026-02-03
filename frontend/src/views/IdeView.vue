@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 overflow-hidden bg-[var(--color-farm-paper)]">
+  <div class="ide-view-root flex flex-col w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 overflow-hidden">
     <!-- 로딩 모달 -->
     <div v-if="isInitializing" class="fixed inset-0 flex items-center justify-center bg-[rgba(245,242,232,0.9)] z-[100]">
       <div class="card bg-base-100 shadow-lg rounded-2xl p-6">
@@ -1324,6 +1324,11 @@ function showToast(msg) {
 </script>
 
 <style scoped>
+/* 다크모드에서도 빈 영역이 흰색으로 보이도록 고정 */
+.ide-view-root {
+  color-scheme: light;
+  background-color: #ffffff;
+}
 .ide-resizer-hit {
   position: relative;
 }
