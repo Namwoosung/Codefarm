@@ -37,6 +37,7 @@
       <Transition name="hint-panel">
         <div v-show="hintPanelOpen" class="flex flex-shrink-0 w-[300px] min-w-[280px] max-w-[320px] h-full min-h-0 overflow-hidden">
           <HintPanel
+            ref="hintPanelRef"
             :hint-remaining="hintRemaining"
             :hint-max="hintMax"
             @hint-used="onHintUsedFromPanel"
@@ -295,11 +296,14 @@ import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
 import * as sessionApi from '@/api/session'
 import { getReportDetail, buildReportFromSubmitResponse } from '@/api/reports'
+import { subscribeHintSSE } from '@/api/hint'
 
 const router = useRouter()
 const route = useRoute()
 const terminalPanel = ref(null)
 const notificationContainerRef = ref(null)
+const hintPanelRef = ref(null)
+let sseUnsubscribe = null
 const authStore = useAuthStore()
 const ideStore = useIdeStore()
 // 스토어 로그인 상태를 computed로 참조해 로그아웃 시에도 블러/오버레이 즉시 반영
@@ -907,6 +911,36 @@ watch(
   { immediate: true }
 )
 
+/** 400/403/404 등 SSE 재연결 중단 대상 */
+const FATAL_SSE_STATUS_CODES = [400, 403, 404]
+// SSE 힌트 구독: sessionId 준비 시 구독, null 시 해제
+watch(
+  () => ideStore.sessionId,
+  (sid) => {
+    if (sseUnsubscribe) {
+      sseUnsubscribe()
+      sseUnsubscribe = null
+    }
+    if (sid != null && isLoggedIn.value) {
+      console.log('[SSE] IDE 세션 진입으로 인해 SSE 구독을 시작합니다. sessionId=', sid)
+      sseUnsubscribe = subscribeHintSSE(sid, {
+        onConnected(data) {
+          console.log('[SSE] CONNECTED', data)
+        },
+        onAutoHint(data) {
+          hintPanelRef.value?.addAutoHint?.(data)
+        },
+        onError(options) {
+          if (options?.fatal || FATAL_SSE_STATUS_CODES.includes(options?.status)) {
+            showToast('힌트 알림 연결에 실패했습니다. 다시 로그인해 주세요.')
+          }
+        }
+      })
+    }
+  },
+  { immediate: true }
+)
+
 onBeforeRouteLeave(async (to, from, next) => {
   if (skipLeaveConfirm.value) {
     skipLeaveConfirm.value = false
@@ -962,6 +996,10 @@ onUnmounted(() => {
   window.removeEventListener('unload', onUnload)
   document.removeEventListener('visibilitychange', onVisibilityChange)
   closeIdeBroadcastChannel()
+  if (sseUnsubscribe) {
+    sseUnsubscribe()
+    sseUnsubscribe = null
+  }
   clearIdleCheck()
 
   // confirm 대기 중이면 안전하게 취소 처리
