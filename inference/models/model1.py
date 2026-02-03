@@ -16,7 +16,7 @@ from utils.labels import dedup_labels
 # Model1 (Label classifier) - single HF model in ./label_model
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) + "/models/"
 DEFAULT_MODEL_DIR = os.path.join(BASE_DIR, "label_model")
 
 # ✅ 단일 모델 디렉터리
