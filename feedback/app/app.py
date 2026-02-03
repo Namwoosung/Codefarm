@@ -224,19 +224,29 @@ CRITICAL RULES (must follow):
 - NEVER expose programmatic or system terms.
 - ALWAYS translate evidence into student-friendly language.
 
-Hard output rules:
-- 3~5 sentences total. (No bullet points)
+OUTPUT FORMAT (HTML styling required):
+- Output must be plain text + minimal HTML tags only.
+- You MAY use ONLY these tags: <b> ... </b>
+- Do NOT use any other tags (no <div>, <span>, <br>, <ul>, etc.).
+- Sentence formatting:
+  - Write 3~5 sentences total.
+  - After each sentence-ending punctuation (., !, ? or "다.", "요.") insert a newline character '\\n'.
+  - So the final output should look like "문장1.\\n문장2.\\n문장3.\\n..."
+
+HARD RULES:
+- No bullet points.
 - No code blocks, no backticks, no multi-line code.
 - Do NOT provide full correct code or a complete solution.
 
-Content rules:
+CONTENT RULES:
 - Must include:
-  (1) one encouragement,
-  (2) one evidence-based explanation in student language,
-  (3) one concrete next action the student can try.
-- If solved: praise + one improvement tip + optionally ONE short concept keyword.
+  (1) one encouragement sentence (include at least one <b> emphasized phrase),
+  (2) one evidence-based explanation in student language (include <b> key cause phrase),
+  (3) one concrete next action the student can try (include <b> actionable step phrase).
+- If solved: praise + one improvement tip + optionally ONE short concept keyword (keyword can be inside <b>).
 - If failed: explain ONE likely cause + ONE fix strategy (student-friendly).
 """.strip()
+
 
 
 # =========================
@@ -275,22 +285,43 @@ def _strip_forbidden_terms(text: str) -> str:
 
 def postprocess(text: str) -> str:
     text = sanitize_llm_text(text)
-    text = re.sub(r"\s+", " ", text).strip()
+
+    # ✅ 공백 정리는 하되, 개행은 보존
+    # 기존: text = re.sub(r"\s+", " ", text).strip()
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = re.sub(r"[ \t]+", " ", text).strip()
 
     # ✅ 내부 용어/라벨 유출 방지
     text = _strip_forbidden_terms(text)
 
-    # 3~5문장만 유지
+    # ✅ 문장 단위로 자르기 (개행 포함/보존)
+    # "온점이 있으면 줄바꿈" 요구를 만족시키기 위해 문장별로 \n 합치기
     parts = re.split(r"(?<=[.!?])\s+|(?<=[다요]\.)\s+", text)
-    parts = [p for p in parts if p]
-    text = " ".join(parts[:5]).strip()
+    parts = [p.strip() for p in parts if p and p.strip()]
 
-    # ✅ 260자 제한: 문장 끝 기준으로 자르기
+    # ✅ 3~5문장 유지 + 문장마다 '\n' 삽입
+    parts = parts[:5]
+    text = "\n".join(parts).strip()
+
+    # ✅ 강제: 각 줄(문장)이 끝에 마침표/종결이 없으면 유지하되,
+    # 이미 모델이 종결을 넣는 게 정상이라 여기서는 추가 보정은 최소화
+    # (원하면 아래처럼 마지막에 '\n'을 붙일 수도 있음)
+    # text = text + ("\n" if not text.endswith("\n") else "")
+
+    # ✅ 260자 제한: 줄바꿈 포함 상태에서 자르기
     if len(text) <= MAX_FEEDBACK_CHARS:
         return text
 
     cut = text[:MAX_FEEDBACK_CHARS]
-    candidates = [cut.rfind("."), cut.rfind("!"), cut.rfind("?"), cut.rfind("다."), cut.rfind("요.")]
+
+    # 문장 끝(.,!,?,다.,요.) 기준으로 자연스럽게 컷
+    candidates = [
+        cut.rfind("."),
+        cut.rfind("!"),
+        cut.rfind("?"),
+        cut.rfind("다."),
+        cut.rfind("요."),
+    ]
     end = max(candidates)
     if end >= 40:
         cut = cut[: end + 1].strip()
