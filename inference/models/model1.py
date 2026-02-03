@@ -11,53 +11,16 @@ from torch.nn.functional import sigmoid
 
 from utils.labels import dedup_labels
 
+
 # ============================================================
-# Model1 (Label classifier) - local HF model in ./label_model
+# Model1 (Label classifier) - single HF model in ./label_model
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../AI_server
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DEFAULT_MODEL_DIR = os.path.join(BASE_DIR, "label_model")
-MODEL_DIR_ENV = os.getenv("LABEL_MODEL_DIR", "").strip()
-LABEL_MODEL_ROOT = os.getenv("LABEL_MODEL_ROOT", DEFAULT_MODEL_DIR).strip()
-LABEL_MODEL_FOLD = os.getenv("LABEL_MODEL_FOLD", "").strip()  # e.g. "1".."5"
 
-def _resolve_label_model_dir() -> str:
-    # 1) explicit dir wins
-    if MODEL_DIR_ENV:
-        p = Path(MODEL_DIR_ENV)
-        return str(p if p.is_absolute() else (Path(BASE_DIR) / p).resolve())
-
-    root = Path(LABEL_MODEL_ROOT)
-    root = root if root.is_absolute() else (Path(BASE_DIR) / root).resolve()
-
-    # 2) if fold is set and exists under root, use it
-    if LABEL_MODEL_FOLD:
-        try:
-            k = int(LABEL_MODEL_FOLD)
-        except Exception:
-            raise ValueError(f"LABEL_MODEL_FOLD must be integer (1..). got={LABEL_MODEL_FOLD}")
-        candidates = [root / f"fold{k}", root / f"fold_{k}"]
-        for c in candidates:
-            if c.is_dir():
-                return str(c.resolve())
-        raise FileNotFoundError(f"fold dir not found under {root}. tried: {candidates}")
-
-    # 3) if root itself looks like a HF model dir, use it
-    if (root / "config.json").exists():
-        return str(root)
-
-    # 4) auto-pick: prefer fold1 if present, else first fold*
-    for c in [root / "fold1", root / "fold_1"]:
-        if c.is_dir():
-            return str(c.resolve())
-    folds = sorted([p for p in root.iterdir() if p.is_dir() and p.name.lower().startswith("fold")])
-    if folds:
-        return str(folds[0].resolve())
-
-    # 5) fallback
-    return str(root)
-
-MODEL_DIR = _resolve_label_model_dir()
+# ✅ 단일 모델 디렉터리
+MODEL_DIR = os.getenv("LABEL_MODEL_DIR", DEFAULT_MODEL_DIR).strip()
 
 # Inference params
 DEFAULT_THRESHOLD = float(os.getenv("MODEL1_THRESHOLD", "0.5"))
@@ -83,32 +46,39 @@ BASE_LABELS: List[str] = [
     "Stack_Empty_Handling_Error","Stack_Order_Error",
     "Wrong_Target_Selection"
 ]
-NEW_LABELS: List[str] = []
-ALLOWED_LABELS: List[str] = BASE_LABELS + NEW_LABELS
-ID2LABEL: Dict[int, str] = {i: l for i, l in enumerate(ALLOWED_LABELS)}
+
+ID2LABEL = {i: l for i, l in enumerate(BASE_LABELS)}
 
 _tokenizer = None
 _model = None
 
+
 def _primary_device(model) -> torch.device:
-    # If model is on a single device, model.device works.
     dev = getattr(model, "device", None)
     if isinstance(dev, torch.device):
         return dev
-    # If using device_map="auto", pick the first real device in hf_device_map if present.
+
     hf_map = getattr(model, "hf_device_map", None)
-    if isinstance(hf_map, dict) and hf_map:
+    if isinstance(hf_map, dict):
         for _, d in hf_map.items():
             if isinstance(d, str) and d not in ("cpu", "disk", "meta"):
                 return torch.device(d)
+
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 def _load_once():
     global _tokenizer, _model
     if _tokenizer is not None and _model is not None:
         return
+
     if not os.path.isdir(MODEL_DIR):
-        raise FileNotFoundError(f"Model1 label_model directory not found: {MODEL_DIR}")
+        raise FileNotFoundError(f"label_model directory not found: {MODEL_DIR}")
+
+    if not os.path.exists(os.path.join(MODEL_DIR, "config.json")):
+        raise FileNotFoundError(
+            f"{MODEL_DIR} does not look like a HF model directory (missing config.json)"
+        )
 
     _tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR, local_files_only=True)
     _model = AutoModelForSequenceClassification.from_pretrained(
@@ -118,10 +88,12 @@ def _load_once():
     )
     _model.eval()
 
+    print(f"[Model1] loaded label model from: {MODEL_DIR}", flush=True)
+
+
 def _payload_to_text(payload: Dict[str, Any]) -> str:
-    # Keep it simple + stable: serialize the payload as JSON.
-    # If you later want a curated text, do it here (but keep training/inference consistent).
     return json.dumps(payload, ensure_ascii=False)
+
 
 @torch.no_grad()
 def predict_payload(
@@ -130,11 +102,10 @@ def predict_payload(
     topk: int = DEFAULT_TOPK,
     threshold: float = DEFAULT_THRESHOLD,
 ) -> Tuple[List[Tuple[str, float]], List[Tuple[str, float]]]:
+
     _load_once()
-    assert _tokenizer is not None and _model is not None
 
     text = _payload_to_text(payload)
-
     inputs = _tokenizer(
         text,
         return_tensors="pt",
@@ -146,10 +117,9 @@ def predict_payload(
     device = _primary_device(_model)
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
-    logits = _model(**inputs).logits.squeeze(0)  # (num_labels,)
+    logits = _model(**inputs).logits.squeeze(0)
     probs = sigmoid(logits)
 
-    # threshold predictions
     pred_labels = [
         (ID2LABEL[i], probs[i].item())
         for i in range(len(probs))
@@ -157,32 +127,21 @@ def predict_payload(
     ]
     pred_labels.sort(key=lambda x: x[1], reverse=True)
 
-    # --- No_Issue postprocess (same as provided code) ---
-    labels_only = [l for l, _ in pred_labels]
-    if len(pred_labels) > 1 and "No_Issue" in labels_only:
-        pred_labels = [(l, p) for (l, p) in pred_labels if l != "No_Issue"]
+    # No_Issue 제거 규칙
+    if len(pred_labels) > 1:
+        pred_labels = [(l, p) for l, p in pred_labels if l != "No_Issue"]
 
-    # top-k (debug/inspection)
-    k = min(max(int(topk), 1), len(probs))
+    k = min(max(topk, 1), len(probs))
     topk_idx = torch.topk(probs, k).indices
     topk_labels = [(ID2LABEL[i.item()], probs[i].item()) for i in topk_idx]
 
     return pred_labels, topk_labels
 
+
 async def run_model1(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Model1 runner used by the main pipeline.
+    preds, _ = predict_payload(payload)
 
-    Returns:
-      {"mistake_type": ["..."]}
-
-    Notes:
-    - Uses local HF model from ./label_model by default.
-    - Multi-label: sigmoid + threshold
-    - No_Issue is removed if other labels exist.
-    """
-    preds, _topk = predict_payload(payload)
-    mistake_types = [label for label, _prob in preds]
+    mistake_types = [label for label, _ in preds]
     mistake_types = dedup_labels(mistake_types)
 
     return {"mistake_type": mistake_types}

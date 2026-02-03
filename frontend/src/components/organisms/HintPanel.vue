@@ -23,12 +23,50 @@
         </div>
         <div
           v-for="(msg, idx) in chatMessages"
-          :key="idx"
+          :key="msg.hintId != null ? 'hint-' + msg.hintId : idx"
           class="mb-2.5"
           :class="msg.role === 'user' ? 'text-right' : 'text-left'"
         >
           <span class="block text-[0.65rem] text-neutral-500 mb-0.5">{{ msg.role === 'user' ? '나' : '힌트' }}</span>
-          <p class="inline-block px-2.5 py-1.5 rounded-md text-xs m-0 break-words max-w-full" :class="msg.role === 'user' ? 'bg-white/90 text-[#1a1a1a]' : 'bg-white/70 text-[#1a1a1a]'">
+          <!-- 자동 힌트 도착: 확인 전/볼게요/괜찮아요 -->
+          <div
+            v-if="msg.type === 'pending_auto_hint'"
+            class="inline-block px-2.5 py-1.5 rounded-md text-xs max-w-full bg-white/70 text-[#1a1a1a]"
+          >
+            <template v-if="msg.dismissed">
+              <span class="text-neutral-400 italic">힌트를 보지 않았어요</span>
+            </template>
+            <template v-else-if="msg.viewed">
+              <p class="m-0 break-words">{{ msg.content }}</p>
+            </template>
+            <template v-else>
+              <p class="m-0 flex items-center gap-1.5 mb-2">
+                <iconify-icon icon="mdi:message-text-outline" class="text-[var(--color-farm-green)] shrink-0"></iconify-icon>
+                <span>힌트가 도착했습니다. 확인하시겠습니까?</span>
+              </p>
+              <div class="flex gap-2 flex-wrap">
+                <button
+                  type="button"
+                  class="btn btn-xs h-7 px-2 rounded-md bg-[var(--color-farm-green)] text-white border-none"
+                  @click="viewPendingHint(idx)"
+                >
+                  볼게요
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-xs h-7 px-2 rounded-md btn-ghost border border-base-300"
+                  @click="dismissPendingHint(idx)"
+                >
+                  괜찮아요
+                </button>
+              </div>
+            </template>
+          </div>
+          <p
+            v-else
+            class="inline-block px-2.5 py-1.5 rounded-md text-xs m-0 break-words max-w-full"
+            :class="msg.role === 'user' ? 'bg-white/90 text-[#1a1a1a]' : 'bg-white/70 text-[#1a1a1a]'"
+          >
             {{ msg.text }}
           </p>
         </div>
@@ -42,7 +80,7 @@
           v-model="chatInput"
           type="text"
           class="input input-bordered input-sm w-full rounded-md bg-base-100 border-base-300 text-xs"
-          placeholder="자... 힌트를"
+          placeholder="선생님께 당근을 흔들어 궁금한 걸 물어보세요!"
           :disabled="hintLoading || hintRemaining <= 0"
           @keydown.enter.exact.prevent="sendHint"
         />
@@ -62,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useIdeStore } from '@/stores/ide'
 import * as hintApi from '@/api/hint'
@@ -72,13 +110,97 @@ const props = defineProps({
   hintRemaining: { type: Number, default: 3 },
   hintMax: { type: Number, default: 3 }
 })
-const emit = defineEmits(['hint-used', 'close'])
+const emit = defineEmits(['hint-used', 'close', 'auto-hint-arrived', 'dismiss-hint-toast'])
 
 const route = useRoute()
 const ideStore = useIdeStore()
 const chatInput = ref('')
 const chatMessages = ref([])
 const hintLoading = ref(false)
+
+/** 힌트 목록을 채팅 메시지 형태로 변환 (과거순). AUTO는 세션 생성 이후 것만 표시 */
+function hintsToMessages(hints) {
+  const list = Array.isArray(hints) ? [...hints].reverse() : []
+  const sessionStart = ideStore.sessionStartedAt ?? 0
+  const messages = []
+  for (const h of list) {
+    if (h.hintType === 'MANUAL') {
+      if (h.userQuestion) {
+        messages.push({ role: 'user', text: h.userQuestion, createdAt: h.createdAt, hintId: h.hintId })
+      }
+      messages.push({ role: 'assistant', text: h.content ?? '', createdAt: h.createdAt ?? '', hintId: h.hintId })
+    } else if (h.hintType === 'AUTO') {
+      const at = h.createdAt ? new Date(h.createdAt).getTime() : 0
+      if (at >= sessionStart) {
+        messages.push({ role: 'assistant', text: h.content ?? '', createdAt: h.createdAt ?? '', hintId: h.hintId })
+      }
+    }
+  }
+  return messages
+}
+
+/** 힌트 목록 로드 후 채팅에 반영, 미열람 힌트는 열람 처리 */
+async function loadHintList() {
+  const sid = ideStore.sessionId
+  if (sid == null) return
+  try {
+    const hints = await hintApi.getHintList(sid)
+    chatMessages.value = hintsToMessages(hints)
+    for (const h of hints) {
+      if (h.hintId != null && h.isViewed === false) {
+        hintApi.markHintViewed(sid, h.hintId).catch(() => {})
+      }
+    }
+  } catch (_) {
+    chatMessages.value = []
+  }
+}
+
+/** SSE 자동 힌트 수신 시: 알림 + pending 말풍선 (볼게요/괜찮아요) */
+function handleAutoHint(data) {
+  if (!data?.content) return
+  emit('auto-hint-arrived')
+  chatMessages.value.push({
+    role: 'assistant',
+    type: 'pending_auto_hint',
+    content: data.content,
+    hintId: data.hintId,
+    createdAt: data.createdAt ?? new Date().toISOString(),
+    viewed: false,
+    dismissed: false
+  })
+}
+
+/** pending 자동 힌트 "볼게요" 클릭: 내용 표시 + 열람 처리 */
+function viewPendingHint(idx) {
+  const msg = chatMessages.value[idx]
+  if (!msg || msg.type !== 'pending_auto_hint' || msg.viewed || msg.dismissed) return
+  msg.viewed = true
+  const sid = ideStore.sessionId
+  if (sid != null && msg.hintId != null) {
+    hintApi.markHintViewed(sid, msg.hintId).catch(() => {})
+  }
+}
+
+/** pending 자동 힌트 "괜찮아요" 클릭: 비활성화 + 토스트 */
+function dismissPendingHint(idx) {
+  const msg = chatMessages.value[idx]
+  if (!msg || msg.type !== 'pending_auto_hint' || msg.dismissed) return
+  msg.dismissed = true
+  emit('dismiss-hint-toast')
+}
+
+watch(
+  () => ideStore.sessionId,
+  (sid) => {
+    if (sid != null) {
+      loadHintList()
+    } else {
+      chatMessages.value = []
+    }
+  },
+  { immediate: true }
+)
 
 async function sendHint() {
   const q = chatInput.value?.trim()

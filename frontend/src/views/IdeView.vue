@@ -40,6 +40,8 @@
             :hint-remaining="hintRemaining"
             :hint-max="hintMax"
             @hint-used="onHintUsedFromPanel"
+            @auto-hint-arrived="onAutoHintArrived"
+            @dismiss-hint-toast="onDismissHintToast"
             @close="hintPanelOpen = false"
           />
         </div>
@@ -85,25 +87,7 @@
                 aria-label="경과 시간"
               >
                 <iconify-icon icon="mdi:timer-outline" class="text-xl text-[var(--color-farm-brown-dark)]"></iconify-icon>
-                <div class="flex items-center gap-1 font-mono text-sm font-black text-[var(--color-farm-brown-dark)] tabular-nums">
-                  <span class="flex items-center">
-                    <span v-for="(d, idx) in elapsedDigits.h" :key="`codebar-h-${idx}`" class="countdown">
-                      <span :style="{ '--value': d }"></span>
-                    </span>
-                  </span>
-                  <span class="opacity-50">:</span>
-                  <span class="flex items-center">
-                    <span v-for="(d, idx) in elapsedDigits.m" :key="`codebar-m-${idx}`" class="countdown">
-                      <span :style="{ '--value': d }"></span>
-                    </span>
-                  </span>
-                  <span class="opacity-50">:</span>
-                  <span class="flex items-center">
-                    <span v-for="(d, idx) in elapsedDigits.s" :key="`codebar-s-${idx}`" class="countdown">
-                      <span :style="{ '--value': d }"></span>
-                    </span>
-                  </span>
-                </div>
+                <span class="font-mono text-sm font-black text-[var(--color-farm-brown-dark)] tabular-nums">{{ elapsedDisplay }}</span>
               </div>
 
               <!-- right: carrots + bell -->
@@ -113,11 +97,62 @@
                     <CarrotIcon />
                   </span>
                 </div>
-                <button type="button" class="btn btn-ghost btn-xs btn-square" aria-label="알림">
-                  <BellIcon />
-                </button>
+                <div ref="notificationContainerRef" class="relative inline-block">
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-xs btn-square relative"
+                    aria-label="알림"
+                    @click="toggleNotificationPanel"
+                  >
+                    <BellIcon />
+                    <span
+                      v-if="hasUnreadAutoHint"
+                      class="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-red-500"
+                      aria-hidden="true"
+                    ></span>
+                  </button>
+                  <!-- 알림 탭 -->
+                  <Transition name="dropdown">
+                    <div
+                      v-if="notificationPanelOpen"
+                      class="absolute right-0 top-full mt-1 z-50 min-w-[200px] max-w-[280px] rounded-lg border border-base-300 bg-base-100 shadow-lg py-2"
+                      @click.stop
+                    >
+                      <p class="px-3 py-1.5 text-xs font-medium text-[var(--color-farm-brown)] border-b border-base-200">알림</p>
+                      <div v-if="notificationItems.length === 0" class="px-3 py-4 text-xs text-[var(--color-farm-brown)]">알림이 없습니다.</div>
+                      <div
+                        v-for="item in notificationItems"
+                        :key="item.id"
+                        class="flex items-center gap-2 px-3 py-2 text-xs text-[var(--color-farm-brown-dark)]"
+                      >
+                        <iconify-icon icon="mdi:message-text-outline" class="text-base text-[var(--color-farm-green)] shrink-0"></iconify-icon>
+                        <span>{{ item.text }}</span>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
               </div>
             </div>
+            <!-- IDE 진입 시 한 번만: 다른 탭 중복 열기 안내 (X로 닫기) -->
+            <Transition name="dropdown">
+              <div
+                v-if="showDuplicateTabBanner && isLoggedIn && ideStore.sessionId && !isInitializing"
+                class="flex-shrink-0 flex items-center justify-between gap-2 px-3 py-2 bg-[var(--color-farm-cream)]/80 border-b border-[var(--color-farm-cream)] text-xs text-[var(--color-farm-brown-dark)]"
+              >
+                <span class="flex items-center gap-1.5">
+                  <iconify-icon icon="mdi:information-outline" class="text-base text-[var(--color-farm-green)] shrink-0"></iconify-icon>
+                  <span>다른 탭에서 어떤 문제를 열어도 기존 탭의 세션이 자동으로 종료됩니다.</span>
+                </span>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-xs btn-square shrink-0 text-[var(--color-farm-brown)] hover:bg-base-200/60"
+                  aria-label="닫기"
+                  @click="showDuplicateTabBanner = false"
+                >
+                  <iconify-icon icon="mdi:close" class="text-base"></iconify-icon>
+                </button>
+              </div>
+            </Transition>
             <div class="flex-1 min-h-0 relative ide-editor-container" :class="{ 'blur-sm': !isLoggedIn }">
               <MonacoEditor />
             </div>
@@ -209,6 +244,26 @@
       @cancel="onConfirmModalCancel"
     />
 
+    <!-- 30분 무입력 시: 현재 문제를 풀고 있나요? -->
+    <Teleport to="body">
+      <Transition name="modal">
+        <div v-if="showIdleConfirmModal" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]">
+          <div class="card bg-base-100 shadow-2xl rounded-xl p-6 min-w-[320px] max-w-[90vw] border border-base-300">
+            <p class="text-lg font-semibold text-[var(--color-farm-brown-dark)] mb-4">현재 문제를 풀고 있나요?</p>
+            <div class="flex justify-end">
+              <button
+                type="button"
+                class="btn btn-sm bg-[var(--color-farm-green)] text-white border-none hover:bg-[var(--color-farm-green-dark)]"
+                @click="onIdleConfirmContinue"
+              >
+                예(계속하기)
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- 힌트 차감 토스트 -->
     <Transition name="toast">
       <div v-if="toastMessage" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100] w-[min(520px,calc(100vw-2rem))]">
@@ -224,7 +279,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
 import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import HintPanel from '@/components/organisms/HintPanel.vue'
@@ -244,6 +299,7 @@ import { getReportDetail, buildReportFromSubmitResponse } from '@/api/reports'
 const router = useRouter()
 const route = useRoute()
 const terminalPanel = ref(null)
+const notificationContainerRef = ref(null)
 const authStore = useAuthStore()
 const ideStore = useIdeStore()
 // 스토어 로그인 상태를 computed로 참조해 로그아웃 시에도 블러/오버레이 즉시 반영
@@ -274,11 +330,28 @@ const hintMax = ref(3)
 const hintRemaining = computed(() => Math.max(0, hintMax.value - hintUsed.value))
 /** 힌트(채팅) 패널 접기/펼치기 */
 const hintPanelOpen = ref(true)
+/** 자동 힌트 미확인 시 종 아이콘 빨간 점 */
+const hasUnreadAutoHint = ref(false)
+/** 알림 탭 열림 */
+const notificationPanelOpen = ref(false)
+/** 알림 목록 (자동 힌트 도착 등) */
+const notificationItems = ref([])
+/** IDE 진입 시 다른 탭 중복 열기 안내 배너 (X로 닫으면 이번 세션 동안 숨김) */
+const showDuplicateTabBanner = ref(true)
 /** 문제 패널 탭 (problem | results) - 툴바에 표시 */
 const problemPanelActiveTab = ref('problem')
 const problemTitle = ref('문제')
 /** 이번 진입에서 방금 생성한 세션 ID (getLatestCode 호출 생략용) */
 const justCreatedSessionId = ref(null)
+/** 30분 무입력 시 확인 모달: 마지막 활동 시각 (코드 입력 또는 "예(계속하기)" 클릭) */
+const lastActivityAt = ref(null)
+/** 무입력 확인 모달 표시 여부 */
+const showIdleConfirmModal = ref(false)
+/** 확인 모달을 띄운 시각 (모달 표시 후 IDLE_MS 경과 시 강제 종료용) */
+const idleConfirmShownAt = ref(null)
+// const IDLE_MS = 30 * 60 * 1000 // 30분(운영)
+const IDLE_MS = 1 * 60 * 1000 // 1분(테스트: 1분 무입력 → 모달, 그로부터 1분 → 메인 취소 안내)
+let idleCheckIntervalId = null
 /** 힌트 차감 토스트 (FR-CODE-010-1) */
 const toastMessage = ref('')
 let toastTimer = null
@@ -319,6 +392,54 @@ function onConfirmModalConfirm() {
 function onConfirmModalCancel() {
   closeConfirm(false)
 }
+
+/** 30분 무입력 확인 모달 "예(계속하기)" 클릭: 활동 시각 갱신 후 모달 닫기 */
+function onIdleConfirmContinue() {
+  showIdleConfirmModal.value = false
+  idleConfirmShownAt.value = null
+  lastActivityAt.value = Date.now()
+}
+
+/** 무입력 체크 interval (테스트 시 15초마다 확인해 1분 타이밍에 가깝게 동작) */
+function startIdleCheck() {
+  if (idleCheckIntervalId) return
+  const checkIntervalMs = IDLE_MS === 60 * 1000 ? 15 * 1000 : 60 * 1000 // 테스트(1분)면 15초, 운영(30분)이면 1분
+  idleCheckIntervalId = setInterval(async () => {
+    const sid = ideStore.sessionId
+    if (sid == null) return
+    const now = Date.now()
+    if (showIdleConfirmModal.value) {
+      if (idleConfirmShownAt.value != null && now - idleConfirmShownAt.value >= IDLE_MS) {
+        showIdleConfirmModal.value = false
+        idleConfirmShownAt.value = null
+        clearInterval(idleCheckIntervalId)
+        idleCheckIntervalId = null
+        if (snapshotIntervalId) {
+          clearInterval(snapshotIntervalId)
+          snapshotIntervalId = null
+        }
+        skipLeaveConfirm.value = true
+        await closeSessionOnLeave()
+        await nextTick()
+        router.replace({ path: '/', query: { idle_cancel: '1' } })
+      }
+    } else {
+      const last = lastActivityAt.value ?? now
+      if (now - last >= IDLE_MS) {
+        showIdleConfirmModal.value = true
+        idleConfirmShownAt.value = now
+      }
+    }
+  }, checkIntervalMs)
+}
+
+function clearIdleCheck() {
+  if (idleCheckIntervalId) {
+    clearInterval(idleCheckIntervalId)
+    idleCheckIntervalId = null
+  }
+}
+
 // FR-CODE-002-1: 저장 상태 표시
 const lastSavedAt = ref(null)
 const isSaveInProgress = ref(false)
@@ -481,6 +602,7 @@ async function initSession() {
         return
       }
       ideStore.setSessionId(session.sessionId)
+      ideStore.setSessionStartedAt(session.startedAt ?? Date.now())
       // 방금 이번 진입에서 생성한 세션이면 저장된 코드가 없으므로 latest 호출 생략
       if (session.sessionId === justCreatedSessionId.value) {
         ideStore.setCodeToDefault(problemId)
@@ -502,8 +624,10 @@ async function initSession() {
 
   try {
     const { data: res } = await sessionApi.createSession(problemId)
-    const newSessionId = res?.data?.sessionId ?? null
+    const data = res?.data ?? {}
+    const newSessionId = data.sessionId ?? null
     ideStore.setSessionId(newSessionId)
+    ideStore.setSessionStartedAt(data.startedAt ?? Date.now())
     if (newSessionId) {
       justCreatedSessionId.value = newSessionId
       ideStore.setCodeToDefault(problemId)
@@ -628,12 +752,98 @@ function onBeforeUnload(e) {
   }
 }
 
+/** unload/pagehide 시 세션 종료 1회만 전송 (fetch keepalive, sendBeacon은 POST 전용이라 백엔드 PATCH와 호환 불가) */
+let sessionCloseSentForUnload = false
+function sendCloseOnUnload() {
+  if (sessionCloseSentForUnload) return
+  const sid = ideStore.sessionId
+  if (sid == null) return
+  sessionCloseSentForUnload = true
+  const baseURL = (import.meta.env.VITE_API_BASE_URL || '/api/v1').replace(/\/$/, '')
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null
+  const url = `${baseURL}/sessions/${sid}/close`
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+  try {
+    fetch(url, { method: 'PATCH', headers, keepalive: true })
+  } catch (_) {}
+}
+
+/** 탭/브라우저 종료·새로고침 시 (pagehide) */
+function onPageHide() {
+  sendCloseOnUnload()
+}
+
+/** 탭/브라우저 종료·새로고침 시 (unload, 문서 기준) */
+function onUnload() {
+  sendCloseOnUnload()
+}
+
+/** 가시성 API: 탭 전환/최소화 시에는 세션 종료하지 않음 (close는 페이지 종료·라우트 이탈 시에만) */
+function onVisibilityChange() {
+  // 탭 전환 시 세션을 닫으면 입장 직후 다른 탭 갔다 오면 세션이 끊겨 유휴 모달·리다이렉트가 동작하지 않음. 따라서 아무 동작 안 함.
+}
+
+/** Broadcast Channel: 다른 탭/창에서 어떤 문제를 열어도 기존 IDE 탭은 세션 종료 후 메인 이동 (전역 채널 1개) */
+const IDE_BROADCAST_CHANNEL_NAME = 'codefarm-ide-opened'
+let ideChannel = null
+let ideTabId = ''
+let ideOpenTime = 0
+let ideChannelResendTimeoutId = null
+function setupIdeBroadcastChannel() {
+  if (typeof BroadcastChannel === 'undefined') return
+  try {
+    if (ideChannelResendTimeoutId) {
+      clearTimeout(ideChannelResendTimeoutId)
+      ideChannelResendTimeoutId = null
+    }
+    ideChannel?.close()
+    ideChannel = new BroadcastChannel(IDE_BROADCAST_CHANNEL_NAME)
+    ideTabId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `tab-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    ideOpenTime = Date.now()
+    const payload = { type: 'opened', tabId: ideTabId, timestamp: ideOpenTime }
+    ideChannel.postMessage(payload)
+    // 새로 연 탭이 채널 구독 전에 첫 메시지를 놓치는 경우를 방지하기 위해 300ms 후 한 번 더 전송
+    ideChannelResendTimeoutId = setTimeout(() => {
+      ideChannelResendTimeoutId = null
+      try {
+        if (ideChannel) ideChannel.postMessage(payload)
+      } catch (_) {}
+    }, 300)
+    ideChannel.onmessage = (e) => {
+      const msg = e?.data
+      if (msg?.type !== 'opened' || msg?.tabId === ideTabId) return
+      // 나보다 나중에 연 탭이 보낸 메시지일 때만 닫기 (같은/다른 문제 무관)
+      if (msg.timestamp > ideOpenTime) {
+        closeSessionOnLeave()
+        showToast('다른 탭에서 문제를 열었습니다. 이 탭의 세션을 종료합니다.')
+        skipLeaveConfirm.value = true
+        router.replace('/')
+      }
+    }
+  } catch (_) {}
+}
+function closeIdeBroadcastChannel() {
+  try {
+    if (ideChannelResendTimeoutId) {
+      clearTimeout(ideChannelResendTimeoutId)
+      ideChannelResendTimeoutId = null
+    }
+    ideChannel?.close()
+    ideChannel = null
+  } catch (_) {}
+}
+
 onMounted(async () => {
   isInitializing.value = true
   try {
     await initSession()
     problemStartTime.value = Date.now()
     timerStoppedAt.value = null
+    if (ideStore.sessionId != null) {
+      lastActivityAt.value = Date.now()
+      startIdleCheck()
+    }
   } finally {
     isInitializing.value = false
     ideStore.ideRouteLoading = false
@@ -646,12 +856,24 @@ onMounted(async () => {
   window.addEventListener('online', onOnline)
   window.addEventListener('offline', onOffline)
   window.addEventListener('beforeunload', onBeforeUnload)
+  window.addEventListener('pagehide', onPageHide)
+  window.addEventListener('unload', onUnload)
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 // 첫 입력(또는 30초 idle 후 재입력) 시 10초 스냅샷 interval 시작
 watch(() => ideStore.lastCodeInputAt, () => {
   if (ideStore.lastCodeInputAt && !snapshotIntervalId) startSnapshotInterval()
 }, { deep: true })
+
+// 30분 무입력 체크: 코드 입력 시 마지막 활동 시각 갱신
+watch(
+  () => ideStore.lastCodeInputAt,
+  (v) => {
+    if (v != null) lastActivityAt.value = v
+  },
+  { immediate: true }
+)
 
 // 같은 IDE 페이지에서 문제 ID만 바뀐 경우 세션 재초기화 (interval은 입력 시 다시 시작)
 watch(() => route.params.id, async (newId, oldId) => {
@@ -661,11 +883,29 @@ watch(() => route.params.id, async (newId, oldId) => {
       await initSession()
       problemStartTime.value = Date.now()
       timerStoppedAt.value = null
+      if (ideStore.sessionId != null) {
+        lastActivityAt.value = Date.now()
+        if (!idleCheckIntervalId) startIdleCheck()
+      }
     } finally {
       isInitializing.value = false
+      ideStore.ideRouteLoading = false
     }
   }
 })
+
+// Broadcast Channel: IDE 진입 시 전역 채널 구독 → 다른 탭에서 어떤 문제를 열어도 이 탭은 세션 종료 후 메인으로
+watch(
+  () => ideStore.sessionId,
+  (sid) => {
+    if (sid != null) {
+      setupIdeBroadcastChannel()
+    } else {
+      closeIdeBroadcastChannel()
+    }
+  },
+  { immediate: true }
+)
 
 onBeforeRouteLeave(async (to, from, next) => {
   if (skipLeaveConfirm.value) {
@@ -718,6 +958,11 @@ onUnmounted(() => {
   window.removeEventListener('online', onOnline)
   window.removeEventListener('offline', onOffline)
   window.removeEventListener('beforeunload', onBeforeUnload)
+  window.removeEventListener('pagehide', onPageHide)
+  window.removeEventListener('unload', onUnload)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  closeIdeBroadcastChannel()
+  clearIdleCheck()
 
   // confirm 대기 중이면 안전하게 취소 처리
   if (confirmResolver) closeConfirm(false)
@@ -975,6 +1220,39 @@ function onHintUsedFromPanel({ usedHint, maxHint }) {
   showToast(`힌트가 차감되었습니다. (잔여: ${(maxHint ?? 3) - (usedHint ?? 0)}/${maxHint ?? 3})`)
 }
 
+/** 자동 힌트 도착 시 종 빨간 점 + 알림 목록에 추가 */
+function onAutoHintArrived() {
+  hasUnreadAutoHint.value = true
+  notificationItems.value.push({
+    id: Date.now(),
+    text: '자동 힌트가 왔습니다.',
+    type: 'auto_hint'
+  })
+}
+
+/** 힌트 "괜찮아요" 클릭 시 토스트 */
+function onDismissHintToast() {
+  showToast('대단해요!')
+}
+
+function toggleNotificationPanel() {
+  notificationPanelOpen.value = !notificationPanelOpen.value
+  if (notificationPanelOpen.value) hasUnreadAutoHint.value = false
+}
+
+/** 알림 탭 열렸을 때 바깥 클릭 시 닫기 */
+watch(notificationPanelOpen, (open) => {
+  if (!open) return
+  nextTick(() => {
+    const close = (e) => {
+      if (notificationContainerRef.value?.contains(e.target)) return
+      notificationPanelOpen.value = false
+      document.removeEventListener('click', close)
+    }
+    setTimeout(() => document.addEventListener('click', close), 0)
+  })
+})
+
 function showToast(msg) {
   toastMessage.value = msg
   if (toastTimer) clearTimeout(toastTimer)
@@ -1020,6 +1298,15 @@ function showToast(msg) {
 .modal-enter-from,
 .modal-leave-to {
   opacity: 0;
+}
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 
 /* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */

@@ -18,6 +18,7 @@ public class SseEmitterRepository {
 
     public SseEmitter save(Long sessionId, SseEmitter emitter) {
 
+        log.info("Saving SseEmitter for sessionId={}", sessionId);
         emitters.computeIfAbsent(sessionId, id -> new CopyOnWriteArrayList<>())
                 .add(emitter);
 
@@ -39,6 +40,7 @@ public class SseEmitterRepository {
                                 .name(eventName)
                                 .data(data)
                 );
+                log.info("Sent SSE event. sessionId={}, eventName={}", sessionId, eventName);
             } catch (IOException e) {
                 log.warn("SSE 전송 실패. sessionId={}", sessionId);
                 remove(sessionId, emitter);
@@ -48,11 +50,13 @@ public class SseEmitterRepository {
     }
 
     public void remove(Long sessionId, SseEmitter emitter) {
+        log.info("Removing SseEmitter for sessionId={}", sessionId);
         List<SseEmitter> list = emitters.get(sessionId);
         if (list != null) {
             list.remove(emitter);
             if (list.isEmpty()) {
                 emitters.remove(sessionId);
+                log.info("All SseEmitters removed for sessionId={}", sessionId);
             }
         }
     }
