@@ -1,1 +1,1 @@
-deploy test 2602031106: update syntax error in rsync on ci
+deploy test 2602031106: delete extra index url from requirements.txt
