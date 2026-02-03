@@ -349,5 +349,5 @@ inference-deploy:
 
     - echo "Unzipping models..."
     - cd "$MODEL_DIR"
-    - unzip -q model_label.zip -d "$DEPLOY_DIR/models/label_model"
+    - unzip -q label_model.zip -d "$DEPLOY_DIR/models/label_model"
     - unzip -q text_label.zip -d "$DEPLOY_DIR/models/text_model"
