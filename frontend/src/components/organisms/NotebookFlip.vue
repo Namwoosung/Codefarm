@@ -641,11 +641,9 @@ onBeforeUnmount(() => {
   border-radius: 14px;
   padding: 18px;
 
-  /* 종이 질감 느낌 */
-  background-image:
-    radial-gradient(rgba(78, 59, 42, 0.06) 1px, transparent 1px),
-    linear-gradient(transparent, transparent);
-  background-size: 18px 18px;
+  /* texture */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='rgba(122,92,62,0.08)' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'/%3E%3C/svg%3E");
+  background-size: 4px 4px;
 }
 
 .diary__index {

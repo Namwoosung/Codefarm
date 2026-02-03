@@ -3,13 +3,13 @@
   <section class="relative w-full bg-farm-olive px-20 py-3 md:py-4 overflow-hidden">
     <div class="relative">
       <transition name="banner-slide-up" mode="out-in">
-        <div :key="currentSlide.key" class="min-h-[92px] md:min-h-[112px] flex flex-col justify-center">
+        <div :key="currentSlide.key" class="min-h-[92px] md:min-h-[112px] flex flex-col justify-center px-10">
           <!-- 인트로 슬라이드 -->
           <template v-if="currentSlide.type === 'intro'">
             <p v-if="currentSlide.kicker" class="text-xs font-bold tracking-[0.2em] text-farm-cream/80">
               {{ currentSlide.kicker }}
             </p>
-            <h1 class="mt-1 text-2xl md:text-3xl font-bold text-farm-cream">
+            <h1 class="mt-1 text-2xl md:text-3xl font-dnf text-farm-cream">
               {{ currentSlide.title }}
             </h1>
             <p v-if="currentSlide.description" class="mt-2 text-xs md:text-base text-farm-cream/90">
@@ -19,9 +19,9 @@
 
           <!-- 랭킹 슬라이드: rank.png 위로 텍스트 오버레이 -->
           <template v-else>
-            <div class="flex items-center justify-between">
-              <p class="text-xs font-bold tracking-[0.2em] text-white/80">RANKING</p>
-              <span class="text-[11px] font-semibold text-white/80">TOP 3</span>
+            <div class="flex items-center justify-between px-6">
+              <p class="text-xs font-dnf tracking-[0.2em] text-white/80">RANKING</p>
+              <span class="text-[11px] font-dnf text-white/80">TOP 3</span>
             </div>
 
             <div class="relative mt-2 flex justify-center">
@@ -35,7 +35,7 @@
               <!-- 나무덩굴(이미지) 위에 텍스트 -->
               <div class="absolute inset-0 flex items-center justify-center">
                 <div class="-translate-y-[16px] md:-translate-y-[18px] text-center">
-                  <div class="text-base md:text-lg font-extrabold text-white leading-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.75)]">
+                  <div class="text-base md:text-lg font-dnf text-white leading-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.75)]">
                     {{ currentSlide.title }}
                   </div>
                   <div class="mt-0.5 text-xs md:text-sm font-semibold text-white/95 leading-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.65)]">

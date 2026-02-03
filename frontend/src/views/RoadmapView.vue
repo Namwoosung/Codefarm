@@ -4,7 +4,7 @@
       <!-- 메인 로드맵 이미지 영역 (레벨 미선택 시) -->
       <section v-if="!selectedLevel" class="relative w-full flex flex-col items-center">
         <div class="mb-12 text-center">
-          <h2 class="text-4xl font-black text-farm-brown-dark mb-4 tracking-tight">Welcome to Code Farm!</h2>
+          <h2 class="text-4xl font-dnf text-farm-brown-dark mb-4 tracking-tight">Welcome to Code Farm!</h2>
           <p class="text-lg text-farm-brown opacity-75 font-medium">길을 따라 모험을 시작할 레벨을 선택하세요.</p>
         </div>
         
@@ -91,10 +91,10 @@
             </div>
 
             <!-- 타이틀 영역: 이미지 위에 절대 위치로 배치 -->
-            <div class="absolute top-12 left-0 w-full z-20 pointer-events-none">
+            <div class="absolute top-24 left-0 w-full z-20 pointer-events-none">
               <div class="text-center relative">
                 <h2 class="text-sm font-bold text-farm-olive/80 tracking-[0.3em] uppercase mb-1">Curriculum</h2>
-                <h1 class="text-6xl font-black text-farm-olive mb-2 relative inline-block">
+                <h1 class="text-6xl font-dnf text-farm-olive mb-2 relative inline-block">
                   LEVEL {{ selectedLevel }}
                 </h1>
                 <p class="text-2xl text-farm-olive font-bold tracking-tight">
@@ -922,7 +922,7 @@ async function goToNewProblem() {
   left: 0;
   right: 0;
   bottom: 0;
-  transform: translateY(-250px);
+  transform: translateY(-200px);
   display: flex;
   justify-content: center;
   align-items: flex-end;
@@ -961,7 +961,7 @@ async function goToNewProblem() {
   transform: translate(-50%, -50%);
   font-size: 1.25rem;
   font-weight: 800;
-  color: #fff;
+  color: var(--color-farm-yellow);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
   line-height: 1.2;
   z-index: 1;
@@ -1025,9 +1025,6 @@ async function goToNewProblem() {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(4px);
-  /* 버튼/포인트 올리브 톤을 조금 더 연하게 */
-  border: 2px solid #6B6B3A;
-  box-shadow: 0 4px 0 #6B6B3A;
   width: 220px;
   text-align: center;
   z-index: 10;

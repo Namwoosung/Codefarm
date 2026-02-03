@@ -10,22 +10,22 @@
               alt="CODE FARM"
               class="h-[92px] md:h-[105px] w-auto max-w-[85vw] object-contain -translate-y-1 drop-shadow-sm select-none"
               draggable="false"
-            />
+            /> 
           </router-link>
         </div>
 
         <!-- 네비게이션 메뉴 (데스크톱) -->
-        <nav class="hidden md:flex md:items-center h-full gap-2 me-auto mx-4">
+        <nav class="hidden md:flex md:items-center md:justify-start flex-1 h-full gap-4 mx-4 font-dnf">
           <router-link
             to="/"
-            class="relative px-4 py-2 text-sm font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            class="relative flex items-center justify-center px-4 py-2 text-lg font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('home')"
           >
             메인페이지
           </router-link>
           <router-link
             to="/roadmap"
-            class="relative px-4 py-2 text-sm font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            class="relative flex items-center justify-center px-4 py-2 text-lg font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('roadmap')"
             @click="onCurriculumClick"
           >
@@ -34,7 +34,7 @@
           <router-link
             v-if="isLoggedIn"
             to="/cards"
-            class="relative px-4 py-2 text-sm font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            class="relative flex items-center justify-center px-4 py-2 text-lg font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('cards')"
           >
             카드
@@ -42,7 +42,7 @@
           <router-link
             v-if="isLoggedIn && user && user.userId"
             :to="`/profile/${user.userId}`"
-            class="relative px-4 py-2 text-sm font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
+            class="relative flex items-center justify-center px-4 py-2 text-lg font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('profile')"
           >
             마이페이지
@@ -99,11 +99,11 @@
       </div>
 
       <!-- 모바일 네비게이션 메뉴 -->
-      <div v-if="showMobileMenu" class="md:hidden border-t border-farm-cream py-4">
-        <div class="flex flex-col space-y-2">
+      <div v-if="showMobileMenu" class="md:hidden border-t border-farm-cream py-4 font-dnf-bitbit">
+        <div class="flex flex-col items-center space-y-2">
           <router-link
             to="/"
-            class="px-3 py-2 text-base font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
+            class="w-full text-center px-3 py-2.5 text-lg font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
             active-class="text-farm-green bg-farm-cream"
             @click="closeMobileMenu"
           >
@@ -111,7 +111,7 @@
           </router-link>
           <router-link
             to="/roadmap"
-            class="px-3 py-2 text-base font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
+            class="w-full text-center px-3 py-2.5 text-lg font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
             active-class="text-farm-green bg-farm-cream"
             @click="onCurriculumClickMobile"
           >
@@ -120,7 +120,7 @@
           <router-link
             v-if="isLoggedIn"
             to="/cards"
-            class="px-3 py-2 text-base font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
+            class="w-full text-center px-3 py-2.5 text-lg font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
             active-class="text-farm-green bg-farm-cream"
             @click="closeMobileMenu"
           >
@@ -129,7 +129,7 @@
           <router-link
             v-if="isLoggedIn && user && user.userId"
             :to="`/profile/${user.userId}`"
-            class="px-3 py-2 text-base font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
+            class="w-full text-center px-3 py-2.5 text-lg font-medium text-farm-brown-dark hover:text-farm-green hover:bg-farm-cream rounded-lg transition-colors"
             active-class="text-farm-green bg-farm-cream"
             @click="closeMobileMenu"
           >

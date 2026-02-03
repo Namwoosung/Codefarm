@@ -2,12 +2,7 @@
   <div class="min-h-screen bg-farm-cream/20">
     <!-- 최상단 배너: 전체 화면 폭 -->
     <MainHeroBanner :top3="top3" />
-
-    <div class="max-w-7xl mx-auto px-12 py-10">
-      <div class="mb-4">
-        <h2 class="text-2xl font-bold text-farm-brown-dark"> 모든 문제</h2>
-        <p class="text-sm text-farm-brown/80">필터로 원하는 유형/난이도를 빠르게 골라보세요.</p>
-  <div class="min-h-screen p-10">
+    <div class="min-h-screen p-10">
     <!-- 30분 무입력 강제 종료 후 메인 진입 시 안내 모달 (X로 닫기) -->
     <Teleport to="body">
       <Transition name="modal">
@@ -58,13 +53,10 @@
     </Teleport>
 
     <div class="max-w-7xl mx-auto">
-      <div class="text-center mb-10">
-        <h1 class="text-3xl font-bold text-farm-brown-dark mb-2">CODE FARM 문제 목록</h1>
-        <p class="text-farm-brown">
-          문제를 선택하면 IDE 화면으로 이동해 풀 수 있어요.
-        </p>
-      </div>
-
+          <div class="max-w-7xl mx-auto pb-10">
+        <h2 class="text-2xl font-bold text-farm-brown-dark"> 모든 문제</h2>
+        <p class="text-sm text-farm-brown/80">필터로 원하는 유형/난이도를 빠르게 골라보세요.</p>
+    </div>
       <!-- 필터 / 정렬 UI -->
       <div class="mb-6 flex flex-wrap items-center gap-3 ">
         <!-- 문제 유형 -->
@@ -191,28 +183,12 @@
           class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity"
           :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
-          <div
+          <ProblemCard
             v-for="problem in problems"
             :key="problem.problemId ?? problem.id"
-            role="button"
-            tabindex="0"
-            class="block bg-farm-paper border-4 border-farm-brown rounded-2xl p-6 hover:shadow-lg transition-shadow cursor-pointer"
-            @click="onClickProblem(problem)"
-            @keydown.enter="onClickProblem(problem)"
-          >
-            <div class="mb-3 flex items-center justify-between text-sm text-farm-brown-dark">
-              <span class="inline-flex items-center gap-1">
-                <span class="px-3 py-1 bg-farm-cream rounded-full text-xs font-semibold">
-                  Lv.{{ problem.difficulty }}
-                </span>
-                <span class="font-medium">#{{ problem.algorithm }}</span>
-              </span>
-              <span class="text-xs text-farm-brown/70">ID: {{ problem.problemId ?? problem.id }}</span>
-            </div>
-            <h2 class="text-xl font-bold text-farm-brown-dark">
-              {{ problem.title }}
-            </h2>
-          </div>
+            :problem="problem"
+            @click="onClickProblem"
+          />
         </div>
 
         <div v-if="loading" class="absolute inset-0 flex items-center justify-center">
@@ -278,6 +254,7 @@
         </div>
       </nav>
     </div>
+    </div>
   </div>
 </template>
 
@@ -285,18 +262,16 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProblemList } from '@/api/problem'
-<<<<<<< frontend/src/views/MainView.vue
 import { useCardStore } from '@/stores/card'
 import MainHeroBanner from '@/components/organisms/MainHeroBanner.vue'
+import ProblemCard from '@/components/organisms/ProblemCard.vue'
 onMounted(() => {
   cardStore.ranking()
 })
 const cardStore = useCardStore()
 const rankingList = computed(() => cardStore.rankingList)
 const top3 = computed(() => (rankingList.value ?? []).slice(0, 3))
-=======
 import * as sessionApi from '@/api/session'
->>>>>>> frontend/src/views/MainView.vue
 
 const route = useRoute()
 const router = useRouter()
