@@ -5,26 +5,35 @@ stages:
   - deploy
   - inference
 
+########################
+# PIPELINE CREATION
+########################
 workflow:
   rules:
-    - if: $CI_COMMIT_BRANCH
+    # MR 생성/업데이트 시 파이프라인 생성
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: always
+    # 일반 push 파이프라인
+    - if: '$CI_COMMIT_BRANCH'
+      when: always
+    - when: never
 
 variables:
   IMAGE_TAG: "$CI_COMMIT_SHA"
 
 default:
   before_script:
-    - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
+    - echo "source=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
 ########################
-# BUILD (docker build & push)
+# BUILD (push 후, protected 브랜치만)
 ########################
 .build-template:
   stage: build
   before_script:
-    - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
     - docker info
+    - test -n "$DOCKERHUB_USERNAME" || { echo "DOCKERHUB_USERNAME missing"; exit 1; }
+    - test -n "$DOCKERHUB_TOKEN" || { echo "DOCKERHUB_TOKEN missing"; exit 1; }
     - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
 build-backend:
@@ -33,7 +42,9 @@ build-backend:
     - docker build -t "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA" -f backend/Dockerfile backend
     - docker push "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
       changes:
         - backend/**
         - .gitlab-ci.yml
@@ -44,7 +55,9 @@ build-web:
     - docker build -t "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA" -f infra/nginx/Dockerfile .
     - docker push "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
       changes:
         - frontend/**
         - infra/nginx/**
@@ -56,7 +69,9 @@ build-execution:
     - docker build -t "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA" -f execution/Dockerfile execution
     - docker push "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
       changes:
         - execution/**
         - .gitlab-ci.yml
@@ -67,126 +82,44 @@ build-feedback:
     - docker build -t "$DOCKERHUB_USERNAME/feedback:$CI_COMMIT_SHA" -f feedback/Dockerfile feedback
     - docker push "$DOCKERHUB_USERNAME/feedback:$CI_COMMIT_SHA"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
       changes:
         - feedback/**
         - .gitlab-ci.yml
 
 ########################
-# TEST
+# TEST (MR + feature 브랜치)
 ########################
-test-fast:
-  tags: [ec2-mono]
+test:
   stage: test
-  script:
-    - echo "Fast tests for feature/infra/fix"
-  rules:
-    - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\/.+/'
-      changes:
-        - backend/**
-        - frontend/**
-        - infra/**
-        - execution/**
-        - feedback/**
-        - .gitlab-ci.yml
-
-test-full:
   tags: [ec2-mono]
-  stage: test
   script:
-    - echo "Full tests for develop/main/hotfix"
+    - echo "Running tests"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      changes:
-        - backend/**
-        - frontend/**
-        - infra/**
-        - execution/**
-        - feedback/**
-        - .gitlab-ci.yml
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\//'
 
 ########################
-# SECURITY SCAN
+# SECURITY
 ########################
 cache:
   key: trivy-cache
   paths:
     - .trivycache/
 
-trivy_scan_images:
-  stage: security
-  tags: [ec2-mono]
-  needs:
-    - job: build-backend
-      optional: true
-    - job: build-web
-      optional: true
-    - job: build-execution
-      optional: true
-    - job: build-feedback
-      optional: true
-  variables:
-    TRIVY_SEVERITY: "CRITICAL,HIGH"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - backend/**
-        - frontend/**
-        - infra/**
-        - execution/**
-        - feedback/**
-        - .gitlab-ci.yml
-      variables:
-        TRIVY_EXIT_CODE: "0"   # develop은 발견돼도 통과
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      changes:
-        - backend/**
-        - frontend/**
-        - infra/**
-        - execution/**
-        - feedback/**
-        - .gitlab-ci.yml
-      variables:
-        TRIVY_EXIT_CODE: "0"   # 운영은 차단 <- 임시 패스
-  script:
-    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA} || true
-    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA} || true
-    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/execution:${CI_COMMIT_SHA} || true
-    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/feedback:${CI_COMMIT_SHA} || true
-
-# 파일/설정 스캔은 빌드와 무관하므로 needs 제거 (needs로 인해 "job does not exist" 터지는 것 방지)
 trivy_fs:
   stage: security
   tags: [ec2-mono]
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      changes:
-        - backend/**
-        - frontend/**
-        - infra/**
-        - execution/**
-        - feedback/**
-        - .gitlab-ci.yml
   script:
     - trivy fs --severity HIGH,CRITICAL .
-
-trivy_config:
-  stage: security
-  tags: [ec2-mono]
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      changes:
-        - backend/**
-        - frontend/**
-        - infra/**
-        - execution/**
-        - feedback/**
-        - .gitlab-ci.yml
-  script:
-    - trivy config .
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
 
 ########################
-# DEPLOY (EC2에서 docker pull & compose up)
+# DEPLOY (push 후 only)
 ########################
 .deploy-template:
   stage: deploy
@@ -194,107 +127,29 @@ trivy_config:
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
-deploy-foundation:
-  needs:
-    - job: build-execution
-      optional: true
-    - job: build-feedback
-      optional: true
-  extends: .deploy-template
-  script:
-    - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
-    - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      when: manual
-      allow_failure: true
-
 deploy-dev:
-  needs:
-    - job: build-backend
-      optional: true
-    - job: build-web
-      optional: true
-    - job: build-execution
-      optional: true
-    - job: build-feedback
-      optional: true
   extends: .deploy-template
   script:
-    - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
   rules:
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - backend/**
-        - frontend/**
-        - infra/**
-        - execution/**
-        - feedback/**
-        - .gitlab-ci.yml
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop"'
 
 deploy-prod:
-  needs:
-    - job: build-backend
-      optional: true
-    - job: build-web
-      optional: true
-    - job: build-execution
-      optional: true
-    - job: build-feedback
-      optional: true
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh prod"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
-      allow_failure: true
 
 ########################
-# ROLLBACK (manual)
-########################
-.rollback-template:
-  stage: deploy
-  before_script:
-    - mkdir -p ~/.ssh
-    - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
-
-rollback-dev:
-  extends: .rollback-template
-  script:
-    - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh dev"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      when: manual
-      allow_failure: true
-
-rollback-prod:
-  extends: .rollback-template
-  script:
-    - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh prod"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      when: manual
-      allow_failure: true
-
-rollback-foundation:
-  extends: .rollback-template
-  script:
-    - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' bash /srv/app/scripts/rollback.sh foundation"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      when: manual
-      allow_failure: true
-
-########################
-# INFERENCE STAGE
+# INFERENCE (push 후 only)
 ########################
 inference-deploy:
   stage: inference
@@ -305,49 +160,36 @@ inference-deploy:
     DEPLOY_DIR: "/srv/app/app/inference"
     MODEL_DIR: "/home/elicer/models"
   rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
       changes:
         - inference/**
-  script:
-    - set -euo pipefail
+        - .gitlab-ci.yml
+  script: |-
+    set -euo pipefail
+    echo "Deploying inference service"
 
-    - echo "Deploying inference service..."
-    - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
+    rm -rf repo
+    mkdir repo
+    cd repo
 
-    # 1) Clean working dir
-    - rm -rf repo
-    - mkdir -p repo
-    - cd repo
+    git init
+    git remote add origin "$CI_REPOSITORY_URL"
+    git fetch --depth 1 origin "$CI_COMMIT_SHA"
+    git sparse-checkout init --cone
+    git sparse-checkout set "$INF_DIR"
+    git checkout -f FETCH_HEAD
 
-    # 2) Sparse checkout only inference/
-    - git init
-    - git remote add origin "$CI_REPOSITORY_URL"
-    - git fetch --depth 1 origin "$CI_COMMIT_SHA"
-    - git sparse-checkout init --cone
-    - git sparse-checkout set "$INF_DIR"
-    - git checkout -f FETCH_HEAD
+    mkdir -p "$DEPLOY_DIR"
+    rsync -a "$INF_DIR/" "$DEPLOY_DIR/"
 
-    # 3) Stage copy to /tmp first (avoid "file has vanished" due to cleanup)
-    - STAGE_DIR="/tmp/inference_stage_${CI_PIPELINE_ID}_${CI_JOB_ID}"
-    - rm -rf "$STAGE_DIR"
-    - mkdir -p "$STAGE_DIR"
-    - cp -a "$INF_DIR/." "$STAGE_DIR/"
+    cd "$DEPLOY_DIR"
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+    pyenv activate venv
+    pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
 
-    # 4) Deploy with rsync
-    - mkdir -p "$DEPLOY_DIR"
-    - rsync -a --delete --ignore-missing-args --exclude='__pycache__/' --exclude='*.pyc' "$STAGE_DIR/" "$DEPLOY_DIR/" || { rc=$?; [ "$rc" -eq 24 ] && echo "rsync warning(code 24) ignored" && exit 0; exit "$rc"; }
-
-    # 5) Python env + deps
-    - cd "$DEPLOY_DIR"
-    - export PYENV_ROOT="$HOME/.pyenv"
-    - export PATH="$PYENV_ROOT/bin:$PATH"
-    - eval "$(pyenv init -)"
-    - pyenv activate venv
-    - python -V
-    - pip install --upgrade pip
-    - pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
-
-    - echo "Unzipping models..."
-    - cd "$MODEL_DIR"
-    - unzip -q label_model.zip -d "$DEPLOY_DIR/models/label_model"
-    - unzip -q text_model.zip -d "$DEPLOY_DIR/models/text_model"
+    unzip -q "$MODEL_DIR/label_model.zip" -d "$DEPLOY_DIR/models/label_model"
+    unzip -q "$MODEL_DIR/text_model.zip"  -d "$DEPLOY_DIR/models/text_model"
