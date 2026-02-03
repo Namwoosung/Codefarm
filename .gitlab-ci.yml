@@ -303,7 +303,7 @@ inference-deploy:
     GIT_STRATEGY: "none"
     INF_DIR: "inference"
     DEPLOY_DIR: "/srv/app/app/inference"
-    MODEL_DIR: "~/models"
+    MODEL_DIR: "/home/elicer/models"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       changes:
