@@ -87,7 +87,18 @@ public class SessionService {
 
         sessionCodeRedisService.initialize(session.getId());
 
-        autoHintSchedulerService.start(session.getId()); // 스케줄러 시작
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            autoHintSchedulerService.start(session.getId());
+                        }
+                    }
+            );
+        } else {
+            autoHintSchedulerService.start(session.getId());
+        }
 
         return SessionResponseDto.from(session);
     }
