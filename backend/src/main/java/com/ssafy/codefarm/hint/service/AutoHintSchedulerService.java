@@ -46,9 +46,13 @@ public class AutoHintSchedulerService {
 
         ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(
                 () -> {
-                    boolean keepRunning = hintProcessingService.process(sessionId);
-                    if (!keepRunning) {
-                        stop(sessionId);
+                    try {
+                        boolean keepRunning = hintProcessingService.process(sessionId);
+                        if (!keepRunning) {
+                            stop(sessionId);
+                        }
+                    } catch (Exception e) {
+                        log.error("Error occurred in auto hint scheduler for session: {}", sessionId, e);
                     }
                 },
                 Instant.now().plus(INTERVAL),

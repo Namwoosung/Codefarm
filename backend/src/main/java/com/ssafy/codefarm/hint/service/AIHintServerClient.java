@@ -29,8 +29,10 @@ public class AIHintServerClient {
                     .body(request)
                     .retrieve()
                     .onStatus(status -> status.isError(), (req, res) -> {
+                        String body = new String(res.getBody().readAllBytes());
+                        log.error("AI Hint Server Error: status={}, body={}", res.getStatusCode(), body);
                         throw new CustomException(
-                                "AI 힌트 서버 오류",
+                                "AI 힌트 서버 오류: " + res.getStatusCode(),
                                 ErrorCode.EXTERNAL_API_ERROR
                         );
                     })

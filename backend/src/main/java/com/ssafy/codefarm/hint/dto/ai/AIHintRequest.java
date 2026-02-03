@@ -90,20 +90,21 @@ public record AIHintRequest(
     }
 
     private static String extractLanguage(List<CodeHistoryItem> history) {
-        if (history == null || history.isEmpty()) return null;
-        return history.get(history.size() - 1).code() != null ? "python" : null;
+//        if (history == null || history.isEmpty()) return null;
+//        return history.get(history.size() - 1).code() != null ? "python" : null;
+        return "python"; // 현재는 python만 호환 가능
     }
 
     public record UserInformation(
             Integer age,
             Integer coding_level,
-            Long user_id
+            String user_id
     ) {
         public static UserInformation from(User user) {
             return new UserInformation(
                     user.getAge(),
                     user.getCodingLevel(),
-                    user.getId()
+                    String.valueOf(user.getId())
             );
         }
     }
