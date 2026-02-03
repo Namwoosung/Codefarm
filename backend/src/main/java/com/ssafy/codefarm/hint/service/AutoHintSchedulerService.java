@@ -1,5 +1,7 @@
 package com.ssafy.codefarm.hint.service;
 
+import com.ssafy.codefarm.hint.dto.ai.AIHintRequest;
+import com.ssafy.codefarm.hint.dto.ai.AIHintResponse;
 import com.ssafy.codefarm.hint.entity.Hint;
 import com.ssafy.codefarm.hint.entity.HintType;
 import com.ssafy.codefarm.hint.repository.HintRepository;
@@ -28,6 +30,8 @@ import java.util.concurrent.ScheduledFuture;
 public class AutoHintSchedulerService {
 
     private final TaskScheduler taskScheduler;
+    private final AIHintServerClient aiHintServerClient;
+
     private final SessionRepository sessionRepository;
     private final SessionCodeRedisService sessionCodeRedisService;
     private final HintRepository hintRepository;
@@ -112,37 +116,27 @@ public class AutoHintSchedulerService {
         List<PreviousJudgementRedisDto> previousJudgements =
                 sessionCodeRedisService.getPreviousJudgements(sessionId);
 
-        // AI 요청 DTO 구성 (추후 실제 구현)
-        /*
-        AIHintRequest request = AIHintRequest.builder()
-                .startedAt(session.getStartedAt())
-                .observedAt(LocalDateTime.now())
-                .language(extractLanguage(codeHistory))
-                .userInformation(...)
-                .problemInformation(...)
-                .codeHistory(codeHistory)
-                .previousJudgement(previousJudgements)
-                .build();
-        */
+        AIHintRequest request = AIHintRequest.of(
+                session,
+                session.getUser(),
+                session.getProblem(),
+                null,
+                codeHistory,
+                previousJudgements
+        );
 
-        // ====================================
-        // AI 호출 부분 (현재는 주석)
-        // AIHintResponse response = feedbackServerClient.requestAutoHint(request);
-        // ====================================
+        AIHintResponse response = aiHintServerClient.request(sessionId, request);
 
-
-        // 🔹 테스트용 더미 응답
-        String analysis = "아직 코드 작성이 충분하지 않습니다.";
-        List<String> mistakeTypes = List.of("NoCode_Early");
-        String hintContent = "입력 처리 순서를 다시 확인해보세요.";
+        String hintContent = response.hint();
+        AIHintResponse.CurrentJudgement cj = response.current_judgement();
 
         // judgement는 무조건 Redis 저장
         sessionCodeRedisService.appendJudgement(
                 sessionId,
                 PreviousJudgementRedisDto.builder()
-                        .analysis(analysis)
-                        .mistakeType(mistakeTypes)
-                        .judgedAt(LocalDateTime.now())
+                        .analysis(cj.analysis())
+                        .mistakeType(cj.mistake_type())
+                        .judgedAt(java.time.LocalDateTime.now())
                         .hint(hintContent)
                         .build()
         );
