@@ -107,7 +107,6 @@ unsloth==2025.10.8
 unsloth_zoo==2025.10.9
 urllib3==2.6.3
 wcwidth==0.2.14
-xformers==0.0.34
 xxhash==3.6.0
 yarl==1.22.0
 zipp==3.23.0
