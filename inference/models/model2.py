@@ -64,7 +64,7 @@ def _resolve_fold_dir(root: str, fold: int) -> str:
 # ============================================================
 
 ADAPTER_DIR_ENV = os.getenv("MODEL2_ADAPTER_DIR", "").strip()
-ADAPTER_ROOT = os.getenv("MODEL2_ADAPTER_ROOT", "./cv_outputs_analysis_qlora_v3").strip()
+ADAPTER_ROOT = os.getenv("MODEL2_ADAPTER_ROOT", "./models/text_model/").strip()
 ADAPTER_FOLD = int(os.getenv("MODEL2_ADAPTER_FOLD", "5"))
 
 BASE_MODEL = os.getenv("MODEL2_BASE_MODEL", "").strip()  # optional
@@ -313,6 +313,7 @@ def _primary_device(model) -> torch.device:
         for _, d in hf_map.items():
             if isinstance(d, str) and d not in ("cpu", "disk", "meta"):
                 return torch.device(d)
+    print("cuda" if torch.cuda.is_available() else "cpu")
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def load_model_once() -> None:
