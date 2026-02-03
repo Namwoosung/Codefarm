@@ -21,7 +21,7 @@
             class="relative flex items-center justify-center px-4 py-2 text-lg font-medium text-farm-brown-dark/65 hover:text-farm-brown-dark transition-colors select-none"
             :class="navLinkClass('home')"
           >
-            메인페이지
+            모든 문제
           </router-link>
           <router-link
             to="/roadmap"

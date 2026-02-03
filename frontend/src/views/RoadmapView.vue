@@ -197,10 +197,11 @@
             >
               <button
                 type="button"
-                class="cf-recommend-btn"
+                class="cf-sun-btn"
+                aria-label="추천 문제 보기"
                 @click="onClickRecommend(selectedLevel - 1)"
               >
-                추천 문제 보기
+                <span class="cf-sun-text">추천문제</span>
               </button>
             </div>
           </div>
@@ -811,9 +812,80 @@ async function goToNewProblem() {
 
 .cf-roadmap-recommend {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  right: 5.25rem;
+  top: 3.25rem;
+  bottom: auto;
   z-index: 5;
+}
+
+.cf-sun-btn {
+  position: relative;
+  width: 66px;
+  height: 66px;
+  border-radius: 9999px;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 30% 30%, #fff7cc 0%, #ffe082 35%, #ffb300 100%);
+  box-shadow:
+    0 10px 22px rgba(255, 179, 0, 0.35),
+    0 2px 8px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* 빛살(레이) */
+.cf-sun-btn::before {
+  content: '';
+  position: absolute;
+  inset: -14px;
+  border-radius: 9999px;
+  background: repeating-conic-gradient(
+    from 0deg,
+    rgba(255, 224, 130, 0.95) 0 10deg,
+    rgba(255, 224, 130, 0) 10deg 20deg
+  );
+  opacity: 0.9;
+  /* 가운데는 비우고 바깥만 보이게 */
+  -webkit-mask: radial-gradient(circle, transparent 0 58%, #000 59% 100%);
+  mask: radial-gradient(circle, transparent 0 58%, #000 59% 100%);
+  pointer-events: none;
+}
+
+/* 은은한 글로우 */
+.cf-sun-btn::after {
+  content: '';
+  position: absolute;
+  inset: -26px;
+  border-radius: 9999px;
+  background: radial-gradient(circle, rgba(255, 224, 130, 0.55), transparent 60%);
+  pointer-events: none;
+}
+
+.cf-sun-btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow:
+    0 14px 28px rgba(255, 179, 0, 0.38),
+    0 3px 10px rgba(0, 0, 0, 0.12);
+}
+.cf-sun-btn:active {
+  transform: translateY(0);
+  filter: brightness(0.98);
+}
+.cf-sun-btn:focus-visible {
+  outline: 3px solid rgba(255, 224, 130, 0.85);
+  outline-offset: 3px;
+}
+
+.cf-sun-text {
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: rgba(78, 59, 42, 0.92); /* farm-brown-dark 계열 */
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  line-height: 1;
+  user-select: none;
 }
 .cf-recommend-desc {
   font-size: 0.8rem;
@@ -1070,22 +1142,22 @@ async function goToNewProblem() {
 .cf-modal {
   width: 100%;
   max-width: 26rem;
-  /* 크림 배경 + 살짝 투명 */
-  background: rgba(245, 242, 232, 0.92);
+  /* 더 밝은 페이퍼 톤 */
+  background: rgba(255, 253, 245, 0.97);
   /* 테두리 두께 줄임 */
-  border: 2px solid rgba(74, 74, 41, 0.55);
+  border: 2px solid rgba(74, 74, 41, 0.35);
   border-radius: 24px;
   /* 배경이 투명하므로 블러로 유리 느낌 */
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 10px 0 rgba(74, 74, 41, 0.10); /* 올리브색 계열 그림자 */
+  box-shadow: 0 10px 0 rgba(74, 74, 41, 0.08); /* 올리브색 계열 그림자 */
   cursor: default;
   overflow: hidden;
   position: relative;
 }
 .cf-modal-header {
   padding: 1.5rem 1.5rem 1rem;
-  background: rgba(245, 242, 232, 0.65);
+  background: rgba(255, 253, 245, 0.85);
   border-bottom: 1px solid rgba(122, 92, 62, 0.18);
 }
 .cf-modal-label {
@@ -1093,7 +1165,7 @@ async function goToNewProblem() {
   font-size: 0.75rem;
   font-weight: 900;
   color: #6B6B3A;
-  background: #e8e0d0;
+  background: rgba(245, 242, 232, 0.95);
   padding: 0.2rem 0.5rem;
   border-radius: 6px;
   text-transform: uppercase;
@@ -1119,7 +1191,7 @@ async function goToNewProblem() {
   background: #ffffff;
   padding: 0.75rem 1rem;
   border-radius: 16px;
-  border: 2px solid #e8e0d0;
+  border: 2px solid rgba(245, 242, 232, 0.95);
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -1144,7 +1216,7 @@ async function goToNewProblem() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(245, 242, 232, 0.55);
+  background: rgba(255, 253, 245, 0.9);
   border: 1px solid rgba(122, 92, 62, 0.18);
 }
 .cf-modal-status-label {
@@ -1166,7 +1238,7 @@ async function goToNewProblem() {
   padding: 1rem 1.5rem 1.5rem;
   display: flex;
   gap: 0.75rem;
-  background: rgba(245, 242, 232, 0.65);
+  background: rgba(255, 253, 245, 0.85);
   border-top: 1px solid rgba(122, 92, 62, 0.18);
 }
 .cf-modal-btn {

@@ -1,32 +1,19 @@
 <template>
   <div class="signup-form">
-    <p class="text-center text-sm text-gray-600 mb-6">
+    <p v-if="!embedded" class="text-center text-sm text-gray-600 mb-6">
       또는
-      <router-link
-        to="/login"
-        class="font-medium text-blue-600 hover:text-blue-500"
-      >
+      <router-link to="/login" class="font-medium text-farm-point hover:brightness-110">
         로그인
       </router-link>
     </p>
-    <!-- 기본 동작(로그인) 방지를 위해 prevent 추가 -->
-    <!-- novalidate: 브라우저 기본 HTML5 검증 비활성화 (영어 메시지 방지) -->
     <form class="space-y-6" @submit.prevent="handleSubmit" novalidate>
-      <div class="space-y-4">
+      <div class="space-y-3">
         
         <!-- 이메일 -->
         <div>
           <label for="email" class="block text-sm font-medium text-gray-700">
             이메일
           </label>
-          <!-- 
-            id="email": HTML 요소의 고유 식별자, label과 연결하여 접근성 향상
-            v-model="formData.email": Vue 양방향 데이터 바인딩, 입력값이 formData.email에 자동 반영
-            type="email": 이메일 입력 필드로 지정, 브라우저 기본 이메일 형식 검증 제공
-            required: 필수 입력 필드, 값이 없으면 브라우저 기본 검증 메시지 표시
-            class: Tailwind CSS 클래스 (mt-1, appearance-none, relative, block, w-full, px-3, py-2, border, border-gray-300, placeholder-gray-500, text-gray-900, rounded-md, focus:outline-none, focus:ring-blue-500, focus:border-blue-500, focus:z-10, sm:text-sm) - 스타일링 및 레이아웃
-            placeholder="example@email.com": 입력 전 보이는 힌트 텍스트, 사용자 가이드 제공
-          -->
           <div class="relative">
             <input
               id="email"
@@ -223,7 +210,7 @@
         <button
           type="submit"
           :disabled="authStore.isLoading"
-          class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-farm-paper bg-farm-point hover:brightness-110 active:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-olive/40 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span v-if="!authStore.isLoading">회원가입</span>
           <span v-else>처리 중...</span>
@@ -234,21 +221,22 @@
 </template>
 
 <script setup>
-// Vue 3의 반응형 API: ref(단일 값), reactive(객체) - 데이터 변경 시 자동으로 UI 업데이트
 import { ref, reactive } from 'vue'
-// Vue Router의 라우터 훅: 페이지 이동 등 라우팅 기능 제공
 import { useRouter } from 'vue-router'
-// Pinia auth 스토어: 회원가입 등 인증 관련 상태 관리
 import { useAuthStore } from '@/stores/auth'
 
-// Vue Router 인스턴스: 페이지 이동 등 라우팅 기능 사용
+const props = defineProps({
+  /** 로그인/회원가입 스왑 화면에 포함될 때 true */
+  embedded: { type: Boolean, default: false }
+})
+
+const emit = defineEmits(['signed-up'])
 const router = useRouter()
-// Pinia auth 스토어 인스턴스: 회원가입 API 호출 및 로딩 상태 관리
 const authStore = useAuthStore()
 
 // 중복 확인 상태 관리
-const emailCheckStatus = ref('') // '', 'checking', 'available', 'duplicate'
-const nicknameCheckStatus = ref('') // '', 'checking', 'available', 'duplicate'
+const emailCheckStatus = ref('')
+const nicknameCheckStatus = ref('') 
 const isCheckingEmail = ref(false)
 const isCheckingNickname = ref(false)
 
@@ -256,24 +244,19 @@ const isCheckingNickname = ref(false)
 let emailCheckTimer = null
 let nicknameCheckTimer = null  
 
-/**
- * 폼 데이터 (반응형 객체)
- * reactive: Vue 3의 반응형 API로, 객체를 반응형으로 만듦
- * - 객체의 속성이 변경되면 자동으로 UI가 업데이트됨 (v-model과 연동)
- * - ref와 달리 객체 전체를 반응형으로 만들 때 사용
- */
+/* 폼 데이터 */
 const formData = reactive({
-  email: '',              // 이메일
-  password: '',           // 비밀번호
-  passwordConfirm: '',    // 비밀번호 확인
-  name: '',              // 이름
-  nickname: '',          // 닉네임
-  age: null,             // 나이 (number 타입)
-  codingLevel: null     // 코딩 레벨 (1~5, number 타입)
+  email: '',         
+  password: '',          
+  passwordConfirm: '',    
+  name: '',            
+  nickname: '',         
+  age: null,             
+  codingLevel: null    
 })
 
 /**
- * 필드별 에러 메시지 (반응형 객체)
+ * 필드별 에러 메시지 
  * 각 필드의 유효성 검사 실패 시 표시할 에러 메시지 저장
  */
 const errors = reactive({
@@ -288,18 +271,14 @@ const errors = reactive({
 
 /**
  * 제출 시 발생하는 전체 에러 메시지 (예: API 에러)
- * ref: 단일 값을 반응형으로 만듦 (문자열, 숫자 등)
  */
 const submitError = ref('')
-// isLoading은 authStore에서 관리하므로 로컬 변수 제거
 
 /**
  * 폼 유효성 검사 함수
- * 모든 필드의 입력값을 검증하고 에러 메시지를 설정
  * @returns {boolean} 모든 검증을 통과하면 true, 실패하면 false
  */
 const validateForm = () => {
-  // 에러 초기화: 이전 검증 결과 제거
   Object.keys(errors).forEach((key) => {
     errors[key] = ''
   })
@@ -425,13 +404,9 @@ const handleSubmit = async () => {
   if (!validateForm()) {
     return
   }
-
-  // 이전 에러 메시지 초기화
   submitError.value = ''
 
   try {
-    // Pinia 스토어의 signup 액션 호출
-    // authStore.isLoading이 자동으로 true로 변경됨
     await authStore.signup({
       email: formData.email,
       password: formData.password,
@@ -441,12 +416,19 @@ const handleSubmit = async () => {
       codingLevel: formData.codingLevel
     })
 
-    // 성공 시 로그인 페이지로 이동
+    // 성공 시: 임베드 모드면 이벤트로 알리고 화면 전환은 부모가 처리
+    if (props.embedded) {
+      emit('signed-up', { email: formData.email })
+      // 입력값 일부 초기화 (UX: 바로 로그인 가능하게 이메일은 유지해도 되지만, 여기선 초기화)
+      formData.password = ''
+      formData.passwordConfirm = ''
+      submitError.value = ''
+      return
+    }
+
+    // 기본 동작: 로그인 페이지로 이동
     router.push('/login')
   } catch (error) {
-    // API 에러 발생 시 에러 메시지 표시
-    // error.response?.data?.message: 백엔드에서 전달한 에러 메시지
-    // 없으면 기본 메시지 표시
     submitError.value =
       error.response?.data?.message || '회원가입에 실패했습니다. 다시 시도해주세요.'
   }
