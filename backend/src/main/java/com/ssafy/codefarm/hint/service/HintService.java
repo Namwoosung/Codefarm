@@ -106,7 +106,7 @@ public class HintService {
 
     public ManualHintResponseDto createManualHint(Long sessionId, Long userId, ManualHintRequestDto requestDto) {
 
-        Session session = sessionRepository.findById(sessionId)
+        Session session = sessionRepository.findByIdWithUserAndProblem(sessionId)
                 .orElseThrow(() ->
                         new CustomException("세션을 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND)
                 );

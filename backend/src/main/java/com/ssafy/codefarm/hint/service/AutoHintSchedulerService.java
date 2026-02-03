@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -77,7 +78,7 @@ public class AutoHintSchedulerService {
 
     public void process(Long sessionId) {
 
-        Session session = sessionRepository.findById(sessionId).orElse(null);
+        Session session = sessionRepository.findByIdWithUserAndProblem(sessionId).orElse(null);
 
         if (session == null) {
             stop(sessionId);
