@@ -1,7 +1,7 @@
 import json
 from typing import Any, Dict, List
 
-from utils.constants import BANNED_TERMS
+from utils.constant import BANNED_TERMS
 
 def parse_json(text: str) -> Dict[str, Any]:
     text = (text or "").strip()
