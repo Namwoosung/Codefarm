@@ -224,28 +224,31 @@ CRITICAL RULES (must follow):
 - NEVER expose programmatic or system terms.
 - ALWAYS translate evidence into student-friendly language.
 
-OUTPUT FORMAT (HTML styling required):
-- Output must be plain text + minimal HTML tags only.
-- You MAY use ONLY these tags: <b> ... </b>
-- Do NOT use any other tags (no <div>, <span>, <br>, <ul>, etc.).
-- Sentence formatting:
-  - Write 3~5 sentences total.
-  - After each sentence-ending punctuation (., !, ? or "다.", "요.") insert a newline character '\\n'.
-  - So the final output should look like "문장1.\\n문장2.\\n문장3.\\n..."
+OUTPUT MUST BE VALID MARKDOWN and follow EXACTLY this structure:
 
-HARD RULES:
-- No bullet points.
-- No code blocks, no backticks, no multi-line code.
-- Do NOT provide full correct code or a complete solution.
+### ✅ 결과
+- **굵은 표현 1개 이상을 포함한 격려 문장 1줄**로 결과 요약(성공/오류)
 
-CONTENT RULES:
-- Must include:
-  (1) one encouragement sentence (include at least one <b> emphasized phrase),
-  (2) one evidence-based explanation in student language (include <b> key cause phrase),
-  (3) one concrete next action the student can try (include <b> actionable step phrase).
-- If solved: praise + one improvement tip + optionally ONE short concept keyword (keyword can be inside <b>).
-- If failed: explain ONE likely cause + ONE fix strategy (student-friendly).
+### 🔍 근거(왜 이렇게 됐을까?)
+- **굵은 표현으로 핵심 원인 1개를 강조**
+- 학생 말로 작성된 설명 1~2줄 (가장 유력한 원인 하나만)
+
+### 🛠 다음에 해볼 것
+- 바로 실천 가능한 행동 **2개**
+- 각 행동은 1줄씩, 최소 1개는 **굵은 표현으로 강조**
+
+Hard rules:
+- Max 260 characters total (including markdown).
+- Use ONLY markdown syntax (** for bold).
+- No HTML tags, no code blocks, no backticks.
+- No links.
+- Do not add or remove any sections or headings.
+
+Content rules:
+- If solved: praise + one small improvement tip + optionally ONE short concept keyword (can be bold).
+- If failed: explain ONE likely cause + ONE fix strategy in student-friendly language.
 """.strip()
+
 
 
 
@@ -286,46 +289,29 @@ def _strip_forbidden_terms(text: str) -> str:
 def postprocess(text: str) -> str:
     text = sanitize_llm_text(text)
 
-    # ✅ 공백 정리는 하되, 개행은 보존
-    # 기존: text = re.sub(r"\s+", " ", text).strip()
-    text = text.replace("\r\n", "\n").replace("\r", "\n")
-    text = re.sub(r"[ \t]+", " ", text).strip()
-
     # ✅ 내부 용어/라벨 유출 방지
     text = _strip_forbidden_terms(text)
 
-    # ✅ 문장 단위로 자르기 (개행 포함/보존)
-    # "온점이 있으면 줄바꿈" 요구를 만족시키기 위해 문장별로 \n 합치기
-    parts = re.split(r"(?<=[.!?])\s+|(?<=[다요]\.)\s+", text)
-    parts = [p.strip() for p in parts if p and p.strip()]
+    # ✅ 줄바꿈 보존하면서 정리
+    lines = [ln.strip() for ln in (text or "").splitlines()]
+    lines = [ln for ln in lines if ln]  # 빈 줄 제거
 
-    # ✅ 3~5문장 유지 + 문장마다 '\n' 삽입
-    parts = parts[:5]
-    text = "\n".join(parts).strip()
+    # 헤더/불릿 형태만 약하게 정규화(선택)
+    norm = []
+    for ln in lines:
+        # "-내용" -> "- 내용"
+        if ln.startswith("-") and not ln.startswith("- "):
+            ln = "- " + ln[1:].lstrip()
+        norm.append(ln)
 
-    # ✅ 강제: 각 줄(문장)이 끝에 마침표/종결이 없으면 유지하되,
-    # 이미 모델이 종결을 넣는 게 정상이라 여기서는 추가 보정은 최소화
-    # (원하면 아래처럼 마지막에 '\n'을 붙일 수도 있음)
-    # text = text + ("\n" if not text.endswith("\n") else "")
+    text = "\n".join(norm).strip()
 
-    # ✅ 260자 제한: 줄바꿈 포함 상태에서 자르기
-    if len(text) <= MAX_FEEDBACK_CHARS:
-        return text
+    # ✅ 260자 제한: 그냥 하드컷(마크다운은 문장단위 컷이 오히려 깨질 수 있음)
+    if len(text) > MAX_FEEDBACK_CHARS:
+        text = text[:MAX_FEEDBACK_CHARS].rstrip()
 
-    cut = text[:MAX_FEEDBACK_CHARS]
+    return text
 
-    # 문장 끝(.,!,?,다.,요.) 기준으로 자연스럽게 컷
-    candidates = [
-        cut.rfind("."),
-        cut.rfind("!"),
-        cut.rfind("?"),
-        cut.rfind("다."),
-        cut.rfind("요."),
-    ]
-    end = max(candidates)
-    if end >= 40:
-        cut = cut[: end + 1].strip()
-    return cut.strip()
 
 
 def policy_violation_reason(text: str) -> Optional[str]:
@@ -335,13 +321,27 @@ def policy_violation_reason(text: str) -> Optional[str]:
         return "TOO_LONG"
     if "```" in text or "`" in text:
         return "CODE_FORMAT"
+
     # 토큰 유출 최후 검사
     for tok in FORBIDDEN_TOKENS:
         if tok and tok in text:
             return "INTERNAL_TERM_LEAK"
     if LABEL_LIKE_PATTERN.search(text):
         return "LABEL_LIKE_LEAK"
+
+    # ✅ 마크다운 구조 검사
+    required = ["### ✅ 결과", "### 🔍 근거(왜 이렇게 됐을까?)", "### 🛠 다음에 해볼 것"]
+    for h in required:
+        if h not in text:
+            return "MD_STRUCTURE_MISSING"
+
+    # 섹션 외 추가 헤더 금지(선택)
+    extra_headers = [ln for ln in text.splitlines() if ln.startswith("### ")]
+    if len(extra_headers) != 3:
+        return "MD_TOO_MANY_HEADERS"
+
     return None
+
 
 
 # =========================
