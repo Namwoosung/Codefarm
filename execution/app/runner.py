@@ -1,160 +1,275 @@
-import os, tempfile, time, subprocess, textwrap, uuid, shutil
+import os
+import tempfile
+import subprocess
+import uuid
+import shutil
 import logging
+import threading
+import json
 
-# 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 PY_IMAGE = "codefarm-python:3.11"
 
-def run_python_in_docker(code: str, stdin: str, time_limit_ms: int, mem_mb: int, cpu: float):
-    # 호스트의 /tmp를 사용하여 임시 디렉토리 생성 (Docker 볼륨 마운트를 위해)
-    # Docker-in-Docker 환경에서는 호스트의 /tmp가 마운트되어 있어야 함
-    tmp_base = "/tmp"
-    tmp = tempfile.mkdtemp(prefix="codefarm_", dir=tmp_base)
-    try:
-        main_path = os.path.join(tmp, "main.py")
-        
-        # 사용자가 solution() 함수만 정의하고 호출하지 않는 경우를 대비해
-        # 실행 코드를 추가해줌
-        submission_code = code + textwrap.dedent("""
-        
-        # --- Auto-generated execution logic ---
-        if __name__ == "__main__":
-            import resource
-            import time
-            if "solution" in globals() and callable(globals()["solution"]):
-                try:
-                    _start = time.perf_counter()
-                    solution()
-                    _end = time.perf_counter()
-                    _exec_ms = int((_end - _start) * 1000)
-                    print(f"\\nEXEC_TIME: {_exec_ms}")
-                except Exception as e:
-                    import traceback
-                    traceback.print_exc()
-            
-            # Print max RSS memory usage in KB
-            # ru_maxrss is in KB on Linux
-            mem = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-            print(f"\\nMEM_USAGE: {mem}")
-        """)
+MAX_STDOUT_SIZE = 1 * 1024 * 1024  # 1MB
+MAX_STDERR_SIZE = 1 * 1024 * 1024  # 1MB
+READ_CHUNK_SIZE = 4096
 
+
+def indent_user_code(code: str) -> str:
+    return "\n".join("    " + line for line in code.splitlines())
+
+
+def _docker_exec_read_int(container_name: str, path: str, timeout: float = 0.2) -> int | None:
+    """
+    컨테이너 내부 파일을 docker exec cat으로 읽어 정수로 파싱.
+    실패 시 None.
+    """
+    try:
+        r = subprocess.run(
+            ["docker", "exec", container_name, "cat", path],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+        if r.returncode != 0:
+            return None
+
+        s = r.stdout.strip()
+        if not s or s == "max":
+            return None
+
+        return int(s)
+    except Exception:
+        return None
+
+
+def read_cgroup_peak_or_current_kb(container_name: str) -> int:
+    """
+    v2: memory.peak 우선, 없으면 memory.current
+    v1: memory.max_usage_in_bytes 우선, 없으면 memory.usage_in_bytes
+    """
+    # cgroup v2
+    peak_v2 = _docker_exec_read_int(container_name, "/sys/fs/cgroup/memory.peak")
+    if peak_v2 is not None:
+        return peak_v2 // 1024
+
+    cur_v2 = _docker_exec_read_int(container_name, "/sys/fs/cgroup/memory.current")
+    if cur_v2 is not None:
+        return cur_v2 // 1024
+
+    # cgroup v1
+    peak_v1 = _docker_exec_read_int(container_name, "/sys/fs/cgroup/memory/memory.max_usage_in_bytes")
+    if peak_v1 is not None:
+        return peak_v1 // 1024
+
+    cur_v1 = _docker_exec_read_int(container_name, "/sys/fs/cgroup/memory/memory.usage_in_bytes")
+    if cur_v1 is not None:
+        return cur_v1 // 1024
+
+    return 0
+
+
+def run_python_in_docker(
+    code: str,
+    stdin: str,
+    time_limit_ms: int,
+    mem_mb: int,
+    cpu_limit: float,
+):
+    tmp = tempfile.mkdtemp(prefix="codefarm_", dir="/tmp")
+    container_name = f"codefarm-run-{uuid.uuid4().hex[:12]}"
+
+    wrapped_code = f"""
+import time
+import json
+
+__cf_start = time.perf_counter()
+try:
+{indent_user_code(code)}
+except Exception:
+    raise
+__cf_end = time.perf_counter()
+
+print("\\n__CF_TIME__=" + json.dumps({{"time_ms": int((__cf_end-__cf_start)*1000)}}))
+"""
+
+    peak_mem_kb = 0  # "kill 전에 한번 읽고" 보존하기 위한 변수
+
+    def snapshot_memory():
+        """컨테이너가 살아있을 때만 읽을 수 있으니, 필요할 때 한번 찍어두기"""
+        nonlocal peak_mem_kb
+        try:
+            kb = read_cgroup_peak_or_current_kb(container_name)
+            if kb > peak_mem_kb:
+                peak_mem_kb = kb
+        except Exception:
+            pass
+
+    try:
+        # 1) 코드 파일 생성
+        main_path = os.path.join(tmp, "main.py")
         with open(main_path, "w", encoding="utf-8") as f:
-            f.write(submission_code)
+            f.write(wrapped_code)
 
         os.chmod(tmp, 0o755)
         os.chmod(main_path, 0o644)
-        
-        # Docker-in-Docker: 호스트 관점의 절대 경로 사용
-        # 실행 컨테이너의 /tmp가 호스트의 /tmp와 마운트되어 있으므로
-        # 여기서 생성한 경로를 그대로 사용
-        tmp_abs = tmp  # 이미 /tmp/codefarm_xxx 형태
 
-        container_name = f"codefarm-run-{uuid.uuid4().hex[:12]}"
-
-        # docker run 옵션(보안/자원제한)
-        cmd = [
-            "docker", "run", "--rm", "-i",       # -i: stdin을 컨테이너로 전달
+        # 2) 컨테이너 create/start (sleep infinity)
+        create_cmd = [
+            "docker", "create",
             "--name", container_name,
-            "--network", "none",                 # 인터넷 차단
-            "--cpus", str(cpu),                  # CPU 제한
-            "--memory", f"{mem_mb}m",            # 메모리 제한
-            "--pids-limit", "64",                # 프로세스 폭주 방지
-            "--read-only",                       # 컨테이너 루트 FS 읽기 전용
-            "--security-opt", "no-new-privileges",# 권한 상승 방지
-            "-v", f"{tmp_abs}:/workspace:ro",    # 코드 마운트(읽기전용)
+            "--network", "none",
+            "--cpus", str(cpu_limit),
+            "--memory", f"{mem_mb}m",
+            "--memory-swap", f"{mem_mb}m",
+            "--pids-limit", "64",
+            "--read-only",
+            "--security-opt", "no-new-privileges",
+            "--cap-drop", "ALL",
+            "-v", f"{tmp}:/workspace:ro",
             "-w", "/workspace",
             PY_IMAGE,
-            "python", "-u", "main.py"            # -u: Unbuffered output
+            "sleep", "infinity"
         ]
+        subprocess.run(create_cmd, check=True)
+        subprocess.run(["docker", "start", container_name], check=True)
 
-        logger.info(f"Executing Docker command: {' '.join(cmd)}")
-        logger.info(f"Code to execute:\n{code}")
-        logger.info(f"Stdin: {stdin}")
+        # 3) python 실행 (docker exec)
+        exec_cmd = ["docker", "exec", "-i", container_name, "python", "-u", "main.py"]
 
-        start = time.time()
-
-        # timeout은 호스트에서 1차로 강제
         timeout_sec = max(0.1, time_limit_ms / 1000.0)
 
-        try:
-            p = subprocess.run(
-                cmd,
-                input=stdin,
-                text=True,
-                capture_output=True,
-                timeout=timeout_sec
-            )
-            is_timeout = False
-            stdout = p.stdout
-            stderr = p.stderr
-            
-            logger.info(f"Docker execution completed. Return code: {p.returncode}")
-            
-            # Check for OOM (Exit Code 137)
-            is_oom = False
-            if p.returncode == 137:
-                is_oom = True
-                stderr = "Memory Limit Exceeded"
-                logger.warning("Container killed by OOM (Exit Code 137)")
-            elif p.returncode != 0 and not stderr:
-                stderr = f"Process exited with code {p.returncode}"
-                
-            logger.info(f"Stdout length: {len(stdout)}, Stderr length: {len(stderr)}")
-            if stdout:
-                logger.info(f"Stdout: {stdout}")
-            else:
-                logger.warning("Stdout is empty!")
-            if stderr:
-                logger.warning(f"Stderr: {stderr}")
-            else:
-                logger.info("Stderr is empty (no errors)")
-                
-        except subprocess.TimeoutExpired:
-            # timeout 발생 시 컨테이너 kill (혹시 남아있을 수 있으니)
-            subprocess.run(["docker", "kill", container_name], capture_output=True, text=True)
-            is_timeout = True
-            is_oom = False
-            stdout = ""
-            stderr = "Time Limit Exceeded"
-            logger.warning(f"Execution timed out after {timeout_sec}s")
+        p = subprocess.Popen(
+            exec_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0,
+        )
 
-        exec_time_ms = int((time.time() - start) * 1000)
-        
-        # Parse output fields (MEM_USAGE, EXEC_TIME)
-        memory_usage = 0
-        internal_exec_time = None
-        
-        if stdout:
-            lines = stdout.splitlines()
-            new_lines = []
-            for line in lines:
-                if line.startswith("MEM_USAGE:"):
-                    try:
-                        memory_usage = int(line.split(":")[1].strip())
-                    except:
-                        pass
-                elif line.startswith("EXEC_TIME:"):
-                    try:
-                        internal_exec_time = int(line.split(":")[1].strip())
-                    except:
-                        pass
-                else:
-                    new_lines.append(line)
-            stdout = "\n".join(new_lines) + ("\n" if lines and not stdout.endswith("\n") else "")
-        
-        # Prefer internal execution time if available (excludes docker overhead)
-        if internal_exec_time is not None:
-            exec_time_ms = internal_exec_time
-            
-        logger.info(f"Total execution time: {exec_time_ms}ms")
-        logger.info(f"Max memory usage: {memory_usage}KB")
-        logger.info(f"Is OOM: {is_oom}")
-        return stdout, stderr, exec_time_ms, memory_usage, is_timeout, is_oom
-    finally:
-        # 임시 디렉토리 정리
+        stdout_buf = bytearray()
+        stderr_buf = bytearray()
+        stdout_over = False
+        stderr_over = False
+
+        killed = False
+        kill_lock = threading.Lock()
+
+        def kill_process_and_container():
+            nonlocal killed
+            with kill_lock:
+                if killed:
+                    return
+                killed = True
+
+                snapshot_memory()
+
+                try:
+                    p.kill()
+                except:
+                    pass
+
+                # 컨테이너 내부 python이 남아있을 수 있으므로 컨테이너 kill
+                subprocess.run(
+                    ["docker", "kill", container_name],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+
+        def reader(stream, buf: bytearray, limit: int, mark: str):
+            nonlocal stdout_over, stderr_over
+            try:
+                while True:
+                    chunk = stream.read(READ_CHUNK_SIZE)
+                    if not chunk:
+                        break
+
+                    remaining = limit - len(buf)
+                    if remaining > 0:
+                        buf.extend(chunk[:remaining])
+
+                    if len(buf) >= limit:
+                        if mark == "stdout":
+                            stdout_over = True
+                        else:
+                            stderr_over = True
+                        kill_process_and_container()
+                        break
+            except:
+                pass
+
+        t_out = threading.Thread(target=reader, args=(p.stdout, stdout_buf, MAX_STDOUT_SIZE, "stdout"))
+        t_err = threading.Thread(target=reader, args=(p.stderr, stderr_buf, MAX_STDERR_SIZE, "stderr"))
+        t_out.start()
+        t_err.start()
+
+        is_timeout = False
         try:
-            shutil.rmtree(tmp)
+            if stdin:
+                p.stdin.write(stdin.encode("utf-8"))
+            p.stdin.close()
+            p.wait(timeout=timeout_sec)
+        except subprocess.TimeoutExpired:
+            is_timeout = True
+            kill_process_and_container()
+
+        t_out.join()
+        t_err.join()
+
+        # 정상 종료 케이스에서도 마지막에 한번 더 읽어서 확정
+        snapshot_memory()
+
+        stdout_text = stdout_buf.decode(errors="replace")
+        stderr_text = stderr_buf.decode(errors="replace")
+
+        # python 내부 시간 파싱
+        exec_time_ms = 0
+        if "__CF_TIME__=" in stdout_text:
+            parts = stdout_text.split("__CF_TIME__=")
+            try:
+                data = json.loads(parts[-1])
+                exec_time_ms = int(data.get("time_ms", 0))
+            except:
+                pass
+            stdout_text = parts[0].strip()
+
+        # OOMKilled 확인
+        is_oom = False
+        try:
+            oom_flag = subprocess.run(
+                ["docker", "inspect", "-f", "{{.State.OOMKilled}}", container_name],
+                capture_output=True,
+                text=True,
+                timeout=0.3,
+            ).stdout.strip()
+            if oom_flag.lower() == "true":
+                is_oom = True
+                stderr_text = "Memory Limit Exceeded"
         except:
             pass
+
+        if is_timeout:
+            stderr_text = "Time Limit Exceeded"
+        elif stdout_over:
+            stderr_text = "Output Limit Exceeded"
+        elif stderr_over:
+            stderr_text = "Error Output Limit Exceeded"
+
+        return (
+            stdout_text,
+            stderr_text,
+            exec_time_ms,
+            peak_mem_kb,
+            is_timeout,
+            is_oom,
+        )
+
+    finally:
+        subprocess.run(
+            ["docker", "rm", "-f", container_name],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        shutil.rmtree(tmp, ignore_errors=True)
