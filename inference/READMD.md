@@ -1,1 +1,1 @@
-deploy test 2602031106: delete extra index url from requirements.txt
+deploy test 2602031229: recovery test message
