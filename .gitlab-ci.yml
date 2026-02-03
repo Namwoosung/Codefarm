@@ -5,9 +5,6 @@ stages:
   - deploy
   - inference
 
-########################
-# PIPELINE CREATION
-########################
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -23,9 +20,6 @@ default:
   before_script:
     - echo "source=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
-########################
-# BUILD (develop/main은 항상 빌드)
-########################
 .build-template:
   stage: build
   before_script:
@@ -74,9 +68,6 @@ build-feedback:
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
 
-########################
-# TEST
-########################
 test:
   stage: test
   tags: [ec2-mono]
@@ -86,9 +77,6 @@ test:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\//'
 
-########################
-# SECURITY
-########################
 cache:
   key: trivy-cache
   paths:
@@ -103,9 +91,6 @@ trivy_fs:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
 
-########################
-# DEPLOY
-########################
 .deploy-template:
   stage: deploy
   before_script:
@@ -116,9 +101,7 @@ deploy-dev:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" \
-        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' \
-         bash /srv/app/scripts/deploy_server.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
@@ -128,18 +111,13 @@ deploy-prod:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" \
-        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' \
-         bash /srv/app/scripts/deploy_server.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh prod"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
 
-########################
-# INFERENCE
-########################
 inference-deploy:
   stage: inference
   tags: [elice-container]
