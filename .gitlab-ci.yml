@@ -275,9 +275,7 @@ inference-deploy:
 
     # 4) Deploy with rsync (ignore transient vanish, exclude pycache)
     - mkdir -p "$DEPLOY_DIR"
-    - rsync -a --delete --ignore-missing-args \
-        --exclude='__pycache__/' --exclude='*.pyc' \
-        "$STAGE_DIR/" "$DEPLOY_DIR/" || { rc=$?; [ "$rc" -eq 24 ] && echo "rsync warning(code 24) ignored"; [ "$rc" -eq 24 ] && exit 0; exit "$rc"; }
+    - rsync -a --delete --ignore-missing-args --exclude='__pycache__/' --exclude='*.pyc' "$STAGE_DIR/" "$DEPLOY_DIR/" || { rc=$?; [ "$rc" -eq 24 ] && echo "rsync warning(code 24) ignored" && exit 0; exit "$rc"; }
 
     # 5) Python env + deps
     - cd "$DEPLOY_DIR"
