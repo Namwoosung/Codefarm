@@ -23,14 +23,18 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// 401 시 토큰 제거 → 로그아웃 상태로 맞춤 (블러 등 UI 반영)
+// 401 시 토큰 제거 → 로그아웃 상태로 맞춤 (단, 로그인 요청 실패 시에는 스토어 건드리지 않음)
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      try {
-        useAuthStore().logout()
-      } catch (_) {}
+      const requestUrl = err.config?.url ?? ''
+      const isLoginRequest = requestUrl.includes('/users/login')
+      if (!isLoginRequest) {
+        try {
+          useAuthStore().logout()
+        } catch (_) {}
+      }
     }
     return Promise.reject(err)
   }

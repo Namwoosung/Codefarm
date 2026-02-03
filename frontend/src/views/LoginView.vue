@@ -116,7 +116,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, nextTick } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import SignupForm from '@/components/organisms/SignupForm.vue'
@@ -140,6 +140,7 @@ onMounted(() => {
 const login = async () => {
   try {
     await auth.login({ email: email.value, password: password.value })
+    await nextTick()
     router.push('/')
   } catch (e) {
     console.error(e)

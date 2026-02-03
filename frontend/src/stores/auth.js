@@ -62,8 +62,10 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const res = await api.post('/users/login', payload)
-      user.value = res.data?.data?.user ?? null
-      token.value = res.data?.data?.token?.accessToken ?? null
+      const data = res.data?.data ?? {}
+      // 백엔드: LoginResponseDto { user, token: { accessToken, tokenType } }
+      user.value = data.user ?? null
+      token.value = data.token?.accessToken ?? data.accessToken ?? null
       if (token.value) localStorage.setItem('token', token.value)
       if (user.value) localStorage.setItem('user', JSON.stringify(user.value))
       return res.data
@@ -77,11 +79,16 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const logout = async () => {
-    await api.post('/users/logout')
-    token.value = null
-    user.value = null
-    localStorage.removeItem('token')
-    localStorage.removeItem('user')
+    try {
+      await api.post('/users/logout')
+    } catch (_) {
+      // 로그아웃 API 실패(401 등)여도 클라이언트 상태는 항상 비움
+    } finally {
+      token.value = null
+      user.value = null
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+    }
   }
 
   const signup = async (signupData) => {
