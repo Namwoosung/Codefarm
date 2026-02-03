@@ -385,58 +385,66 @@ inference-deploy:
     DEPLOY_DIR: "/srv/app/app/inference"
     MODEL_DIR: "/home/elicer/models"
   rules:
-    # MR에서는 배포 금지
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       changes:
         - inference/**
         - .gitlab-ci.yml
-  script:
-    - set -euo pipefail
+  script: |-
+    set -euo pipefail
 
-    - echo "Deploying inference service..."
-    - echo "source=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
+    echo "Deploying inference service..."
+    echo "source=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
     # 1) Clean working dir
-    - rm -rf repo
-    - mkdir -p repo
-    - cd repo
+    rm -rf repo
+    mkdir -p repo
+    cd repo
 
     # 2) Sparse checkout only inference/
-    - git init
-    - git remote add origin "$CI_REPOSITORY_URL"
-    - git fetch --depth 1 origin "$CI_COMMIT_SHA"
-    - git sparse-checkout init --cone
-    - git sparse-checkout set "$INF_DIR"
-    - git checkout -f FETCH_HEAD
+    git init
+    git remote add origin "$CI_REPOSITORY_URL"
+    git fetch --depth 1 origin "$CI_COMMIT_SHA"
+    git sparse-checkout init --cone
+    git sparse-checkout set "$INF_DIR"
+    git checkout -f FETCH_HEAD
 
     # 3) Stage copy to /tmp first (avoid "file has vanished" due to cleanup)
-    - STAGE_DIR="/tmp/inference_stage_${CI_PIPELINE_ID}_${CI_JOB_ID}"
-    - rm -rf "$STAGE_DIR"
-    - mkdir -p "$STAGE_DIR"
-    - cp -a "$INF_DIR/." "$STAGE_DIR/"
+    STAGE_DIR="/tmp/inference_stage_${CI_PIPELINE_ID}_${CI_JOB_ID}"
+    rm -rf "$STAGE_DIR"
+    mkdir -p "$STAGE_DIR"
+    cp -a "$INF_DIR/." "$STAGE_DIR/"
 
     # 4) Deploy with rsync
-    - mkdir -p "$DEPLOY_DIR"
-    - rsync -a --delete --ignore-missing-args --exclude='__pycache__/' --exclude='*.pyc' "$STAGE_DIR/" "$DEPLOY_DIR/" || { rc=$?; [ "$rc" -eq 24 ] && echo "rsync warning(code 24) ignored" && exit 0; exit "$rc"; }
+    mkdir -p "$DEPLOY_DIR"
+    rsync -a --delete --ignore-missing-args \
+      --exclude='__pycache__/' --exclude='*.pyc' \
+      "$STAGE_DIR/" "$DEPLOY_DIR/" || rc=$?
+    if [ "${rc:-0}" -ne 0 ] && [ "${rc:-0}" -ne 24 ]; then
+      exit "${rc:-0}"
+    fi
+    if [ "${rc:-0}" -eq 24 ]; then
+      echo "rsync warning(code 24) ignored"
+    fi
 
     # 5) Python env + deps
-    - cd "$DEPLOY_DIR"
-    - export PYENV_ROOT="$HOME/.pyenv"
-    - export PATH="$PYENV_ROOT/bin:$PATH"
-    - eval "$(pyenv init -)"
-    - pyenv activate venv
-    - python -V
-    - pip install --upgrade pip
-    - pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
+    cd "$DEPLOY_DIR"
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+    pyenv activate venv
+    python -V
+    pip install --upgrade pip
+    pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
 
     # 6) Models
-    - echo "Unzipping models..."
-    - echo "MODEL_DIR=$MODEL_DIR"
-    - ls -al "$MODEL_DIR" || true
-    - test -f "$MODEL_DIR/label_model.zip" || { echo "❌ missing: $MODEL_DIR/label_model.zip"; exit 1; }
-    - test -f "$MODEL_DIR/text_model.zip"  || { echo "❌ missing: $MODEL_DIR/text_model.zip";  exit 1; }
-    - mkdir -p "$DEPLOY_DIR/models/label_model" "$DEPLOY_DIR/models/text_model"
-    - unzip -q "$MODEL_DIR/label_model.zip" -d "$DEPLOY_DIR/models/label_model"
-    - unzip -q "$MODEL_DIR/text_model.zip"  -d "$DEPLOY_DIR/models/text_model"
+    echo "Unzipping models..."
+    echo "MODEL_DIR=$MODEL_DIR"
+    ls -al "$MODEL_DIR" || true
+    test -f "$MODEL_DIR/label_model.zip" || { echo "❌ missing: $MODEL_DIR/label_model.zip"; exit 1; }
+    test -f "$MODEL_DIR/text_model.zip"  || { echo "❌ missing: $MODEL_DIR/text_model.zip";  exit 1; }
+    mkdir -p "$DEPLOY_DIR/models/label_model" "$DEPLOY_DIR/models/text_model"
+    unzip -q "$MODEL_DIR/label_model.zip" -d "$DEPLOY_DIR/models/label_model"
+    unzip -q "$MODEL_DIR/text_model.zip"  -d "$DEPLOY_DIR/models/text_model"
+
