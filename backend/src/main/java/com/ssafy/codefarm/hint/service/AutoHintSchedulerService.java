@@ -38,12 +38,25 @@ public class AutoHintSchedulerService {
 
     public void start(Long sessionId) {
 
+        // 이미 실행 중이면 중복 시작 방지
+        if (tasks.containsKey(sessionId)) {
+            log.warn("Auto hint scheduler already running. sessionId={}", sessionId);
+            return;
+        }
+
         ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(
                 () -> process(sessionId),
                 INTERVAL
         );
 
-        tasks.put(sessionId, future);
+        ScheduledFuture<?> existing = tasks.putIfAbsent(sessionId, future);
+
+        if (existing != null) {
+            // 이미 다른 스레드가 먼저 등록했다면 방금 만든 future 취소
+            future.cancel(true);
+            log.warn("Auto hint scheduler duplicate prevented. sessionId={}", sessionId);
+            return;
+        }
 
         log.info("Auto hint scheduler started. sessionId={}", sessionId);
     }
@@ -60,10 +73,35 @@ public class AutoHintSchedulerService {
 
         Session session = sessionRepository.findById(sessionId).orElse(null);
 
-        if (session == null || session.getStatus() != SessionStatus.ACTIVE) {
+        if (session == null) {
             stop(sessionId);
             return;
         }
+
+        // 세션 24시간 초과 여부 체크
+        LocalDateTime now = LocalDateTime.now();
+        if (session.getStatus() == SessionStatus.ACTIVE
+                && session.getStartedAt() != null
+                && Duration.between(session.getStartedAt(), now).toHours() >= 24) {
+
+            log.warn("Session expired after 24 hours. sessionId={}", sessionId);
+
+            session.close(); // DB 상태 변경
+
+            // 리소스 정리
+            sessionCodeRedisService.delete(sessionId);
+            hintService.clearSession(sessionId);
+
+            stop(sessionId);
+
+            return;
+        }
+
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            stop(sessionId);
+            return;
+        }
+
 
         // Redis 데이터 조회
         List<CodeSnapshotRedisDto> codeHistory =

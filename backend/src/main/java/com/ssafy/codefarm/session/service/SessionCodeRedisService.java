@@ -32,6 +32,7 @@ public class SessionCodeRedisService {
 
     public void initialize(Long sessionId) {
         redisTemplate.delete(buildKey(sessionId));
+        redisTemplate.delete(buildJudgementKey(sessionId));
     }
 
     public void appendSnapshot(Long sessionId, CodeSnapshotRedisDto snapshot) {

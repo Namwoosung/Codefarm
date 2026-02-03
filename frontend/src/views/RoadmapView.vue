@@ -33,7 +33,7 @@
 
             <!-- 오리 캐릭터와 툴팁: z-30으로 상향 -->
             <div class="absolute right-[-140px] top-[58%] -translate-y-1/2 w-52 h-52 z-30 hidden lg:block pointer-events-none">
-              <div class="tooltip tooltip-open tooltip-top [--tooltip-tail:0px] [--tooltip-color:rgba(74,74,41,0.9)] [--tooltip-text-color:#ffffff] [--tooltip-offset:-20px]" data-tip="50포인트로 카드뽑기를 할 수 있어요!">
+              <div class="tooltip tooltip-open tooltip-top [--tooltip-tail:0px] [--tooltip-color:rgba(74,74,41,0.9)] [--tooltip-text-color:#ffffff] [--tooltip-offset:-20px]" data-tip="100포인트로 카드뽑기를 할 수 있어요!">
                 <img
                   class="w-full h-full object-contain"
                   :src="duckCharacter"
@@ -339,7 +339,7 @@ import woodPanel1 from '@/assets/wood_panel_1.png'
 import RoadmapMap from '@/components/organisms/RoadmapMap.vue'
 import api from '@/api'
 import * as sessionApi from '@/api/session'
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -540,6 +540,16 @@ watch(
     fetchCurriculums()
   }
 )
+
+// 레벨 페이지 진입 시 스크롤을 맨 위로
+watch(selectedLevel, async (level) => {
+  if (level != null) {
+    await nextTick()
+    window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }
+})
 
 function formatSuccessRate(successCount, submissionCount) {
   const s = successCount ?? 0

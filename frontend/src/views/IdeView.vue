@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 overflow-hidden bg-[var(--color-farm-paper)]">
+  <div class="ide-view-root flex flex-col w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 overflow-hidden">
     <!-- 로딩 모달 -->
     <div v-if="isInitializing" class="fixed inset-0 flex items-center justify-center bg-[rgba(245,242,232,0.9)] z-[100]">
       <div class="card bg-base-100 shadow-lg rounded-2xl p-6">
@@ -41,6 +41,7 @@
             :hint-remaining="hintRemaining"
             :hint-max="hintMax"
             @hint-used="onHintUsedFromPanel"
+            @hint-exhausted="onHintExhausted"
             @auto-hint-arrived="onAutoHintArrived"
             @dismiss-hint-toast="onDismissHintToast"
             @close="hintPanelOpen = false"
@@ -1077,13 +1078,18 @@ const handleSubmit = async () => {
     }
   } catch (err) {
     if (terminalPanel.value) {
-      const msg = err.response?.data?.message || err.message
+      const isTimeout = err.code === 'ECONNABORTED'
+      const msg = isTimeout
+        ? '요청 시간이 초과되었습니다. 채점이 진행 중일 수 있으니 잠시 후 제출 내역을 확인해 주세요.'
+        : (err.response?.data?.message || err.message)
       terminalPanel.value.write(`제출 실패: ${msg}\r\n`)
-      const data = err.response?.data
-      if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-        try {
-          terminalPanel.value.write('\r\n' + JSON.stringify(data, null, 2) + '\r\n')
-        } catch (_) {}
+      if (!isTimeout) {
+        const data = err.response?.data
+        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+          try {
+            terminalPanel.value.write('\r\n' + JSON.stringify(data, null, 2) + '\r\n')
+          } catch (_) {}
+        }
       }
       terminalPanel.value.write('❌ 제출 실패\r\n')
     }
@@ -1166,7 +1172,11 @@ const doRunWithInput = async (input) => {
     }
   } catch (err) {
     if (terminalPanel.value) {
-      terminalPanel.value.write(`실행 실패: ${err.response?.data?.message || err.message}\r\n`)
+      const isTimeout = err.code === 'ECONNABORTED'
+      const msg = isTimeout
+        ? '요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.'
+        : (err.response?.data?.message || err.message)
+      terminalPanel.value.write(`실행 실패: ${msg}\r\n`)
       terminalPanel.value.write('❌ 실행 실패\r\n')
     }
   } finally {
@@ -1253,9 +1263,21 @@ const onReportModalClose = (goToMain = false) => {
 
 /** 문제 패널 채팅에서 힌트 사용 시 툴바 당근·잔여 횟수 동기화 */
 function onHintUsedFromPanel({ usedHint, maxHint }) {
-  hintUsed.value = usedHint ?? hintUsed.value
-  hintMax.value = maxHint ?? hintMax.value
-  showToast(`힌트가 차감되었습니다. (잔여: ${(maxHint ?? 3) - (usedHint ?? 0)}/${maxHint ?? 3})`)
+  const u = usedHint ?? hintUsed.value
+  const m = maxHint ?? hintMax.value
+  hintUsed.value = u
+  hintMax.value = m
+  const remaining = Math.max(0, m - u)
+  if (remaining <= 0) {
+    showToast('힌트가 모두 사용되었습니다')
+  } else {
+    showToast(`힌트가 차감되었습니다. (잔여: ${remaining}/${m})`)
+  }
+}
+
+/** 수동 힌트 소진 시 툴팁(토스트) — 힌트 패널에서 전송 시도 시 */
+function onHintExhausted() {
+  showToast('힌트가 모두 사용되었습니다')
 }
 
 /** 자동 힌트 도착 시 종 빨간 점 + 알림 목록에 추가 */
@@ -1302,6 +1324,11 @@ function showToast(msg) {
 </script>
 
 <style scoped>
+/* 다크모드에서도 빈 영역이 흰색으로 보이도록 고정 */
+.ide-view-root {
+  color-scheme: light;
+  background-color: #ffffff;
+}
 .ide-resizer-hit {
   position: relative;
 }

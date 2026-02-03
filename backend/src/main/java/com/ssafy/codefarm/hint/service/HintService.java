@@ -33,7 +33,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class HintService {
 
-    private static final Long DEFAULT_TIMEOUT = 6 * 60L * 60 * 1000L; // 6시간
+    private static final Long DEFAULT_TIMEOUT = 24 * 60L * 60 * 1000L; // 24시간
 
     private final SessionCodeRedisService sessionCodeRedisService;
 
