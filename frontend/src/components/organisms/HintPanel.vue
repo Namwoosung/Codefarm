@@ -117,6 +117,8 @@ const ideStore = useIdeStore()
 const chatInput = ref('')
 const chatMessages = ref([])
 const hintLoading = ref(false)
+/** SSE 수신 힌트 hintId 중복 방지용 (세션 변경 시 초기화) */
+const seenHintIds = ref(new Set())
 
 /** 힌트 목록을 채팅 메시지 형태로 변환 (과거순). AUTO는 세션 생성 이후 것만 표시 */
 function hintsToMessages(hints) {
@@ -147,8 +149,11 @@ async function loadHintList() {
     const hints = await hintApi.getHintList(sid)
     chatMessages.value = hintsToMessages(hints)
     for (const h of hints) {
-      if (h.hintId != null && h.isViewed === false) {
-        hintApi.markHintViewed(sid, h.hintId).catch(() => {})
+      if (h.hintId != null) {
+        seenHintIds.value.add(h.hintId)
+        if (h.isViewed === false) {
+          hintApi.markHintViewed(sid, h.hintId).catch(() => {})
+        }
       }
     }
   } catch (_) {
@@ -170,6 +175,20 @@ function handleAutoHint(data) {
     dismissed: false
   })
 }
+
+/**
+ * IdeView SSE에서 호출: 자동 힌트 추가 (hintId 중복 방지)
+ * @param {object} data - { hintId, content, createdAt, ... }
+ */
+function addAutoHint(data) {
+  if (!data?.content) return
+  const hid = data.hintId ?? data.hint_id
+  if (hid != null && seenHintIds.value.has(hid)) return
+  if (hid != null) seenHintIds.value.add(hid)
+  handleAutoHint(data)
+}
+
+defineExpose({ addAutoHint })
 
 /** pending 자동 힌트 "볼게요" 클릭: 내용 표시 + 열람 처리 */
 function viewPendingHint(idx) {
@@ -194,9 +213,11 @@ watch(
   () => ideStore.sessionId,
   (sid) => {
     if (sid != null) {
+      seenHintIds.value = new Set()
       loadHintList()
     } else {
       chatMessages.value = []
+      seenHintIds.value = new Set()
     }
   },
   { immediate: true }
