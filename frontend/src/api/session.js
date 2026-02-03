@@ -50,6 +50,10 @@ export const getLatestCode = (sessionId) => {
   return api.get(`/sessions/${sessionId}/codes/latest`)
 }
 
+/** 실행/제출 API용 긴 타임아웃 (채점·피드백 서버 대기). ms */
+const RUN_TIMEOUT_MS = 30000
+const SUBMIT_TIMEOUT_MS = 60000
+
 /**
  * 실행하기 (input 없으면 빈 문자열 전송, input() 시 stdin으로 사용)
  * @param {number} sessionId
@@ -57,7 +61,7 @@ export const getLatestCode = (sessionId) => {
  */
 export const runCode = (sessionId, { language, code, input }) => {
   const body = { language, code, input: input != null ? String(input) : '' }
-  return api.post(`/sessions/${sessionId}/run`, body)
+  return api.post(`/sessions/${sessionId}/run`, body, { timeout: RUN_TIMEOUT_MS })
 }
 
 /**
@@ -66,7 +70,7 @@ export const runCode = (sessionId, { language, code, input }) => {
  * @param {{ language: string, code: string }} body
  */
 export const submitCode = (sessionId, { language, code }) => {
-  return api.post(`/sessions/${sessionId}/submit`, { language, code })
+  return api.post(`/sessions/${sessionId}/submit`, { language, code }, { timeout: SUBMIT_TIMEOUT_MS })
 }
 
 /**

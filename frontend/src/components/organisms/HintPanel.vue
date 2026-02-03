@@ -80,7 +80,7 @@
           v-model="chatInput"
           type="text"
           class="input input-bordered input-sm w-full rounded-md bg-base-100 border-base-300 text-xs"
-          placeholder="선생님께 당근을 흔들어 궁금한 걸 물어보세요!"
+          :placeholder="hintRemaining <= 0 ? '힌트를 모두 사용했습니다' : '선생님께 당근을 흔들어 궁금한 걸 물어보세요!'"
           :disabled="hintLoading || hintRemaining <= 0"
           @keydown.enter.exact.prevent="sendHint"
         />
@@ -110,7 +110,7 @@ const props = defineProps({
   hintRemaining: { type: Number, default: 3 },
   hintMax: { type: Number, default: 3 }
 })
-const emit = defineEmits(['hint-used', 'close', 'auto-hint-arrived', 'dismiss-hint-toast'])
+const emit = defineEmits(['hint-used', 'hint-exhausted', 'close', 'auto-hint-arrived', 'dismiss-hint-toast'])
 
 const route = useRoute()
 const ideStore = useIdeStore()
@@ -224,8 +224,12 @@ watch(
 )
 
 async function sendHint() {
+  if (props.hintRemaining <= 0) {
+    emit('hint-exhausted')
+    return
+  }
   const q = chatInput.value?.trim()
-  if (!q || hintLoading.value || props.hintRemaining <= 0) return
+  if (!q || hintLoading.value) return
   chatMessages.value.push({ role: 'user', text: q, createdAt: new Date().toISOString() })
   chatInput.value = ''
   hintLoading.value = true

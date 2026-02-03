@@ -1,107 +1,136 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="report-modal-overlay" @click.self="$emit('close', false)">
-      <div class="report-modal-card">
-        <div class="report-modal-header">
-          <h2 class="report-modal-title">Report</h2>
-          <button type="button" class="report-modal-close" aria-label="모달 닫기" @click="$emit('close', false)">
-            <iconify-icon icon="mdi:close"></iconify-icon>
+    <div v-if="show" class="modal modal-open" @click.self="$emit('close', false)">
+      <div class="modal-box max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-[var(--color-farm-paper)] border border-[var(--color-farm-cream)] shadow-xl">
+        <!-- Header -->
+        <div class="flex items-center justify-between sticky top-0 z-10 px-6 py-4 bg-[var(--color-farm-paper)] border-b border-[var(--color-farm-cream)]">
+          <div class="flex items-center gap-3">
+            <h2 class="text-xl font-bold text-[var(--color-farm-green-dark)]">📋 Report</h2>
+            <span
+              v-if="report?.result?.resultType"
+              class="badge badge-lg font-semibold"
+              :class="resultTypeBadgeClass(report.result.resultType)"
+            >
+              {{ resultTypeLabel(report.result.resultType) }}
+            </span>
+          </div>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm btn-square text-[var(--color-farm-brown)] hover:bg-[var(--color-farm-cream)] hover:text-[var(--color-farm-brown-dark)]"
+            aria-label="모달 닫기"
+            @click="$emit('close', false)"
+          >
+            <iconify-icon icon="mdi:close" class="text-xl"></iconify-icon>
           </button>
         </div>
-        <div v-if="reportLoading" class="report-modal-section report-modal-loading">
-          <p class="text-[var(--color-farm-brown)]">불러오는 중...</p>
-        </div>
-        <div v-else-if="!report?.result" class="report-modal-section report-modal-loading">
-          <p class="text-[var(--color-farm-brown)]">불러오지 못했습니다.</p>
-        </div>
-        <template v-else>
-        <!-- 결과 타입 -->
-        <div v-if="report?.result?.resultType" class="report-modal-section">
-          <span class="badge badge-sm" :class="resultTypeBadgeClass(report.result.resultType)">{{ resultTypeLabel(report.result.resultType) }}</span>
-        </div>
-        <!-- 문제 정보 -->
-        <div v-if="report?.result?.problem" class="report-modal-section">
-          <h4 class="report-modal-section-title">문제 정보</h4>
-          <p class="report-modal-problem-title">{{ report.result.problem.title }}</p>
-          <p v-if="report.result.problem.difficulty != null" class="report-modal-meta-text">난이도 {{ formatDifficulty(report.result.problem.difficulty) }}</p>
-          <p v-if="report.result.problem.algorithm" class="report-modal-meta-text">알고리즘 {{ formatAlgorithm(report.result.problem.algorithm) }}</p>
-        </div>
-        <!-- 학습 정보 (usedHintCount, failCount) -->
-        <div v-if="report?.result?.learning && (report.result.learning.usedHintCount != null || report.result.learning.failCount != null)" class="report-modal-section">
-          <h4 class="report-modal-section-title">학습 정보</h4>
-          <p v-if="report.result.learning.usedHintCount != null" class="report-modal-meta-text">사용한 힌트 수: {{ report.result.learning.usedHintCount }}개</p>
-          <p v-if="report.result.learning.failCount != null" class="report-modal-meta-text">실패 횟수: {{ report.result.learning.failCount }}회</p>
-        </div>
-        <!-- 힌트 (hintCount/hintContents: 구 API 호환) -->
-        <div v-if="report?.result && (report.result.hintCount != null || (Array.isArray(report.result.hintContents) && report.result.hintContents.length))" class="report-modal-section">
-          <h4 class="report-modal-section-title">힌트</h4>
-          <p v-if="report.result.hintCount != null" class="report-modal-meta-text">받은 힌트 수: {{ report.result.hintCount }}개</p>
-          <div v-if="Array.isArray(report.result.hintContents) && report.result.hintContents.length" class="report-modal-hint-contents">
-            <p v-for="(h, i) in report.result.hintContents" :key="i" class="report-modal-hint-item">{{ h }}</p>
+
+        <div class="px-6 pb-6">
+          <!-- Loading / Empty -->
+          <div v-if="reportLoading" class="flex items-center justify-center py-12">
+            <p class="text-[var(--color-farm-brown)]">불러오는 중...</p>
           </div>
-        </div>
-        <!-- FR-CODE-009: 풀이 시간, 풀이 날짜 -->
-        <div v-if="report?.result" class="report-modal-section report-modal-meta">
-          <span v-if="report.result.solveTime != null">풀이 시간 {{ formatSolveTime(report.result.solveTime) }}</span>
-          <span v-if="report.result.createdAt"> · 풀이 날짜 {{ formatDate(report.result.createdAt) }}</span>
-        </div>
-        <!-- FR-CODE-009: 제출 코드 -->
-        <div v-if="report?.result?.code != null && report.result.code !== ''" class="report-modal-section">
-          <h4 class="report-modal-section-title">제출 코드</h4>
-          <pre class="report-modal-code">{{ report.result.code }}</pre>
-        </div>
-        <!-- FR-CODE-009: 실행 시간, 메모리, 사용 언어 -->
-        <div v-if="report?.result" class="report-modal-section report-modal-meta">
-          <span v-if="report.result.execTime != null">실행 {{ report.result.execTime }}ms</span>
-          <span v-if="report.result.memory != null"> · 메모리 {{ report.result.memory }}MB</span>
-          <span v-if="report.result.language"> · 사용 언어 {{ formatLanguage(report.result.language) }}</span>
-        </div>
-        <div v-if="report?.result?.feedback" class="report-modal-feedback">
-          <p class="report-modal-feedback-text">{{ report.result.feedback }}</p>
-        </div>
-        <div v-else-if="report?.result" class="report-modal-feedback">
-          <p class="report-modal-feedback-text">제출이 완료되었습니다.</p>
-        </div>
-        <!-- FR-CODE-009: 개선 방향 -->
-        <div v-if="report?.result?.improvementDirection" class="report-modal-section">
-          <h4 class="report-modal-section-title">개선 방향</h4>
-          <p class="report-modal-feedback-text">{{ report.result.improvementDirection }}</p>
-        </div>
-        <!-- 채점·결과 -->
-        <div v-if="report?.evaluationContext || report?.xp != null" class="report-modal-grading">
-          <h4 class="report-modal-grading-title">채점·결과</h4>
-          <div v-if="report.evaluationContext" class="report-modal-grading-summary">
-            <span class="report-modal-pass-count">
-              {{ report.evaluationContext.passedCount ?? 0 }} / {{ report.evaluationContext.totalCount ?? 0 }}개 통과
-            </span>
-            <span v-if="report.evaluationContext.totalCount > 0" class="report-modal-pass-rate">
-              ({{ passRate }}%)
-            </span>
+          <div v-else-if="!report?.result" class="flex items-center justify-center py-12">
+            <p class="text-[var(--color-farm-brown)]">불러오지 못했습니다.</p>
           </div>
-          <div v-if="report.evaluationContext?.failReason" class="report-modal-fail-reason">
-            {{ report.evaluationContext.failReason }}
-          </div>
-          <div v-if="report.evaluationContext?.failedLineNo != null" class="report-modal-diff">
-            <p class="report-modal-diff-line">실패한 줄: {{ report.evaluationContext.failedLineNo }}</p>
-            <p v-if="report.evaluationContext.expectedLine != null" class="report-modal-diff-expected">
-              기대값: {{ report.evaluationContext.expectedLine }}
-            </p>
-            <p v-if="report.evaluationContext.actualLine != null" class="report-modal-diff-actual">
-              출력: {{ report.evaluationContext.actualLine }}
-            </p>
-          </div>
-          <div v-if="report.xp != null" class="report-modal-xp">
-            획득 XP: <strong>{{ report.xp }}</strong>
-          </div>
+
+          <template v-else>
+            <!-- Feedback: 강조 카드 (가장 눈에 띄게) -->
+            <div
+              v-if="report?.result?.feedback"
+              class="my-6 rounded-xl border-2 border-[var(--color-farm-green-light)] bg-[var(--color-farm-cream)]/60 p-5"
+            >
+              <div class="flex items-center gap-2 mb-3">
+                <iconify-icon icon="mdi:message-text" class="text-2xl text-[var(--color-farm-green)]"></iconify-icon>
+                <h3 class="text-base font-bold text-[var(--color-farm-green-dark)]">선생님 피드백</h3>
+              </div>
+              <p class="text-[var(--color-farm-brown-dark)] text-base leading-relaxed whitespace-pre-wrap break-words m-0">
+                {{ report.result.feedback }}
+              </p>
+            </div>
+            <div v-else-if="report?.result" class="mb-6 rounded-xl border border-[var(--color-farm-cream)] bg-[var(--color-farm-cream)]/40 p-4">
+              <p class="text-[var(--color-farm-brown)] text-sm m-0">제출이 완료되었습니다.</p>
+            </div>
+
+            <!-- 문제 정보 -->
+            <div v-if="report?.result?.problem" class="mb-5 p-4 rounded-lg bg-[var(--color-farm-cream)]/50 border border-[var(--color-farm-cream)]">
+              <h4 class="text-sm font-bold text-[var(--color-farm-green-dark)] mb-2">문제 정보</h4>
+              <p class="font-semibold text-[var(--color-farm-brown-dark)] text-base mb-1">{{ report.result.problem.title }}</p>
+              <p v-if="report.result.problem.difficulty != null" class="text-sm text-[var(--color-farm-brown)] m-0">난이도 {{ formatDifficulty(report.result.problem.difficulty) }}</p>
+              <p v-if="report.result.problem.algorithm" class="text-sm text-[var(--color-farm-brown)] mt-0.5">알고리즘 {{ formatAlgorithm(report.result.problem.algorithm) }}</p>
+            </div>
+
+            <!-- 학습 정보 -->
+            <div v-if="report?.result?.learning && (report.result.learning.usedHintCount != null || report.result.learning.failCount != null)" class="mb-5">
+              <h4 class="text-sm font-bold text-[var(--color-farm-green-dark)] mb-1.5">학습 정보</h4>
+              <p v-if="report.result.learning.usedHintCount != null" class="text-sm text-[var(--color-farm-brown)] m-0">사용한 힌트 수: {{ report.result.learning.usedHintCount }}개</p>
+              <p v-if="report.result.learning.failCount != null" class="text-sm text-[var(--color-farm-brown)] mt-0.5">실패 횟수: {{ report.result.learning.failCount }}회</p>
+            </div>
+
+            <!-- 힌트 -->
+            <div v-if="report?.result && (report.result.hintCount != null || (Array.isArray(report.result.hintContents) && report.result.hintContents.length))" class="mb-5">
+              <h4 class="text-sm font-bold text-[var(--color-farm-green-dark)] mb-1.5">힌트</h4>
+              <p v-if="report.result.hintCount != null" class="text-sm text-[var(--color-farm-brown)] m-0">받은 힌트 수: {{ report.result.hintCount }}개</p>
+              <div v-if="Array.isArray(report.result.hintContents) && report.result.hintContents.length" class="mt-2 space-y-1.5">
+                <p v-for="(h, i) in report.result.hintContents" :key="i" class="text-sm text-[var(--color-farm-brown-dark)] pl-3 border-l-2 border-[var(--color-farm-green-light)] m-0">
+                  {{ h }}
+                </p>
+              </div>
+            </div>
+
+            <!-- 메타: 풀이 시간, 날짜 -->
+            <div v-if="report?.result" class="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-[var(--color-farm-brown)] mb-4">
+              <span v-if="report.result.solveTime != null">풀이 시간 {{ formatSolveTime(report.result.solveTime) }}</span>
+              <span v-if="report.result.createdAt">풀이 날짜 {{ formatDate(report.result.createdAt) }}</span>
+            </div>
+
+            <!-- 제출 코드 -->
+            <div v-if="report?.result?.code != null && report.result.code !== ''" class="mb-5">
+              <h4 class="text-sm font-bold text-[var(--color-farm-green-dark)] mb-2">제출 코드</h4>
+              <pre class="p-4 rounded-lg bg-[var(--color-farm-cream)] border border-[var(--color-farm-cream)] text-xs font-mono text-[var(--color-farm-brown-dark)] overflow-x-auto m-0 whitespace-pre">{{ report.result.code }}</pre>
+            </div>
+
+            <!-- 실행/메모리/언어 -->
+            <div v-if="report?.result" class="flex flex-wrap gap-x-3 gap-y-0.5 text-sm text-[var(--color-farm-brown)] mb-5">
+              <span v-if="report.result.execTime != null">실행 {{ report.result.execTime }}ms</span>
+              <span v-if="report.result.memory != null">메모리 {{ report.result.memory }}MB</span>
+              <span v-if="report.result.language">사용 언어 {{ formatLanguage(report.result.language) }}</span>
+            </div>
+
+            <!-- 개선 방향 -->
+            <div v-if="report?.result?.improvementDirection" class="mb-5 p-4 rounded-lg bg-[var(--color-farm-cream)]/50 border border-[var(--color-farm-cream)]">
+              <h4 class="text-sm font-bold text-[var(--color-farm-green-dark)] mb-1.5">개선 방향</h4>
+              <p class="text-sm text-[var(--color-farm-brown-dark)] leading-relaxed whitespace-pre-wrap m-0">{{ report.result.improvementDirection }}</p>
+            </div>
+
+            <!-- 채점·결과 -->
+            <div v-if="report?.evaluationContext || report?.xp != null" class="mb-5 p-4 rounded-xl bg-[var(--color-farm-green)]/10 border border-[var(--color-farm-green)]/30">
+              <h4 class="text-sm font-bold text-[var(--color-farm-green-dark)] mb-2">채점·결과</h4>
+              <div v-if="report.evaluationContext" class="text-[var(--color-farm-brown-dark)]">
+                <span class="font-semibold">{{ report.evaluationContext.passedCount ?? 0 }} / {{ report.evaluationContext.totalCount ?? 0 }}개 통과</span>
+                <span v-if="report.evaluationContext.totalCount > 0" class="text-[var(--color-farm-brown)]"> ({{ passRate }}%)</span>
+              </div>
+              <p v-if="report.evaluationContext?.failReason" class="text-sm text-[var(--color-farm-point)] mt-2 m-0">{{ report.evaluationContext.failReason }}</p>
+              <div v-if="report.evaluationContext?.failedLineNo != null" class="mt-2 p-3 rounded-lg bg-black/5 text-sm">
+                <p class="m-0 text-[var(--color-farm-brown-dark)]">실패한 줄: {{ report.evaluationContext.failedLineNo }}</p>
+                <p v-if="report.evaluationContext.expectedLine != null" class="mt-1 m-0 text-[var(--color-farm-brown)]">기대값: {{ report.evaluationContext.expectedLine }}</p>
+                <p v-if="report.evaluationContext.actualLine != null" class="mt-0.5 m-0 text-[var(--color-farm-point)]">출력: {{ report.evaluationContext.actualLine }}</p>
+              </div>
+              <p v-if="report.xp != null" class="text-sm text-[var(--color-farm-brown-dark)] mt-3 m-0">획득 XP: <strong class="text-[var(--color-farm-green-dark)]">{{ report.xp }}</strong></p>
+            </div>
+            <p v-else-if="report?.result" class="text-sm text-[var(--color-farm-brown)] mb-5">채점 결과 없음</p>
+          </template>
+
+          <!-- 메인 버튼 -->
+          <button
+            type="button"
+            class="btn w-full mt-2 text-white border-none rounded-xl font-semibold bg-[var(--color-farm-green)] hover:bg-[var(--color-farm-green-dark)]"
+            @click="$emit('close', true)"
+          >
+            메인 화면으로
+          </button>
         </div>
-        <div v-else-if="report?.result" class="report-modal-no-grading">
-          채점 결과 없음
-        </div>
-        </template>
-        <button type="button" class="report-modal-button" @click="$emit('close', true)">
-          메인 화면으로
-        </button>
       </div>
+      <div class="modal-backdrop bg-black/50" @click="$emit('close', false)"></div>
     </div>
   </Teleport>
 </template>
@@ -164,225 +193,3 @@ function formatAlgorithm(algo) {
   return map[algo] ?? algo ?? '-'
 }
 </script>
-
-<style scoped>
-.report-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 1rem;
-}
-
-.report-modal-card {
-  background: var(--color-farm-paper, #f5f2e8);
-  border-radius: 1rem;
-  padding: 2rem 2.5rem;
-  max-width: 640px;
-  width: 100%;
-  max-height: 94vh;
-  overflow-y: auto;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
-}
-
-.report-modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.25rem;
-}
-
-.report-modal-title {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: var(--color-farm-green, #5e8d48);
-  margin: 0;
-}
-
-.report-modal-close {
-  padding: 0.35rem;
-  color: var(--color-farm-brown, #4e3b2a);
-  background: none;
-  border: none;
-  cursor: pointer;
-  border-radius: 0.5rem;
-}
-.report-modal-close:hover {
-  background: var(--color-farm-cream);
-  color: var(--color-farm-brown-dark);
-}
-
-.report-modal-id {
-  font-size: 0.875rem;
-  color: var(--color-farm-brown, #4e3b2a);
-  margin: 0 0 0.5rem 0;
-}
-
-.report-modal-section {
-  margin-bottom: 1rem;
-}
-
-.report-modal-loading {
-  padding: 1.5rem 0;
-  text-align: center;
-}
-
-.report-modal-section-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-farm-green, #5e8d48);
-  margin: 0 0 0.5rem 0;
-}
-
-.report-modal-problem-title {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: var(--color-farm-brown-dark, #2d2a26);
-  margin: 0 0 0.25rem 0;
-  line-height: 1.4;
-}
-
-.report-modal-meta-text {
-  font-size: 0.85rem;
-  color: var(--color-farm-brown, #4e3b2a);
-  margin: 0.15rem 0 0 0;
-}
-
-.report-modal-hint-contents {
-  margin-top: 0.5rem;
-}
-
-.report-modal-hint-item {
-  font-size: 0.9rem;
-  color: var(--color-farm-brown-dark, #2d2a26);
-  margin: 0.25rem 0 0 0;
-  padding-left: 0.5rem;
-  border-left: 2px solid var(--color-farm-green-light);
-}
-
-.report-modal-code {
-  font-size: 0.8rem;
-  font-family: ui-monospace, monospace;
-  background: var(--color-farm-cream);
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-  margin: 0;
-  white-space: pre;
-  color: var(--color-farm-brown-dark);
-}
-
-.report-modal-meta {
-  font-size: 0.8rem;
-  color: var(--color-farm-brown, #4e3b2a);
-}
-
-.report-modal-feedback {
-  margin-bottom: 1rem;
-}
-
-.report-modal-feedback-text {
-  font-size: 0.95rem;
-  color: var(--color-farm-brown-dark, #2d2a26);
-  line-height: 1.6;
-  white-space: pre-wrap;
-  margin: 0;
-}
-
-.report-modal-grading {
-  margin-bottom: 1.25rem;
-  padding: 1rem;
-  background: rgba(94, 141, 72, 0.08);
-  border-radius: 0.75rem;
-  border: 1px solid rgba(94, 141, 72, 0.2);
-}
-
-.report-modal-grading-title {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: var(--color-farm-green, #5e8d48);
-  margin: 0 0 0.5rem 0;
-}
-
-.report-modal-grading-summary {
-  font-size: 0.95rem;
-  color: var(--color-farm-brown-dark, #2d2a26);
-  margin-bottom: 0.25rem;
-}
-
-.report-modal-pass-count {
-  font-weight: 600;
-}
-
-.report-modal-pass-rate {
-  color: var(--color-farm-brown, #4e3b2a);
-}
-
-.report-modal-fail-reason {
-  font-size: 0.9rem;
-  color: #c0392b;
-  margin-top: 0.5rem;
-}
-
-.report-modal-diff {
-  font-size: 0.85rem;
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: rgba(0, 0, 0, 0.04);
-  border-radius: 0.5rem;
-}
-
-.report-modal-diff-line,
-.report-modal-diff-expected,
-.report-modal-diff-actual {
-  margin: 0.25rem 0 0 0;
-  color: var(--color-farm-brown-dark, #2d2a26);
-}
-
-.report-modal-diff-actual {
-  color: #c0392b;
-}
-
-.report-modal-xp {
-  font-size: 0.95rem;
-  color: var(--color-farm-brown-dark, #2d2a26);
-  margin-top: 0.75rem;
-}
-
-.report-modal-xp strong {
-  color: var(--color-farm-green, #5e8d48);
-}
-
-.report-modal-no-grading {
-  font-size: 0.875rem;
-  color: var(--color-farm-brown, #4e3b2a);
-  margin-bottom: 1rem;
-}
-
-.report-modal-meta {
-  font-size: 0.8rem;
-  color: var(--color-farm-brown, #4e3b2a);
-  margin-bottom: 1.25rem;
-}
-
-.report-modal-button {
-  display: block;
-  width: 100%;
-  padding: 0.75rem 1.25rem;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: #fff;
-  background: var(--color-farm-green, #5e8d48);
-  border: none;
-  border-radius: 0.75rem;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.report-modal-button:hover {
-  background: var(--color-farm-green-dark, #4a7340);
-}
-</style>
