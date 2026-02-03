@@ -10,11 +10,16 @@
           <h1 class="text-2xl md:text-3xl font-bold text-farm-cream font-dnf tracking-tight">
             {{ user?.nickname ?? 'Farm' }}'s Farm Crew
           </h1>
-          <span class="text-sm md:text-base font-black text-farm-cream/95 tracking-tight">
-            {{ (cards?.length ?? 0) }} / {{ GRADES.reduce((sum, g) => sum + gradeMeta[g].slots, 0) }} 개
-          </span>
         </div>
       </div>
+
+      <!-- 배너 포인트 일러스트 -->
+      <img
+        :src="farmerImg"
+        alt="farmer"
+        draggable="false"
+        class="pointer-events-none select-none absolute right-10 md:right-14 bottom-0 h-[88px] md:h-[110px] opacity-95 drop-shadow-[0_10px_14px_rgba(0,0,0,0.25)]"
+      />
     </section>
 
     <!-- 카드 목록 영역: 남은 화면을 전부 사용 -->
@@ -227,6 +232,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import CardDetail from '@/components/organisms/CardDetail.vue'
 import cardListBg from '@/assets/cardlist.png'
 import gachaImg from '@/assets/Gacha.png'
+import farmerImg from '@/assets/farmer.png'
 
 const profile = useProfileStore()
 const cardStore = useCardStore()
