@@ -1,5 +1,8 @@
 <template>
-  <div class="min-h-screen flex flex-col overflow-hidden bg-farm-cream" @dblclick.stop.prevent>
+  <div
+    class="flex flex-col w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 overflow-hidden bg-farm-cream"
+    @dblclick.stop.prevent
+  >
     <!-- 상단 배너 -->
     <section class="relative w-full bg-farm-olive px-20 py-3 md:py-4 overflow-hidden flex-shrink-0">
       <div class="min-h-[92px] md:min-h-[112px] flex flex-col justify-center px-10">
@@ -14,11 +17,11 @@
       </div>
     </section>
 
-    <!-- 카드 목록 영역: 이전과 동일한 750px 높이 유지 -->
-    <div class="w-full flex flex-shrink-0 h-[750px]">
+    <!-- 카드 목록 영역: 남은 화면을 전부 사용 -->
+    <div class="w-full flex flex-1 min-h-0 overflow-hidden">
       <!-- 좌측: 카드 뽑기 영역 (1) -->
-      <aside class="w-2/7 h-full border-r-2 border-farm-brown-dark/50 px-8 py-20 flex flex-col items-center justify-center relative overflow-hidden flex-shrink-0">
-        <div class="relative z-10 w-full flex flex-col items-center gap-4 -mt-14">
+      <aside class="w-2/7 h-full border-r-2 border-farm-brown-dark/50 px-8 pt-6 pb-10 flex flex-col items-center justify-start relative overflow-hidden flex-shrink-0">
+        <div class="relative z-10 w-full flex flex-col items-center gap-4">
           <div class="text-center">
             <div class="inline-flex items-center gap-3 mb-4">
               <span class="px-2.5 py-1 rounded-full bg-farm-olive text-farm-paper text-[11px] font-black tracking-wider shadow-sm">
@@ -68,7 +71,7 @@
       </aside>
 
       <!-- 우측: 카드 리스트 영역 - 너비·높이 꽉 채움 -->
-      <main class="flex-1 h-full min-w-0 flex flex-col min-h-0 bg-farm-cream/30 relative">
+      <main class="flex-1 h-full min-w-0 flex flex-col min-h-0 bg-farm-cream/30 relative overflow-hidden">
         <!-- 배경 텍스처 (선택) -->
         <div
           class="absolute inset-0 bg-center bg-cover opacity-20 pointer-events-none"

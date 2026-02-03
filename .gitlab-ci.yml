@@ -303,6 +303,7 @@ inference-deploy:
     GIT_STRATEGY: "none"
     INF_DIR: "inference"
     DEPLOY_DIR: "/srv/app/app/inference"
+    MODEL_DIR: "/home/elicer/models"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       changes:
@@ -345,12 +346,8 @@ inference-deploy:
     - python -V
     - pip install --upgrade pip
     - pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
-    - pip freeze > requirements.txt
 
-    # 6) Run service safely (restart)
-    - pkill -f "uvicorn app:app.*--port 8090" || true
-    - nohup uvicorn app:app --host 0.0.0.0 --port 8090 > "$DEPLOY_DIR/uvicorn.log" 2>&1 &
-
-    # 7) Simple health check
-    - sleep 1
-    - ss -lntp | grep ':8090' || (echo "uvicorn did not start on 8090" && exit 1)
+    - echo "Unzipping models..."
+    - cd "$MODEL_DIR"
+    - unzip -q label_model.zip -d "$DEPLOY_DIR/models/label_model"
+    - unzip -q text_model.zip -d "$DEPLOY_DIR/models/text_model"
