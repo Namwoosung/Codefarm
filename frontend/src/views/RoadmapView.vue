@@ -339,7 +339,7 @@ import woodPanel1 from '@/assets/wood_panel_1.png'
 import RoadmapMap from '@/components/organisms/RoadmapMap.vue'
 import api from '@/api'
 import * as sessionApi from '@/api/session'
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
 const router = useRouter()
@@ -540,6 +540,16 @@ watch(
     fetchCurriculums()
   }
 )
+
+// 레벨 페이지 진입 시 스크롤을 맨 위로
+watch(selectedLevel, async (level) => {
+  if (level != null) {
+    await nextTick()
+    window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }
+})
 
 function formatSuccessRate(successCount, submissionCount) {
   const s = successCount ?? 0
