@@ -34,9 +34,10 @@ build-backend:
     - docker push "$DOCKERHUB_USERNAME/backend:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      # changes:
+      changes:
+        - backend/**
+        - .gitlab-ci.yml
 
-# web (Vue build + Nginx serve dist) - root Dockerfile
 build-web:
   extends: .build-template
   script:
@@ -44,8 +45,11 @@ build-web:
     - docker push "$DOCKERHUB_USERNAME/web:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      changes:
+        - frontend/**
+        - infra/nginx/**
+        - .gitlab-ci.yml
 
-# execution server image (사용자 제출 코드 실행 서버)
 build-execution:
   extends: .build-template
   script:
@@ -53,8 +57,10 @@ build-execution:
     - docker push "$DOCKERHUB_USERNAME/execution:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      changes:
+        - execution/**
+        - .gitlab-ci.yml
 
-# feedback server image (feedback 서버)
 build-feedback:
   extends: .build-template
   script:
@@ -62,6 +68,9 @@ build-feedback:
     - docker push "$DOCKERHUB_USERNAME/feedback:$CI_COMMIT_SHA"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      changes:
+        - feedback/**
+        - .gitlab-ci.yml
 
 ########################
 # TEST
@@ -74,6 +83,13 @@ test-fast:
     - echo "Fast tests for feature/infra/fix"
   rules:
     - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\/.+/'
+      changes:
+        - backend/**
+        - frontend/**
+        - infra/**
+        - execution/**
+        - feedback/**
+        - .gitlab-ci.yml
 
 test-full:
   tags:
@@ -83,6 +99,13 @@ test-full:
     - echo "Full tests for develop/main/hotfix"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      changes:
+        - backend/**
+        - frontend/**
+        - infra/**
+        - execution/**
+        - feedback/**
+        - .gitlab-ci.yml
 
 ########################
 # SECURITY SCAN
@@ -92,25 +115,6 @@ cache:
   paths:
     - .trivycache/
 
-# trivy_scan_images:
-#   tags: [ec2-mono]
-#   needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
-#   stage: security
-#   variables:
-#     TRIVY_EXIT_CODE: "1"
-#     TRIVY_SEVERITY: "CRITICAL,HIGH"
-#     TRIVY_USERNAME: "$DOCKERHUB_USERNAME"
-#     TRIVY_PASSWORD: "$DOCKERHUB_TOKEN"
-#   script:
-#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA}
-#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA}
-#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/execution:${CI_COMMIT_SHA}
-#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/feedback:${CI_COMMIT_SHA}
-#   rules:
-#     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-
-
-# 개발단계 임시 패스
 trivy_scan_images:
   stage: security
   tags: [ec2-mono]
@@ -119,11 +123,25 @@ trivy_scan_images:
     TRIVY_SEVERITY: "CRITICAL,HIGH"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - backend/**
+        - frontend/**
+        - infra/**
+        - execution/**
+        - feedback/**
+        - .gitlab-ci.yml
       variables:
-        TRIVY_EXIT_CODE: "0"   # 발견돼도 통과
+        TRIVY_EXIT_CODE: "0"
     - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      changes:
+        - backend/**
+        - frontend/**
+        - infra/**
+        - execution/**
+        - feedback/**
+        - .gitlab-ci.yml
       variables:
-        TRIVY_EXIT_CODE: "1"   # 운영은 차단
+        TRIVY_EXIT_CODE: "1"
   script:
     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA}
     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA}
@@ -136,6 +154,13 @@ trivy_fs:
   stage: security
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      changes:
+        - backend/**
+        - frontend/**
+        - infra/**
+        - execution/**
+        - feedback/**
+        - .gitlab-ci.yml
   script:
     - trivy fs --severity HIGH,CRITICAL .
 
@@ -145,6 +170,13 @@ trivy_config:
   stage: security
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      changes:
+        - backend/**
+        - frontend/**
+        - infra/**
+        - execution/**
+        - feedback/**
+        - .gitlab-ci.yml
   script:
     - trivy config .
 
@@ -157,16 +189,14 @@ trivy_config:
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
-# (선택) foundation은 infra가 자주 바뀌지 않으면 manual로 두는 걸 추천
 deploy-foundation:
-  needs: ["build-execution", "build-feedback"]   # db는 공식 이미지라 빌드 불필요, execution & feedback만 필요
+  needs: ["build-execution", "build-feedback"]
   extends: .deploy-template
   script:
     - echo "CI_PIPELINE_SOURCE=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH protected=$CI_COMMIT_REF_PROTECTED"
     - chmod 600 "$SSH_KEY"
     - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
   rules:
-    # develop/main/hotfix에서만 띄우되, 자주 안 건드리면 manual 추천
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       when: manual
       allow_failure: true
@@ -180,6 +210,13 @@ deploy-dev:
     - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - backend/**
+        - frontend/**
+        - infra/**
+        - execution/**
+        - feedback/**
+        - .gitlab-ci.yml
 
 deploy-prod:
   needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
@@ -251,33 +288,26 @@ inference-deploy:
     - echo "Deploying inference service..."
     - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
-    # 1) Clean working dir
     - rm -rf repo
     - mkdir -p repo
     - cd repo
 
-    # 2) Sparse checkout only inference/
     - git init
     - git remote add origin "$CI_REPOSITORY_URL"
     - git fetch --depth 1 origin "$CI_COMMIT_SHA"
+
     - git sparse-checkout init --cone
     - git sparse-checkout set "$INF_DIR"
     - git checkout -f FETCH_HEAD
 
-    - ls -la
-    - ls -la "$INF_DIR"
-
-    # 3) Stage copy to /tmp first (avoid "file has vanished" due to cleanup)
     - STAGE_DIR="/tmp/inference_stage_${CI_PIPELINE_ID}_${CI_JOB_ID}"
     - rm -rf "$STAGE_DIR"
     - mkdir -p "$STAGE_DIR"
     - cp -a "$INF_DIR/." "$STAGE_DIR/"
 
-    # 4) Deploy with rsync (ignore transient vanish, exclude pycache)
     - mkdir -p "$DEPLOY_DIR"
     - rsync -a --delete --ignore-missing-args --exclude='__pycache__/' --exclude='*.pyc' "$STAGE_DIR/" "$DEPLOY_DIR/" || { rc=$?; [ "$rc" -eq 24 ] && echo "rsync warning(code 24) ignored" && exit 0; exit "$rc"; }
 
-    # 5) Python env + deps
     - cd "$DEPLOY_DIR"
     - export PYENV_ROOT="$HOME/.pyenv"
     - export PATH="$PYENV_ROOT/bin:$PATH"
@@ -285,13 +315,10 @@ inference-deploy:
     - pyenv activate venv
     - python -V
     - pip install --upgrade pip
-    - pip install -r requirements.txt
+    - pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cu128
 
-    # 6) Run service safely (restart)
     - pkill -f "uvicorn app:app.*--port 8090" || true
-    - nohup uvicorn app:app --host 0.0.0.0 --port 8090 \
-        > "$DEPLOY_DIR/uvicorn.log" 2>&1 &
+    - nohup uvicorn app:app --host 0.0.0.0 --port 8090 > "$DEPLOY_DIR/uvicorn.log" 2>&1 &
 
-    # 7) Simple health check (port open)
     - sleep 1
     - ss -lntp | grep ':8090' || (echo "uvicorn did not start on 8090" && exit 1)
