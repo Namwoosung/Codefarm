@@ -1,1 +1,1 @@
-deploy test 4: requirements.txt 원상복구 후 pyenv 가상환경 활성화 코드 실행 스크립트 추가
+deploy test 2602031046: base directory route changed
