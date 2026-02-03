@@ -104,3 +104,11 @@ feedback:
     connect-timeout-ms: 2000
     read-timeout-ms: 20000
   token: ${FEEDBACK_SERVER_TOKEN}
+
+ai-hint:
+  server:
+    base-url: ${HINT_SERVER_BASE_URL}:${HINT_SERVER_PORT}
+    connect-timeout-ms: 2000
+    read-timeout-ms: 30000
+  token: ${HINT_SERVER_TOKEN}
+
