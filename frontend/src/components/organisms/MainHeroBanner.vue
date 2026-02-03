@@ -1,45 +1,77 @@
 <template>
-  <!-- 전체 폭 배너 (배경은 full-bleed) -->
-  <section class="relative w-full bg-farm-olive px-20 py-3 md:py-4 overflow-hidden">
-    <div class="relative">
+  <section class="ranking-banner relative w-full bg-farm-olive px-24 overflow-hidden h-[140px] md:h-[160px] flex items-center justify-center">
+    <div class="absolute inset-0 opacity-20 pointer-events-none">
+      <div class="absolute top-0 left-0 w-32 h-32 bg-farm-yellow/30 rounded-full blur-3xl"></div>
+      <div class="absolute bottom-0 right-0 w-40 h-40 bg-farm-green/30 rounded-full blur-3xl"></div>
+    </div>
+    
+    <!-- 패턴 오버레이 -->
+    <div class="absolute inset-0 opacity-10 pointer-events-none" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px);"></div>
+    
+    <div class="relative z-10 w-full h-full flex items-center">
       <transition name="banner-slide-up" mode="out-in">
-        <div :key="currentSlide.key" class="min-h-[92px] md:min-h-[112px] flex flex-col justify-center px-10">
-          <!-- 인트로 슬라이드 -->
+        <div :key="currentSlide.key" class="w-full h-full flex flex-col justify-center px-10 box-border">
           <template v-if="currentSlide.type === 'intro'">
-            <p v-if="currentSlide.kicker" class="text-xs font-bold tracking-[0.2em] text-farm-cream/80">
-              {{ currentSlide.kicker }}
-            </p>
-            <h1 class="mt-1 text-2xl md:text-3xl font-dnf text-farm-cream">
+            <div class="flex items-center gap-2 mb-1">
+              <iconify-icon icon="mdi:trophy" class="text-farm-yellow text-lg"></iconify-icon>
+              <p v-if="currentSlide.kicker" class="text-xs font-bold tracking-[0.2em] text-farm-cream/80">
+                {{ currentSlide.kicker }}
+              </p>
+            </div>
+            <h1 class="mt-1 text-2xl md:text-3xl font-dnf text-farm-cream drop-shadow-lg">
               {{ currentSlide.title }}
             </h1>
-            <p v-if="currentSlide.description" class="mt-2 text-xs md:text-base text-farm-cream/90">
+            <p v-if="currentSlide.description" class="mt-2 text-xs md:text-base text-farm-cream/90 flex items-center gap-2">
+              <iconify-icon icon="mdi:cards" class="text-farm-yellow/80"></iconify-icon>
               {{ currentSlide.description }}
             </p>
+            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+              <span class="text-[11px] md:text-xs text-farm-cream/80 font-medium">문제별 포인트</span>
+              <span class="text-farm-cream/50 text-[10px]">·</span>
+              <span
+                v-for="n in 5"
+                :key="n"
+                class="inline-flex items-center gap-0.5 rounded-md bg-farm-cream/20 px-2 py-0.5 text-[11px] md:text-xs font-semibold text-farm-cream/90"
+              >
+                Lv.{{ n }}<span class="text-farm-yellow/95 px-1">{{ n * 10 }}pt</span>
+              </span>
+            </div>
           </template>
 
-          <!-- 랭킹 슬라이드: rank.png 위로 텍스트 오버레이 -->
+          <!-- 랭킹 슬라이드: 좌측 RANKING 타이틀 + 순위, 우측 랭킹 이미지·닉네임 -->
           <template v-else>
-            <div class="flex items-center justify-between px-6">
-              <p class="text-xs font-dnf tracking-[0.2em] text-white/80">RANKING</p>
-              <span class="text-[11px] font-dnf text-white/80">TOP 3</span>
-            </div>
+            <div class="flex items-center justify-between gap-4 px-5">
+              <!-- 좌측: RANKING 타이틀 + 1위/2위/3위 -->
+              <div class="flex flex-col items-start justify-center gap-1 shrink-0">
+                <div class="flex items-center gap-2">
+                  <iconify-icon icon="mdi:trophy-variant" class="text-farm-yellow text-base md:text-lg animate-pulse"></iconify-icon>
+                  <p class="text-sm md:text-base font-dnf tracking-[0.2em] text-farm-cream font-bold drop-shadow-lg">RANKING</p>
+                </div>
+                <p class="text-xl md:text-3xl font-dnf text-farm-cream font-bold drop-shadow-lg">
+                  {{ currentSlide.title }}
+                </p>
+              </div>
 
-            <div class="relative mt-2 flex justify-center">
-              <img
-                :src="rankImg"
-                alt="rank"
-                class="h-12 md:h-14 w-auto select-none pointer-events-none opacity-90 translate-y-2 md:translate-y-3"
-                draggable="false"
-              />
-
-              <!-- 나무덩굴(이미지) 위에 텍스트 -->
-              <div class="absolute inset-0 flex items-center justify-center">
-                <div class="-translate-y-[16px] md:-translate-y-[18px] text-center">
-                  <div class="text-base md:text-lg font-dnf text-white leading-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.75)]">
-                    {{ currentSlide.title }}
-                  </div>
-                  <div class="mt-0.5 text-xs md:text-sm font-semibold text-white/95 leading-tight drop-shadow-[0_0_10px_rgba(255,255,255,0.65)]">
-                    {{ currentSlide.description }}
+              <!-- 우측: 랭킹 이미지 + 닉네임·카드정보 (이미지 중앙 오버레이, center에서 살짝 아래) -->
+              <div class="flex justify-end items-center shrink-0 flex-1">
+                <div class="relative inline-block leading-[0] translate-y-4 md:translate-y-8">
+                  <img
+                    :src="rankImg"
+                    alt="rank"
+                    class="h-16 md:h-20 w-auto select-none pointer-events-none opacity-95 filter drop-shadow-2xl block"
+                    draggable="false"
+                  />
+                  <div class="absolute inset-0 flex items-center justify-center text-center pb-20">
+                    <div>
+                      <div class="text-base md:text-xl font-dnf text-white leading-tight font-bold text-glow-olive">
+                        {{ currentSlide.nickname ?? '—' }}
+                      </div>
+                      <div v-if="currentSlide.cardCount != null" class="mt-1 flex items-center justify-center gap-1.5 text-xs md:text-sm font-semibold text-white/95 leading-tight drop-shadow-lg">
+                        <span>{{ currentSlide.cardCount }}장</span>
+                        <span class="text-farm-white/70">·</span>
+                        <span>{{ (currentSlide.cardCount ?? 0) * 100 }}pt</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -53,7 +85,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import rankImg from '@/assets/rank.png'
+import rankImg from '@/assets/banner/rank.png'
 
 const props = defineProps({
   kicker: { type: String, default: 'CODE FARM' },
@@ -87,19 +119,22 @@ const slides = computed(() => {
       key: 'rank-1',
       type: 'rank',
       title: '1위',
-      description: `${getNick(0)}${getCount(0) != null ? ` · ${getCount(0)}장` : ''}`,
+      nickname: getNick(0),
+      cardCount: getCount(0),
     },
     {
       key: 'rank-2',
       type: 'rank',
       title: '2위',
-      description: `${getNick(1)}${getCount(1) != null ? ` · ${getCount(1)}장` : ''}`,
+      nickname: getNick(1),
+      cardCount: getCount(1),
     },
     {
       key: 'rank-3',
       type: 'rank',
       title: '3위',
-      description: `${getNick(2)}${getCount(2) != null ? ` · ${getCount(2)}장` : ''}`,
+      nickname: getNick(2),
+      cardCount: getCount(2),
     },
   ]
 })
@@ -127,6 +162,21 @@ watch(
 </script>
 
 <style scoped>
+.ranking-banner {
+  background: linear-gradient(135deg, rgba(124, 187, 103, 1) 0%, rgba(143, 193, 96, 0.95) 50%, rgba(124, 187, 103, 1) 100%);
+}
+
+.ranking-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(255, 214, 93, 0.2) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+
 .banner-slide-up-enter-active,
 .banner-slide-up-leave-active {
   transition: transform 420ms ease, opacity 420ms ease;
@@ -139,5 +189,14 @@ watch(
   transform: translateY(-16px);
   opacity: 0;
 }
+
+.text-glow-olive {
+  text-shadow: 
+    0 0 4px rgba(124, 187, 103, 0.4),
+    0 0 8px rgba(124, 187, 103, 0.3),
+    0 0 12px rgba(124, 187, 103, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
 </style>
 

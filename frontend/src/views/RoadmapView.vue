@@ -324,18 +324,16 @@
 </template>
 
 <script setup>
-import PageTitle from '@/components/atoms/PageTitle.vue'
-import heroCharacter from '@/assets/chicken.png'
-import duckCharacter from '@/assets/duck.png'
-import megacrewImage from '@/assets/megacrew.png'
-import farmerImage from '@/assets/farmer.png'
-import roadmapMainImage from '@/assets/Roadmap.png'
-import roadmapImage1 from '@/assets/pond.png'
-import roadmapImage2 from '@/assets/fruits.png'
-import roadmapImage3 from '@/assets/veg_field.png'
-import roadmapImage4 from '@/assets/forest.png'
-import roadmapImage5 from '@/assets/cowshed.png'
-import woodPanel1 from '@/assets/wood_panel_1.png'
+import heroCharacter from '@/assets/roadmap/chicken.png'
+import duckCharacter from '@/assets/roadmap/duck.png'
+import megacrewImage from '@/assets/roadmap/megacrew.png'
+import roadmapMainImage from '@/assets/roadmap/Roadmap.png'
+import roadmapImage1 from '@/assets/roadmap/pond.png'
+import roadmapImage2 from '@/assets/roadmap/fruits.png'
+import roadmapImage3 from '@/assets/roadmap/veg_field.png'
+import roadmapImage4 from '@/assets/roadmap/forest.png'
+import roadmapImage5 from '@/assets/roadmap/cowshed.png'
+import woodPanel1 from '@/assets/roadmap/wood_panel_1.png'
 import RoadmapMap from '@/components/organisms/RoadmapMap.vue'
 import api from '@/api'
 import * as sessionApi from '@/api/session'
@@ -541,6 +539,20 @@ watch(
   }
 )
 
+// 쿼리 파라미터에서 레벨 복원
+watch(
+  () => route.query.level,
+  (level) => {
+    if (level != null) {
+      const levelNum = Number(level)
+      if (!isNaN(levelNum) && levelNum >= 1 && levelNum <= 5) {
+        selectedLevel.value = levelNum
+      }
+    }
+  },
+  { immediate: true }
+)
+
 // 레벨 페이지 진입 시 스크롤을 맨 위로
 watch(selectedLevel, async (level) => {
   if (level != null) {
@@ -681,7 +693,11 @@ async function goToIdeFromModal() {
     }
   } catch (_) {}
   closeModal()
-  router.push({ name: 'ide', params: { id: String(problemId) } })
+  const query = { from: 'roadmap' }
+  if (selectedLevel.value != null) {
+    query.level = String(selectedLevel.value)
+  }
+  router.push({ name: 'ide', params: { id: String(problemId) }, query })
 }
 
 function goToExistingProblem() {
@@ -689,7 +705,11 @@ function goToExistingProblem() {
   if (!payload) return
   showActiveSessionModal.value = false
   activeSessionPayload.value = null
-  router.push({ name: 'ide', params: { id: String(payload.otherProblemId) } })
+  const query = { from: 'roadmap' }
+  if (selectedLevel.value != null) {
+    query.level = String(selectedLevel.value)
+  }
+  router.push({ name: 'ide', params: { id: String(payload.otherProblemId) }, query })
 }
 
 async function goToNewProblem() {
@@ -702,7 +722,11 @@ async function goToNewProblem() {
   showActiveSessionModal.value = false
   activeSessionPayload.value = null
   activeSessionLoading.value = false
-  router.push({ name: 'ide', params: { id: String(payload.targetProblemId) } })
+  const query = { from: 'roadmap' }
+  if (selectedLevel.value != null) {
+    query.level = String(selectedLevel.value)
+  }
+  router.push({ name: 'ide', params: { id: String(payload.targetProblemId) }, query })
 }
 </script>
 

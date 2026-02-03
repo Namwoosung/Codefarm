@@ -3,33 +3,28 @@
   <div
     role="button"
     tabindex="0"
-    class="problem-card-outer rounded-xl border-5 border-farm-brown shadow-md transition-all duration-200 hover:shadow-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown-dark/40 focus-visible:ring-offset-2 max-w-sm w-full"
+    class="problem-card-outer min-w-0 rounded-xl border-5 border-farm-brown shadow-md transition-all duration-200 hover:shadow-xl cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown-dark/40 focus-visible:ring-offset-2 max-w-sm w-full"
     @click="$emit('click', problem)"
     @keydown.enter="$emit('click', problem)"
   >
     <!-- 내부 박스 -->
-    <div class="problem-card flex flex-col rounded-4xl bg-farm-paper p-6 text-center mx-5 border-2 border-farm-paper">
+    <div class="problem-card flex min-w-0 flex-col rounded-4xl bg-farm-paper p-7 text-center mx-5 border-2 border-farm-paper">
       <!-- 레벨 뱃지 -->
-      <span class="problem-card__level self-start relative inline-block">
+      <span class="problem-card__level self-start relative inline-block shrink-0">
         <span class="relative z-10 text-xs font-dnf text-farm-brown-dark/90">Lv.{{ problem?.difficulty ?? '-' }}</span>
       </span>
 
       <!-- 카테고리  -->
-      <p class="problem-card__category mt-3 text-sm font-medium text-farm-brown-dark/90">
+      <p class="problem-card__category min-w-0 truncate text-sm font-medium text-farm-brown-dark/90">
         #{{ problem?.algorithm ?? '-' }}
       </p>
 
       <!-- 문제 title -->
-      <h2 class="problem-card__title mt-2 text-xl font-bold text-farm-brown-dark leading-snug">
+      <h2 class="problem-card__title mt-2 min-w-0 truncate text-xl font-bold text-farm-brown-dark">
         {{ problem?.title ?? '-' }}
       </h2>
       <!-- 타이틀 밑 얇은 선 -->
-      <span class="problem-card__title-line mt-4 mx-auto block w-12 h-1 bg-farm-yellow"></span>
-
-      <!-- ID: 보조 정보, 작게 우측 하단 -->
-      <span class="problem-card__id mt-4 block text-right text-[11px] text-farm-brown/60">
-        ID: {{ problem?.problemId ?? problem?.id ?? '-' }}
-      </span>
+      <span class="problem-card__title-line my-3 mx-auto block w-12 h-1 bg-farm-yellow"></span>
     </div>
   </div>
 </template>
@@ -76,7 +71,7 @@ defineEmits(['click'])
   left: 0;
   right: 0;
   bottom: 0;
-  height: 45%; /* 레벨 높이의 2/3 */
+  height: 45%;
   background: var(--color-farm-yellow);
   opacity: 0.7;
   z-index: 0;
