@@ -240,23 +240,26 @@ inference-deploy:
   variables:
     GIT_STRATEGY: "none"
     INF_DIR: "inference"
-    DEPLOY_DIR: "/srv/app/app"
+    DEPLOY_DIR: "/srv/app/app/inference"
   rules:
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
       changes:
         - inference/**
   script:
+    - set -euo pipefail
+
     - echo "Deploying inference service..."
     - echo "branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
+    # 1) Clean working dir
     - rm -rf repo
     - mkdir -p repo
     - cd repo
 
+    # 2) Sparse checkout only inference/
     - git init
     - git remote add origin "$CI_REPOSITORY_URL"
     - git fetch --depth 1 origin "$CI_COMMIT_SHA"
-
     - git sparse-checkout init --cone
     - git sparse-checkout set "$INF_DIR"
     - git checkout -f FETCH_HEAD
@@ -264,9 +267,33 @@ inference-deploy:
     - ls -la
     - ls -la "$INF_DIR"
 
-    - rsync -a --delete "$INF_DIR/" "$DEPLOY_DIR/"
+    # 3) Stage copy to /tmp first (avoid "file has vanished" due to cleanup)
+    - STAGE_DIR="/tmp/inference_stage_${CI_PIPELINE_ID}_${CI_JOB_ID}"
+    - rm -rf "$STAGE_DIR"
+    - mkdir -p "$STAGE_DIR"
+    - cp -a "$INF_DIR/." "$STAGE_DIR/"
 
+    # 4) Deploy with rsync (ignore transient vanish, exclude pycache)
+    - mkdir -p "$DEPLOY_DIR"
+    - rsync -a --delete --ignore-missing-args \
+        --exclude='__pycache__/' --exclude='*.pyc' \
+        "$STAGE_DIR/" "$DEPLOY_DIR/" || { rc=$?; [ "$rc" -eq 24 ] && echo "rsync warning(code 24) ignored"; [ "$rc" -eq 24 ] && exit 0; exit "$rc"; }
+
+    # 5) Python env + deps
     - cd "$DEPLOY_DIR"
+    - export PYENV_ROOT="$HOME/.pyenv"
+    - export PATH="$PYENV_ROOT/bin:$PATH"
+    - eval "$(pyenv init -)"
     - pyenv activate venv
+    - python -V
+    - pip install --upgrade pip
     - pip install -r requirements.txt
-    - uvicorn app:app --host 0.0.0.0 --port 8090
+
+    # 6) Run service safely (restart)
+    - pkill -f "uvicorn app:app.*--port 8090" || true
+    - nohup uvicorn app:app --host 0.0.0.0 --port 8090 \
+        > "$DEPLOY_DIR/uvicorn.log" 2>&1 &
+
+    # 7) Simple health check (port open)
+    - sleep 1
+    - ss -lntp | grep ':8090' || (echo "uvicorn did not start on 8090" && exit 1)
