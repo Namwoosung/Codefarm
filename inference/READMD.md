@@ -1,1 +1,1 @@
-deploy test 2602031046: base directory route changed
+deploy test 2602031046: add safe inference deploy with sparse checkout and isolated deploy dir
