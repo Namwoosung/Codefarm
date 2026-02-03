@@ -145,7 +145,7 @@
 import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import logoUrl from '@/assets/logo.png'
+import logoUrl from '@/assets/common/logo.png'
 
 const router = useRouter()
 const route = useRoute()

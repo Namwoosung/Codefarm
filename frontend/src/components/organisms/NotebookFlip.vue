@@ -1,12 +1,12 @@
 <template>
   <div class="w-full h-full">
     <!-- Diary wrapper -->
-    <div class="diary h-full">
+    <div class="w-full flex justify-center h-full">
       <div class="diary__cover">
         <div class="diary__spine" aria-hidden="true"></div>
-        <div class="diary__content">
+        <div class="relative ml-[38px] md:ml-[54px] rounded-[22px] p-2.5 md:p-3 bg-white/6 border border-white/12 flex-1 min-h-0 flex flex-col">
           <!-- Book -->
-          <div class="book-shell">
+          <div class="w-full flex justify-center flex-1 min-h-0">
             <div ref="bookEl" class="pageflip" aria-label="다이어리 페이지">
               <div v-for="page in pages" :key="page.key" class="page">
                 <div class="paper">
@@ -72,14 +72,62 @@
                     </div>
                   </template>
                   <template v-else-if="page.kind === 'info'">
-                    <h1 class="text-xl font-black text-farm-brown-dark">내 정보</h1>
-                    <div class="mt-4 space-y-2 text-sm text-farm-brown-dark/85 font-semibold">
-                      <p>해결한 문제 수 : <span class="font-black">{{ solvedCount }}</span></p>
-                      <p>보유한 카드 수 : <span class="font-black">{{ cardCount }}</span></p>
+                    <div class="h-full flex flex-col">
+                      <!-- 헤더 -->
+                      <div class="mb-6">
+                        <h1 class="text-2xl font-black text-farm-brown-dark">내 정보</h1>
+                        <p class="text-xs text-farm-brown-dark/60 mt-0.5">My Profile</p>
+                      </div>
+
+                      <!-- 통계 카드들 -->
+                      <div class="grid grid-cols-2 gap-4 mb-6">
+                        <!-- 해결한 문제 수 -->
+                        <div class="relative overflow-hidden rounded-xl border-2 border-farm-olive/30 bg-gradient-to-br from-farm-cream to-farm-cream/80 p-4 shadow-md">
+                          <div class="absolute top-0 right-0 w-20 h-20 bg-farm-olive/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                          <div class="relative z-10">
+                            <div class="flex items-center gap-2 mb-2">
+                              <iconify-icon icon="mdi:puzzle" class="text-farm-olive text-xl"></iconify-icon>
+                              <span class="text-xs font-semibold text-farm-brown-dark/70">해결한 문제</span>
+                            </div>
+                            <p class="text-3xl font-black text-farm-brown-dark">{{ solvedCount }}</p>
+                            <p class="text-xs text-farm-brown-dark/50 mt-1">문제</p>
+                          </div>
+                        </div>
+
+                        <!-- 보유한 카드 수 -->
+                        <div class="relative overflow-hidden rounded-xl border-2 border-farm-yellow/30 bg-gradient-to-br from-farm-cream to-farm-cream/80 p-4 shadow-md">
+                          <div class="absolute top-0 right-0 w-20 h-20 bg-farm-yellow/10 rounded-full -translate-y-1/2 translate-x-1/2"></div>
+                          <div class="relative z-10">
+                            <div class="flex items-center gap-2 mb-2">
+                              <iconify-icon icon="mdi:cards" class="text-farm-yellow text-xl"></iconify-icon>
+                              <span class="text-xs font-semibold text-farm-brown-dark/70">보유한 카드</span>
+                            </div>
+                            <p class="text-3xl font-black text-farm-brown-dark">{{ cardCount }}</p>
+                            <p class="text-xs text-farm-brown-dark/50 mt-1">장</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <!-- 장식 구분선 -->
+                      <div class="flex items-center gap-2 my-4">
+                        <div class="flex-1 h-px bg-gradient-to-r from-transparent via-farm-brown/20 to-transparent"></div>
+                        <iconify-icon icon="mdi:book-open-variant" class="text-farm-brown/40"></iconify-icon>
+                        <div class="flex-1 h-px bg-gradient-to-r from-transparent via-farm-brown/20 to-transparent"></div>
+                      </div>
+
+                      <!-- 안내 메시지 -->
+                      <div class="mt-auto p-4 rounded-xl bg-gradient-to-br from-farm-olive/10 to-farm-green/10 border border-farm-olive/20">
+                        <div class="flex items-start gap-3">
+                          <iconify-icon icon="mdi:information" class="text-farm-olive text-lg mt-0.5 flex-shrink-0"></iconify-icon>
+                          <div>
+                            <p class="text-sm font-semibold text-farm-brown-dark mb-1">학습 기록 확인하기</p>
+                            <p class="text-xs text-farm-brown-dark/70 leading-relaxed">
+                              다음 페이지에서 리포트 목록을 확인할 수 있어요.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <p class="mt-6 text-sm text-farm-brown-dark/70">
-                      다음 페이지에서 리포트 목록을 확인할 수 있어요.
-                    </p>
                   </template>
                   <template v-else-if="page.kind === 'report'">
                     <div class="flex items-start justify-between gap-3">
@@ -136,7 +184,7 @@
           />
 
           <!-- Index tabs (붙어있는 다이어리 인덱스) -->
-          <div class="diary__index" aria-label="다이어리 인덱스">
+          <div class="absolute top-0 -right-18 md:-right-16 w-[78px] md:w-23 h-full pointer-events-none" aria-label="다이어리 인덱스">
             <button
               v-for="(tab, idx) in tabs"
               :key="tab.key"
@@ -146,7 +194,7 @@
               :style="{ top: `${idx * 52 + 18}px` }"
               @click="goToTab(idx)"
             >
-              <span class="diary__tabLabel">{{ tab.label }}</span>
+              <span class="block text-left py-2.5 px-3 font-light text-xs whitespace-nowrap overflow-hidden text-ellipsis text-shadow-[0_1px_0_rgba(0,0,0,0.18)]" :style="{ color: 'var(--tab-label-color)' }">{{ tab.label }}</span>
             </button>
           </div>
         </div>
@@ -408,9 +456,6 @@ const goToTab = (idx) => {
   if (flip.value) flip.value.flip(pageIndex)
 }
 
-const flipNext = () => flip.value?.flipNext()
-const flipPrev = () => flip.value?.flipPrev()
-
 onMounted(() => {
   syncCompactMode()
   initIfNeeded()
@@ -438,13 +483,6 @@ watch(
   }
 )
 
-function formatCreatedAt(iso) {
-  if (!iso) return '-'
-  const d = new Date(iso)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
-}
-
 function formatCreatedDate(iso) {
   if (!iso) return '-'
   const d = new Date(iso)
@@ -467,11 +505,6 @@ function resultStatusClass(type) {
 function resultTypeLabel(type) {
   const map = { SUCCESS: '정답', FAIL: '오답', GIVE_UP: '탈주' }
   return map[type] ?? type ?? '-'
-}
-
-function resultTypeBadgeClass(type) {
-  const map = { SUCCESS: 'badge-success text-white', FAIL: 'badge-error text-white', GIVE_UP: 'badge-ghost' }
-  return map[type] ?? 'badge-ghost'
 }
 
 // 다른 화면에서 리포트가 추가된 뒤, 다시 마이페이지로 돌아오면 최신 목록을 재조회
@@ -518,12 +551,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.diary {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
 .diary__cover {
   position: relative;
   width: min(980px, 100%);
@@ -575,52 +602,6 @@ onBeforeUnmount(() => {
     inset 2px 0 0 rgba(255, 255, 255, 0.06);
 }
 
-.diary__title {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-left: 54px;
-  margin-bottom: 14px;
-  color: var(--color-farm-paper);
-}
-
-.diary__badge {
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  font-size: 12px;
-  padding: 7px 10px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-}
-
-.diary__subtitle {
-  font-weight: 700;
-  font-size: 14px;
-  opacity: 0.9;
-}
-
-.diary__content {
-  position: relative;
-  margin-left: 54px;
-  border-radius: 22px;
-  padding: 12px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.book-shell {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  flex: 1;
-  min-height: 0;
-}
-
 .pageflip {
   width: min(980px, 100%);
   border-radius: 16px;
@@ -646,21 +627,11 @@ onBeforeUnmount(() => {
   background-size: 4px 4px;
 }
 
-.diary__index {
-  position: absolute;
-  top: 0;
-  /* 종이 영역을 침범하지 않도록 커버(나무) 쪽으로 더 빼줌 */
-  right: -64px;
-  width: 92px;
-  height: 100%;
-  pointer-events: none; /* 버튼만 포인터 받게 */
+.diary__tab {
   /* 인덱스(테이프) 컬러: 미선택=연한 갈색, 선택=진한 올리브 */
   --tape-inactive: var(--color-farm-brown, #7A5C3E);
   --tape-active: var(--color-farm-olive, #4A4A29);
   --tape-edge: rgba(33, 24, 20, 0.28);
-}
-
-.diary__tab {
   position: absolute;
   right: 0;
   pointer-events: auto;
@@ -721,19 +692,6 @@ onBeforeUnmount(() => {
     inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
-.diary__tabLabel {
-  display: block;
-  text-align: left;
-  padding: 10px 12px;
-  font-weight: 300;
-  font-size: 12px;
-  color: var(--tab-label-color);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.18);
-}
-
 @media (max-width: 768px) {
   .diary__cover {
     padding: 16px;
@@ -744,29 +702,10 @@ onBeforeUnmount(() => {
     width: 18px;
   }
 
-  .diary__title {
-    margin-left: 38px;
-  }
-
-  .diary__content {
-    margin-left: 38px;
-    padding: 10px;
-  }
-
   /* 좁은 화면에서는 인덱스를 더 바깥(나무 커버 영역)으로 빼고, 탭 크기도 줄임 */
-  .diary__index {
-    right: -72px;
-    width: 78px;
-  }
-
   .diary__tab {
     width: 78px;
     height: 40px;
-  }
-
-  .diary__tabLabel {
-    padding: 9px 10px;
-    font-size: 11px;
   }
 }
 </style>

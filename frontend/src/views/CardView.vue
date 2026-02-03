@@ -5,6 +5,14 @@
   >
     <!-- 상단 배너 -->
     <section class="card-hero relative w-full px-20 py-3 md:py-4 overflow-visible flex-shrink-0">
+      <!-- 배경 장식 -->
+      <div class="absolute inset-0 opacity-20 pointer-events-none z-0">
+        <div class="absolute top-0 left-0 w-32 h-32 bg-farm-yellow/30 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 right-0 w-40 h-40 bg-farm-green/30 rounded-full blur-3xl"></div>
+      </div>
+      
+      <div class="absolute inset-0 opacity-10 pointer-events-none z-0" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px);"></div>
+      
       <div class="relative z-10 min-h-[96px] md:min-h-[120px] flex flex-col justify-center px-10 pr-40 sm:pr-52 md:pr-72">
           <p class="mt-2 text-2xl md:text-4xl text-farm-cream font-dnf tracking-tight">
             <!-- {{ bannerNickname }}의 Farm Crew -->
@@ -15,10 +23,10 @@
       <!-- 배너 포인트 일러스트 + 데코 (우측 하단 고정) -->
       <div class="absolute right-16 md:right-50 bottom-1 md:bottom-0 translate-y-1 z-10 pointer-events-none select-none">
         <div class="hero-blob absolute -right-2 md:-right-6 -bottom-8 w-40 h-40 md:w-56 md:h-56 rounded-full blur-2xl"></div>
-        <div class="hero-spark hero-spark--1 hidden sm:flex">
+        <div class="absolute right-[86px] -top-1.5 w-[42px] h-[42px] rounded-full items-center justify-center bg-white/25 border border-white/28 text-white/95 backdrop-blur-[6px] shadow-[0_12px_22px_rgba(0,0,0,0.18)] hidden sm:flex hero-spark--1">
           <iconify-icon icon="mdi:sparkles" class="text-xl"></iconify-icon>
         </div>
-        <div class="hero-spark hero-spark--2 hidden sm:flex">
+        <div class="absolute right-4 top-6 w-[42px] h-[42px] rounded-full items-center justify-center bg-white/25 border border-white/28 text-white/95 backdrop-blur-[6px] shadow-[0_12px_22px_rgba(0,0,0,0.18)] hidden sm:flex hero-spark--2">
           <iconify-icon icon="mdi:star-four-points" class="text-xl"></iconify-icon>
         </div>
         <img
@@ -30,28 +38,19 @@
       </div>
     </section>
 
-    <!-- 카드 목록 영역: 남은 화면을 전부 사용 -->
     <div class="w-full flex flex-1 min-h-0 overflow-hidden">
-      <!-- 좌측: 카드 뽑기 영역 (1) -->
-      <aside class="w-2/7 h-full border-r-2 border-farm-brown-dark/50 px-5 py-5 flex flex-col items-center justify-start relative overflow-visible flex-shrink-0">
-        <!-- 스크린샷 구조: 큰 패널 상자 -->
-        <div class="gacha-panel">
-          <div class="gacha-panel__title">
-            <div class="gacha-panel__headline font-dnf">Gacha!</div>
-            <!-- <div class="gacha-panel__sub">새로운 크루를 영입해보세요</div> -->
-          </div>
-
-          <!-- 카드(연출): 플로팅 + 바닥 그림자 -->
-          <div class="gacha-stage gacha-stage--panel" :class="{ 'gacha-stage--ready': canDraw }" aria-hidden="true">
+      <aside class="w-2/7 h-full border-r-2 border-farm-brown-dark/50 px-5 py-5 flex flex-col items-center justify-center relative overflow-hidden flex-shrink-0">
+        <div class="gacha-panel w-full max-w-[340px] h-full max-h-full flex flex-col">
+          
+          <div class="gacha-stage gacha-stage--panel relative w-full flex justify-center items-end" :class="{ 'gacha-stage--ready': canDraw }" aria-hidden="true">
             <div class="gacha-shadow"></div>
-            <div class="gacha-float">
-              <img :src="gachaImg" class="gacha-card-img w-[17rem] h-auto object-contain select-none" alt="gacha" draggable="false" />
+            <div class="gacha-float h-full flex items-center justify-center">
+              <img :src="gachaImg" class="gacha-card-img w-full max-w-[17rem] h-auto max-h-full object-contain select-none" alt="gacha" draggable="false" />
             </div>
           </div>
 
-          <!-- 프로그레스 + 보유포인트(같은 너비로 정렬) -->
-          <div class="gacha-panel__hud">
-            <div class="gacha-panel__track" aria-hidden="true">
+          <div class="w-full max-w-[280px] flex flex-col items-center gap-2.5 relative z-10">
+            <div class="gacha-panel__track w-full" aria-hidden="true">
               <div
                 :class="[
                   'gacha-bar h-full rounded-full bg-gradient-to-r from-farm-yellow to-farm-green transition-[width] duration-200 ease-out',
@@ -60,7 +59,7 @@
                 :style="{ width: `${Math.max(0, Math.min(100, chargeProgress * 100))}%` }"
               ></div>
             </div>
-            <div class="gacha-panel__points font-dnf">보유 포인트 : {{ points.toLocaleString() }}P</div>
+            <div class="text-lg text-farm-brown-dark/70 relative z-10 w-full text-center font-dnf">보유 포인트 : {{ points.toLocaleString() }}P</div>
           </div>
 
           <button type="button" class="gacha-draw-btn gacha-draw-btn--wide font-dnf" @click="gachaCard" :disabled="!canDraw">
@@ -69,21 +68,18 @@
               :style="{ width: `${Math.max(0, Math.min(100, chargeProgress * 100))}%` }"
               aria-hidden="true"
             ></span>
-            <span class="gacha-draw-btn__content">
+            <span class="relative z-[2] inline-flex items-center gap-2.5">
               <span class="gacha-draw-btn__label">카드뽑기 | 100P</span>
             </span>
           </button>
         </div>
       </aside>
 
-      <!-- 우측: 카드 리스트 영역 - 너비·높이 꽉 채움 -->
       <main class="flex-1 h-full min-w-0 flex flex-col min-h-0 bg-farm-cream/30 relative overflow-hidden">
-        <!-- 배경 텍스처 (선택) -->
         <div
           class="absolute inset-0 bg-center bg-cover opacity-20 pointer-events-none"
           :style="{ backgroundImage: `url(${cardListBg})` }"
         />
-        <!-- 등급별 보유 개수 요약: 카드 목록 시작점을 내려서 상단 잘림 방지 -->
         <div class="relative z-10 flex-shrink-0 flex flex-wrap items-center gap-2 px-6 py-3 border-b border-farm-brown/15 bg-farm-cream/50">
           <span class="text-xs font-bold text-farm-brown-dark/80 mr-1">등급별 보유</span>
           <template v-for="grade in GRADES" :key="grade">
@@ -95,7 +91,6 @@
             </span>
           </template>
         </div>
-        <!-- 등급별 리스트: 오른쪽 전체 채움 -->
         <div class="relative z-10 flex-1 min-h-0 overflow-y-auto scrollbar-hide snap-y snap-mandatory scroll-py-2 px-6 py-4">
           <section
             v-for="grade in GRADES"
@@ -112,9 +107,7 @@
                   </span>
                 </div>
 
-                <!-- 가로 스크롤 슬롯 -->
                 <div class="relative group">
-                  <!-- 좌우 이동 버튼 -->
                   <button
                     v-if="grade !== 'SPECIAL'"
                     type="button"
@@ -148,7 +141,6 @@
                       <div v-if="slotCard" class="w-full flex flex-col items-center">
                         <CardDetail class="w-full" :card="slotCard" @showcard="openCardModal" />
 
-                        <!-- 카드 아래 count 표시 -->
                         <div
                           class="mt-2 inline-flex items-center rounded-full bg-farm-cream/90 border border-farm-brown/15 px-2 py-0.5 text-xs font-black text-farm-brown-dark shadow-sm"
                         >
@@ -174,7 +166,6 @@
     </div>
   </div>
 
-  <!-- 카드 확대 팝업 -->
   <Transition
     enter-active-class="transition-opacity duration-150 ease-out"
     enter-from-class="opacity-0"
@@ -206,12 +197,18 @@
           @pointerleave="onModalPointerLeave"
         >
           <figure class="w-full h-full rounded-2xl overflow-visible relative block m-0">
-            <div
-              v-if="isGachaModal && drawMessage"
-              class="absolute top-3 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-black/70 text-white text-sm font-bold shadow-lg backdrop-blur-sm"
+            <Transition
+              enter-active-class="transition-opacity duration-500 ease-out delay-1000"
+              enter-from-class="opacity-0"
+              enter-to-class="opacity-100"
             >
-              {{ drawMessage }}
-            </div>
+              <div
+                v-if="isGachaModal && drawMessage"
+                class="absolute top-15 left-1/2 whitespace-nowrap -translate-x-1/2 z-10 px-4 py-2 rounded-full text-farm-olive text-sm font-bold"
+              >
+                {{ drawMessage }}
+              </div>
+            </Transition>
             <img
               :src="modalCardImage"
               :alt="selectedCard.name"
@@ -231,9 +228,9 @@ import { useCardStore } from '@/stores/card'
 import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import CardDetail from '@/components/organisms/CardDetail.vue'
-import cardListBg from '@/assets/cardlist.png'
-import gachaImg from '@/assets/Gacha.png'
-import farmerImg from '@/assets/farmer.png'
+import cardListBg from '@/assets/card/cardlist.png'
+import gachaImg from '@/assets/card/Gacha.png'
+import farmerImg from '@/assets/roadmap/farmer.png'
 
 const profile = useProfileStore()
 const cardStore = useCardStore()
@@ -462,28 +459,14 @@ const modalPointerStyle = computed(() => {
 .hero-farmer {
   animation: none;
 }
-.hero-spark {
-  position: absolute;
-  width: 42px;
-  height: 42px;
-  border-radius: 9999px;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  color: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(6px);
-  box-shadow: 0 12px 22px rgba(0, 0, 0, 0.18);
+.hero-spark--1,
+.hero-spark--2 {
   animation: hero-float 5.4s ease-in-out infinite;
 }
 .hero-spark--1 {
-  right: 86px;
-  top: -6px;
   animation-delay: -1.2s;
 }
 .hero-spark--2 {
-  right: 16px;
-  top: 24px;
   animation-delay: -2.6s;
 }
 @keyframes hero-float {
@@ -550,7 +533,7 @@ const modalPointerStyle = computed(() => {
 .gacha-panel {
   width: 100%;
   max-width: 340px;
-  padding: 18px 16px 16px;
+  padding: clamp(20px, 3%, 14px) clamp(12px, 4%, 16px);
   border-radius: 26px;
   background:
     radial-gradient(520px 260px at 50% 0%, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0) 62%),
@@ -558,12 +541,13 @@ const modalPointerStyle = computed(() => {
   border: 1px solid rgba(122, 92, 62, 0.14);
   box-shadow: 0 18px 42px rgba(0, 0, 0, 0.08);
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: clamp(4px, 2%, 8px);
+  min-height: 0;
 }
 
 .gacha-panel::before {
@@ -582,12 +566,6 @@ const modalPointerStyle = computed(() => {
   z-index: 0;
 }
 
-.gacha-panel__title {
-  text-align: center;
-  position: relative;
-  z-index: 1;
-}
-
 .gacha-panel__headline {
   font-size: 45px;
   line-height: 1;
@@ -602,7 +580,10 @@ const modalPointerStyle = computed(() => {
 }
 
 .gacha-stage--panel {
-  margin-top: 8px;
+  margin-top: 0;
+  margin-bottom: 0;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .gacha-panel__track {
@@ -629,26 +610,6 @@ const modalPointerStyle = computed(() => {
   opacity: 0.65;
 }
 
-.gacha-panel__points {
-  font-size: 20px;
-  font-weight: 900;
-  color: rgba(78, 59, 42, 0.70);
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  text-align: center;
-}
-
-.gacha-panel__hud {
-  width: min(280px, 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  position: relative;
-  z-index: 1;
-}
-
 .gacha-draw-btn--wide {
   width: 100%;
   max-width: 280px;
@@ -656,12 +617,7 @@ const modalPointerStyle = computed(() => {
 
 /* Gacha image: 카드 뽑기 연출(플로팅 + 바닥 그림자) */
 .gacha-stage {
-  position: relative;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  padding-bottom: 10px; /* 그림자 공간(조금 줄여서 버튼과 더 붙게) */
+  padding-bottom: clamp(2px, 0.6%, 4px); /* 그림자 공간 */
   user-select: none;
   -webkit-user-select: none;
   isolation: isolate;
@@ -760,7 +716,7 @@ const modalPointerStyle = computed(() => {
   }
 }
 
-/* 뽑기 버튼: 게이미피케이션 스타일 */
+/* 뽑기 버튼 */
 .gacha-draw-btn {
   position: relative;
   display: inline-flex;
@@ -771,9 +727,7 @@ const modalPointerStyle = computed(() => {
   border-radius: 9999px;
   border: 3px solid var(--color-farm-yellow);
   color: var(--color-farm-olive);
-  /* 버튼 그라데이션: farm-yellow 톤 */
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), var(--color-farm-yellow));
-  /* 예시 방식: 눌리면 들어가고 그림자는 줄어드는 형태 */
   box-shadow: 5px 6px 0 var(--color-farm-yellow);
   cursor: pointer;
   user-select: none;
@@ -825,20 +779,10 @@ const modalPointerStyle = computed(() => {
   z-index: 1;
 }
 
-.gacha-draw-btn__content {
-  position: relative;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-
 .gacha-draw-btn__label {
-  font-weight: 900;
   letter-spacing: -0.02em;
-  font-size: 16px;
-  color: var(--color-farm-brown-dark);
+  font-size: 18px;
+  color: var(--color-farm-olive);
 }
 
 .gacha-draw-btn__cost {

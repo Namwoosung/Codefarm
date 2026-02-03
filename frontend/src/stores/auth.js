@@ -1,17 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
-import api from '@/api'
-
-const normalizeCodingLevel = (codingLevel) => {
-  if (typeof codingLevel === 'number') return codingLevel
-  if (typeof codingLevel === 'string') {
-    if (codingLevel.startsWith('LEVEL')) {
-      return parseInt(codingLevel.replace('LEVEL', ''), 10)
-    }
-    return parseInt(codingLevel, 10)
-  }
-  return NaN
-}
+import { login as apiLogin, logout as apiLogout, signup as apiSignup, checkEmailDuplicate as apiCheckEmailDuplicate, checkNicknameDuplicate as apiCheckNicknameDuplicate, getUserProfile as apiGetUserProfile, normalizeCodingLevel } from '@/api/auth'
 
 /** localStorage의 토큰을 읽어, 만료되었으면 제거하고 null 반환 */
 function getValidTokenFromStorage() {
@@ -61,7 +50,7 @@ export const useAuthStore = defineStore('auth', () => {
     errorMessage.value = null
 
     try {
-      const res = await api.post('/users/login', payload)
+      const res = await apiLogin(payload)
       const data = res.data?.data ?? {}
       // 백엔드: LoginResponseDto { user, token: { accessToken, tokenType } }
       user.value = data.user ?? null
@@ -80,7 +69,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const logout = async () => {
     try {
-      await api.post('/users/logout')
+      await apiLogout()
     } catch (_) {
       // 로그아웃 API 실패(401 등)여도 클라이언트 상태는 항상 비움
     } finally {
@@ -111,7 +100,7 @@ export const useAuthStore = defineStore('auth', () => {
         codingLevel: codingLevelNumber
       }
 
-      const response = await api.post('/users/signup', requestData)
+      const response = await apiSignup(requestData)
       return response.data
     } catch (err) {
       errCode.value = err?.response?.data?.errorCode ?? null
@@ -123,12 +112,12 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const checkEmailDuplicate = async (email) => {
-    const response = await api.post('/users/check/emails', { email })
+    const response = await apiCheckEmailDuplicate(email)
     return response.data?.data?.isAvailable ?? false
   }
 
   const checkNicknameDuplicate = async (nickname) => {
-    const response = await api.post('/users/check/nicknames', { nickname })
+    const response = await apiCheckNicknameDuplicate(nickname)
     return response.data?.data?.isAvailable ?? false
   }
 
@@ -136,7 +125,7 @@ export const useAuthStore = defineStore('auth', () => {
   const fetchUserIfNeeded = async () => {
     if (!token.value || user.value != null) return
     try {
-      const res = await api.get('/users/profiles')
+      const res = await apiGetUserProfile()
       user.value = res.data?.data ?? null
     } catch (_) {
       // 401 등이면 인터셉터에서 이미 logout 처리됨

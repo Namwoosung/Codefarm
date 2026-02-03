@@ -6,7 +6,7 @@ import router from './router'
 import { useIdeStore } from '@/stores/ide'
 
 // UI 라이브러리
-import './assets/style.css'
+import './assets/common/style.css'
 import PrimeVue from 'primevue/config'
 import Aura from '@primeuix/themes/aura'
 import Button from 'primevue/button'

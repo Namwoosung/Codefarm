@@ -33,7 +33,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background-image: url('../../assets/patterns/brick-wall.svg');
+  background-image: url('../../assets/common/patterns/brick-wall.svg');
   background-repeat: repeat;
   background-size: 42px 44px;
   opacity: 0.12;  /* 여기 숫자 바꾸면 패턴 라인 진하기 (0.06~0.2 권장) */
