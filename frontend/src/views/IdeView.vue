@@ -1078,13 +1078,18 @@ const handleSubmit = async () => {
     }
   } catch (err) {
     if (terminalPanel.value) {
-      const msg = err.response?.data?.message || err.message
+      const isTimeout = err.code === 'ECONNABORTED'
+      const msg = isTimeout
+        ? '요청 시간이 초과되었습니다. 채점이 진행 중일 수 있으니 잠시 후 제출 내역을 확인해 주세요.'
+        : (err.response?.data?.message || err.message)
       terminalPanel.value.write(`제출 실패: ${msg}\r\n`)
-      const data = err.response?.data
-      if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-        try {
-          terminalPanel.value.write('\r\n' + JSON.stringify(data, null, 2) + '\r\n')
-        } catch (_) {}
+      if (!isTimeout) {
+        const data = err.response?.data
+        if (data && typeof data === 'object' && Object.keys(data).length > 0) {
+          try {
+            terminalPanel.value.write('\r\n' + JSON.stringify(data, null, 2) + '\r\n')
+          } catch (_) {}
+        }
       }
       terminalPanel.value.write('❌ 제출 실패\r\n')
     }
@@ -1167,7 +1172,11 @@ const doRunWithInput = async (input) => {
     }
   } catch (err) {
     if (terminalPanel.value) {
-      terminalPanel.value.write(`실행 실패: ${err.response?.data?.message || err.message}\r\n`)
+      const isTimeout = err.code === 'ECONNABORTED'
+      const msg = isTimeout
+        ? '요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.'
+        : (err.response?.data?.message || err.message)
+      terminalPanel.value.write(`실행 실패: ${msg}\r\n`)
       terminalPanel.value.write('❌ 실행 실패\r\n')
     }
   } finally {
