@@ -41,6 +41,7 @@
             :hint-remaining="hintRemaining"
             :hint-max="hintMax"
             @hint-used="onHintUsedFromPanel"
+            @hint-exhausted="onHintExhausted"
             @auto-hint-arrived="onAutoHintArrived"
             @dismiss-hint-toast="onDismissHintToast"
             @close="hintPanelOpen = false"
@@ -1253,9 +1254,21 @@ const onReportModalClose = (goToMain = false) => {
 
 /** 문제 패널 채팅에서 힌트 사용 시 툴바 당근·잔여 횟수 동기화 */
 function onHintUsedFromPanel({ usedHint, maxHint }) {
-  hintUsed.value = usedHint ?? hintUsed.value
-  hintMax.value = maxHint ?? hintMax.value
-  showToast(`힌트가 차감되었습니다. (잔여: ${(maxHint ?? 3) - (usedHint ?? 0)}/${maxHint ?? 3})`)
+  const u = usedHint ?? hintUsed.value
+  const m = maxHint ?? hintMax.value
+  hintUsed.value = u
+  hintMax.value = m
+  const remaining = Math.max(0, m - u)
+  if (remaining <= 0) {
+    showToast('힌트가 모두 사용되었습니다')
+  } else {
+    showToast(`힌트가 차감되었습니다. (잔여: ${remaining}/${m})`)
+  }
+}
+
+/** 수동 힌트 소진 시 툴팁(토스트) — 힌트 패널에서 전송 시도 시 */
+function onHintExhausted() {
+  showToast('힌트가 모두 사용되었습니다')
 }
 
 /** 자동 힌트 도착 시 종 빨간 점 + 알림 목록에 추가 */
