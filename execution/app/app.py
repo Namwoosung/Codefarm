@@ -15,16 +15,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-MAX_CONCURRENT_EXECUTIONS = 4
 SUPPORTED_LANGUAGES = {"PYTHON"}
-
-semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXECUTIONS)
 
 
 @app.post("/execute", response_model=ExecuteResult)
 async def execute(req: ExecuteRequest):
 
-    # 언어 검증 (Literal이 있지만 방어 차원에서 한 번 더)
+    # 언어 검증
     if req.language not in SUPPORTED_LANGUAGES:
         raise HTTPException(status_code=400, detail="Unsupported language")
 
@@ -36,19 +33,18 @@ async def execute(req: ExecuteRequest):
     )
 
     try:
-        # 동시 실행 제한 + thread offloading
-        async with semaphore:
-            stdout, stderr, exec_time, memory_usage, is_timeout, is_oom = \
-                await asyncio.to_thread(
-                    run_python_in_docker,
-                    req.code,
-                    req.stdin or "",
-                    req.timeLimitMs,
-                    req.memoryLimitMb,
-                    req.cpuLimit,
-                )
+        # 동시 실행 제한 없이 바로 실행
+        stdout, stderr, exec_time, memory_usage, is_timeout, is_oom = \
+            await asyncio.to_thread(
+                run_python_in_docker,
+                req.code,
+                req.stdin or "",
+                req.timeLimitMs,
+                req.memoryLimitMb,
+                req.cpuLimit,
+            )
 
-    except Exception as e:
+    except Exception:
         logger.exception("[EXECUTION ERROR]")
         raise HTTPException(
             status_code=500,
