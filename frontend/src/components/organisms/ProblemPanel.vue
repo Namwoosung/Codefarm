@@ -29,16 +29,34 @@
               <span>실행 제한 시간 <span class="font-semibold">{{ problem?.timeLimit || 0 }}초</span></span>
             </div>
           </div>
-          <div v-if="problem?.concept" class="mb-6">
-            <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)] mb-2">개념</h3>
-            <div class="bg-base-200/60 p-4 rounded-lg text-[var(--color-farm-brown-dark)] whitespace-pre-wrap leading-relaxed text-[0.875rem]">
-              {{ problem.concept }}
-            </div>
-          </div>
           <div class="mb-6">
             <div class="text-[var(--color-farm-brown-dark)] whitespace-pre-wrap leading-relaxed text-[0.875rem]">
               {{ problem?.description ?? '' }}
             </div>
+          </div>
+          <div v-if="problem?.concept" class="mb-6">
+            <button
+              type="button"
+              class="flex items-center justify-between w-full text-left text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)] mb-2 bg-base-200/60 hover:bg-base-200 rounded-lg px-3 py-2 transition-colors"
+              @click="showConcept = !showConcept"
+            >
+              <span class="flex items-center gap-1.5">
+                <iconify-icon icon="mdi:lightbulb-on-outline" class="text-base text-[var(--color-farm-green)]"></iconify-icon>
+                <span>개념</span>
+              </span>
+              <iconify-icon
+                :icon="showConcept ? 'mdi:chevron-up' : 'mdi:chevron-down'"
+                class="text-lg text-[var(--color-farm-brown)]"
+              ></iconify-icon>
+            </button>
+            <transition name="fade-slide">
+              <div
+                v-if="showConcept"
+                class="bg-base-200/60 p-4 rounded-lg text-[var(--color-farm-brown-dark)] whitespace-pre-wrap leading-relaxed text-[0.875rem]"
+              >
+                {{ problem.concept }}
+              </div>
+            </transition>
           </div>
           <div v-if="problem?.inputDescription" class="mb-6">
             <h3 class="text-[0.9375rem] font-semibold text-[var(--color-farm-brown-dark)] mb-2">입력 설명</h3>
@@ -175,6 +193,7 @@ const ideStore = useIdeStore()
 const problem = ref(null)
 const problemLoading = ref(false)
 const copiedWhich = ref(null) // 'input' | 'output' | null
+const showConcept = ref(false)
 
 function copyToClipboard(text, which) {
   if (!text) return
@@ -302,5 +321,15 @@ onMounted(() => {
 }
 .overflow-y-auto::-webkit-scrollbar-thumb:hover {
   background: var(--color-farm-green);
+}
+
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: all 0.15s ease-out;
+}
+.fade-slide-enter-from,
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
 }
 </style>
