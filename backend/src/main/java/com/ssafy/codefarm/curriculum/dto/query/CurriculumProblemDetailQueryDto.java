@@ -10,6 +10,7 @@ public record CurriculumProblemDetailQueryDto(
         Long problemId,
         String title,
         String description,
+        String concept,
         Integer difficulty,
         String algorithm,
         String inputDescription,

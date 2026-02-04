@@ -25,6 +25,7 @@ public record CurriculumProblemItemResponseDto(
                 dto.problemId(),
                 dto.title(),
                 dto.description(),
+                dto.concept(),
                 dto.difficulty(),
                 dto.algorithm(),
                 dto.inputDescription(),
