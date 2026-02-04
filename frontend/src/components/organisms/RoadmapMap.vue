@@ -8,7 +8,9 @@
     <img 
       :src="backgroundImage" 
       class="absolute inset-0 w-full h-full object-contain pointer-events-none"
-      @load="updateHeight"
+      decoding="async"
+      fetchpriority="high"
+      @load="onBgLoad"
     />
     
     <!-- 레벨 선택 영역들 -->
@@ -50,32 +52,60 @@ const props = defineProps({
   }
 })
 
-defineEmits(['select-level'])
+const emit = defineEmits(['select-level', 'bg-loaded'])
 
 const containerRef = ref(null)
+// 초기 레이아웃 점프를 줄이기 위해 기본 비율로 먼저 높이를 잡고,
+// 실제 이미지 로드 후 naturalWidth/Height로 정확한 비율로 보정한다.
+const aspectRatio = ref(0.75) // height / width
 const containerHeight = ref(0)
+let resizeObserver = null
 
-const updateHeight = () => {
+const updateHeight = (forcedWidth) => {
   if (!containerRef.value) return
-  const width = containerRef.value.offsetWidth
-  if (width === 0) {
-    setTimeout(updateHeight, 100)
-    return
+  const width = typeof forcedWidth === 'number' ? forcedWidth : containerRef.value.offsetWidth
+  if (width === 0) return
+  containerHeight.value = Math.round(width * aspectRatio.value)
+}
+
+const onBgLoad = (e) => {
+  const imgEl = e?.target
+  const w = imgEl?.naturalWidth
+  const h = imgEl?.naturalHeight
+  if (typeof w === 'number' && typeof h === 'number' && w > 0 && h > 0) {
+    aspectRatio.value = h / w
   }
-  
-  const img = new Image()
-  img.src = props.backgroundImage
-  img.onload = () => {
-    containerHeight.value = width * (img.height / img.width)
-  }
+  updateHeight()
+  emit('bg-loaded')
 }
 
 onMounted(() => {
+  // 1) 초기 높이 선계산 (레이아웃 점프 최소화)
   updateHeight()
-  window.addEventListener('resize', updateHeight)
+
+  // 2) 컨테이너 폭 변화에만 반응 (window resize보다 정확하고 가벼움)
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver((entries) => {
+      const entry = entries?.[0]
+      const w = entry?.contentRect?.width
+      if (typeof w === 'number') updateHeight(w)
+    })
+    if (containerRef.value) resizeObserver.observe(containerRef.value)
+  } else {
+    window.addEventListener('resize', updateHeight)
+  }
 })
 
 onUnmounted(() => {
+  if (resizeObserver) {
+    try {
+      resizeObserver.disconnect()
+    } catch (_) {
+      // noop
+    }
+    resizeObserver = null
+    return
+  }
   window.removeEventListener('resize', updateHeight)
 })
 </script>

@@ -27,7 +27,7 @@
         <div class="px-6 pb-6">
           <!-- Loading / Empty -->
           <div v-if="reportLoading" class="flex items-center justify-center py-12">
-            <p class="text-[var(--color-farm-brown)]">불러오는 중...</p>
+            <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
           </div>
           <div v-else-if="!report?.result" class="flex items-center justify-center py-12">
             <p class="text-[var(--color-farm-brown)]">불러오지 못했습니다.</p>

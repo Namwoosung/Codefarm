@@ -33,7 +33,7 @@
                 :key="n"
                 class="inline-flex items-center gap-0.5 rounded-md bg-farm-cream/20 px-2 py-0.5 text-[11px] md:text-xs font-semibold text-farm-cream/90"
               >
-                Lv.{{ n }}<span class="text-farm-yellow/95 px-1">{{ n * 10 }}pt</span>
+                Lv.{{ n }}<span class="text-farm-yellow/95 px-1">{{ levelPoints[n - 1] }}pt</span>
               </span>
             </div>
           </template>
@@ -86,6 +86,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import rankImg from '@/assets/banner/rank.png'
+
+const levelPoints = [30, 50, 80, 100, 150]
 
 const props = defineProps({
   kicker: { type: String, default: 'CODE FARM' },

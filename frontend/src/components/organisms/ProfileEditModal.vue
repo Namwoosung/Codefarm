@@ -43,8 +43,9 @@
               placeholder="이름"
               :disabled="isSaving"
               autocomplete="name"
-              maxlength="50"
+              maxlength="20"
             />
+            <p v-if="nameInvalidMessage" class="profile-edit-error">{{ nameInvalidMessage }}</p>
           </label>
 
           <div class="profile-edit-grid">
@@ -74,7 +75,7 @@
             <button type="button" class="profile-edit-btn profile-edit-btn-secondary" :disabled="isSaving" @click="emit('close')">
               취소
             </button>
-            <button type="submit" class="profile-edit-btn profile-edit-btn-primary" :disabled="isSaving">
+            <button type="submit" class="profile-edit-btn profile-edit-btn-primary" :disabled="!canSubmit">
               {{ isSaving ? '저장 중...' : '저장' }}
             </button>
           </div>
@@ -90,6 +91,8 @@ import { checkNicknameDuplicate as apiCheckNicknameDuplicate } from '@/api/auth'
 
 // 닉네임: 한글, 영문, 숫자, _, - 만 가능, 2~20자 (SignupForm과 동일)
 const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9_-]{2,20}$/
+// 이름: 한글/영문/공백만 허용 (특수문자/숫자 불가)
+const NAME_REGEX = /^[가-힣a-zA-Z\s]+$/
 
 const props = defineProps({
   show: { type: Boolean, default: false },
@@ -116,6 +119,8 @@ const nicknameFormatInvalid = computed(() => {
   const trimmed = String(form.nickname ?? '').trim()
   return trimmed.length > 0 && !NICKNAME_REGEX.test(trimmed)
 })
+
+const originalNickname = computed(() => String(props.user?.nickname ?? '').trim())
 
 const form = reactive({
   age: '',
@@ -144,7 +149,11 @@ function validate() {
   if (!NICKNAME_REGEX.test(String(form.nickname).trim())) {
     return '닉네임은 한글, 영문, 숫자, _, - 만 사용 가능하며 2~20자로 입력해주세요.'
   }
-  if (!form.name || !String(form.name).trim()) return '이름을 입력해주세요.'
+  const nameTrimmed = String(form.name ?? '').trim()
+  if (!nameTrimmed) return '이름을 입력해주세요.'
+  const nameNoSpaceLen = nameTrimmed.replace(/\s+/g, '').length
+  if (nameNoSpaceLen < 2 || nameNoSpaceLen > 20) return '이름은 2~20자로 입력해주세요.'
+  if (!NAME_REGEX.test(nameTrimmed)) return '이름에는 특수문자를 사용할 수 없습니다.'
 
   const ageNum = Number(form.age)
   if (!Number.isFinite(ageNum) || ageNum < 0 || ageNum > 150) return '나이는 0~150 사이의 숫자여야 합니다.'
@@ -154,6 +163,29 @@ function validate() {
 
   return null
 }
+
+const nameInvalidMessage = computed(() => {
+  const trimmed = String(form.name ?? '').trim()
+  if (!trimmed) return null
+  const noSpaceLen = trimmed.replace(/\s+/g, '').length
+  if (noSpaceLen < 2 || noSpaceLen > 20) return '이름은 2~20자로 입력해주세요.'
+  // 특수문자가 포함된 경우에만 해당 메시지 노출
+  if (!NAME_REGEX.test(trimmed)) return '이름에는 특수문자를 사용할 수 없습니다.'
+  return null
+})
+
+const canSubmit = computed(() => {
+  if (props.isSaving) return false
+  if (validate()) return false
+
+  // 닉네임이 원래 값이면 중복검사 없이 허용
+  const current = String(form.nickname ?? '').trim()
+  if (originalNickname.value && current === originalNickname.value) return true
+
+  // 닉네임 변경 시: 중복검사 통과(available)해야 저장 가능
+  if (isCheckingNickname.value) return false
+  return nicknameCheckStatus.value === 'available'
+})
 
 const onNicknameInput = () => {
   if (nicknameCheckTimer) clearTimeout(nicknameCheckTimer)
@@ -183,8 +215,7 @@ async function checkNickname() {
   }
 
   // 원래 닉네임이면 중복검사 의미가 없으니 통과 처리
-  const originalNickname = String(props.user?.nickname ?? '').trim()
-  if (originalNickname && nickname === originalNickname) {
+  if (originalNickname.value && nickname === originalNickname.value) {
     nicknameCheckStatus.value = 'available'
     return
   }
@@ -205,11 +236,31 @@ async function checkNickname() {
 
 function submitIfCan() {
   if (props.isSaving) return
+
+  // 버튼이 disabled여도 Enter 등으로 submit될 수 있어 이중 방어
   const msg = validate()
   if (msg) {
     errorMessage.value = msg
     return
   }
+
+  const current = String(form.nickname ?? '').trim()
+  if (!(originalNickname.value && current === originalNickname.value)) {
+    if (isCheckingNickname.value || nicknameCheckStatus.value === 'checking' || nicknameCheckStatus.value === '') {
+      errorMessage.value = '닉네임 중복 확인을 완료해주세요.'
+      return
+    }
+    if (nicknameCheckStatus.value === 'duplicate') {
+      errorMessage.value = '이미 사용 중인 닉네임입니다.'
+      return
+    }
+    if (nicknameCheckStatus.value !== 'available') {
+      errorMessage.value = '닉네임 중복 확인을 완료해주세요.'
+      return
+    }
+  }
+
+  if (!canSubmit.value) return
 
   errorMessage.value = null
   emit('submit', {
@@ -245,6 +296,13 @@ watch(
       clearTimeout(nicknameCheckTimer)
       nicknameCheckTimer = null
     }
+    if (errorMessage.value) errorMessage.value = null
+  }
+)
+
+watch(
+  () => form.name,
+  () => {
     if (errorMessage.value) errorMessage.value = null
   }
 )

@@ -5,11 +5,12 @@ import CommonHeader from '@/components/organisms/CommonHeader.vue'
 import CommonFooter from '@/components/organisms/CommonFooter.vue'
 import AppToast from '@/components/atoms/AppToast.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useIdeStore } from '@/stores/ide'
+import { useUiStore } from '@/stores/ui'
+import PageShell from '@/components/atoms/PageShell.vue'
 
 const route = useRoute()
 const authStore = useAuthStore()
-const ideStore = useIdeStore()
+const uiStore = useUiStore()
 
 // IDE 화면에서는 푸터를 제외
 const showFooter = computed(() => {
@@ -25,19 +26,30 @@ onMounted(() => {
 <template>
   <div class="min-h-screen bg-farm-cream flex flex-col">
     <AppToast />
-    <!-- 메인/커리큘럼 → IDE 진입 시 로딩 오버레이 -->
+    <!-- 라우트 전환 중(완성본 준비 전) 빈 프레임/깜빡임 방지 -->
     <Teleport to="body">
       <Transition name="fade">
-        <div v-if="ideStore.ideRouteLoading" class="fixed inset-0 flex items-center justify-center bg-[rgba(245,242,232,0.95)] z-[9999]">
-          <div class="card bg-base-100 shadow-lg rounded-2xl p-6">
-            <p class="text-base font-semibold text-[var(--color-farm-brown-dark)]">로딩 중...</p>
-          </div>
+        <div v-if="uiStore.routeChanging" class="route-changing">
+          <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
       </Transition>
     </Teleport>
     <CommonHeader />
-    <main class="flex-1">
-      <RouterView />
+    <main class="flex-1 min-h-0">
+      <RouterView v-slot="{ Component, route: r }">
+        <Transition name="page" mode="out-in" appear>
+          <!-- Component가 준비되기 전에는 routeChanging 오버레이가 화면을 커버 -->
+          <PageShell
+            v-if="Component"
+            :key="r.fullPath"
+            :component="Component"
+            :route-key="r.fullPath"
+            :reveal-mode="r.path.startsWith('/profile') ? 'fast' : 'default'"
+            @ready="uiStore.endRouteChange()"
+          />
+          <div v-else :key="`${r.fullPath}-empty`" />
+        </Transition>
+      </RouterView>
     </main>
     <CommonFooter v-if="showFooter" />
   </div>
@@ -51,5 +63,46 @@ onMounted(() => {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* 라우트 전환: 전체 화면이 "천천히" 등장 */
+.page-enter-active {
+  transition: opacity 650ms ease, transform 850ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity, transform;
+}
+.page-leave-active {
+  /* 이전 화면은 천천히 사라지지 않게 즉시 제거 */
+  transition: none;
+}
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.page-leave-to {
+  opacity: 0;
+  transform: none;
+}
+
+/* 라우트 전환 순간(leave 직후 ~ 새 화면 reveal 전) 빈 UI 노출 방지 */
+.route-changing {
+  position: fixed;
+  inset: 0;
+  z-index: 9997;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(245, 242, 232, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter-active,
+  .page-leave-active {
+    transition: none;
+  }
+  .page-enter-from,
+  .page-leave-to {
+    transform: none;
+  }
 }
 </style>

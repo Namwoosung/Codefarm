@@ -30,9 +30,13 @@ const { message } = storeToRefs(toastStore)
 </template>
 
 <style scoped>
-.toast-enter-active,
+.toast-enter-active {
+  transition: opacity 180ms ease-out, transform 220ms ease-out;
+  will-change: opacity, transform;
+}
 .toast-leave-active {
-  transition: opacity 0.25s ease, transform 0.25s ease;
+  /* 사라질 때는 더 부드럽고 길게 */
+  transition: opacity 360ms ease-in, transform 360ms ease-in;
   will-change: opacity, transform;
 }
 .toast-enter-from,

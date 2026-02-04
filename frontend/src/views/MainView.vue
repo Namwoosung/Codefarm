@@ -184,6 +184,12 @@
           초기화
         </button>
       </div>
+
+      <!-- 필터/리스트 구분선 -->
+      <div class="my-6 flex items-center gap-3">
+        <div class="h-px flex-1 bg-gradient-to-r from-transparent via-farm-brown/25 to-transparent"></div>
+        <div class="h-px flex-1 bg-gradient-to-r from-transparent via-farm-brown/25 to-transparent"></div>
+      </div>
       <!-- 에러 -->
       <div v-if="error" class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         {{ error }}
@@ -192,7 +198,7 @@
       <!-- 문제 카드 리스트 (로딩 시에도 유지 + 오버레이만 표시) -->
       <div class="relative" :aria-busy="loading ? 'true' : 'false'">
         <div
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-10 transition-opacity"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 transition-opacity"
           :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard
@@ -204,7 +210,7 @@
         </div>
 
         <div v-if="loading" class="absolute inset-0 flex items-center justify-center">
-          <span class="loading loading-spinner loading-lg text-farm-brown-dark"></span>
+          <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
 
         <div v-if="!loading && !error && filteredProblems.length === 0" class="py-16 text-center text-farm-brown/80">
