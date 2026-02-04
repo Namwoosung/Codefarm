@@ -281,8 +281,10 @@ public class SessionService {
                     .feedback(null)
                     .build();
 
+            Integer awardedPoints = null;
             boolean isFirstSolve = false;
             if (resultType == ResultType.SUCCESS) {
+                awardedPoints = 0;
                 if (!resultRepository.existsBySessionUserIdAndSessionProblemIdAndResultType(
                         submitContext.session().getUser().getId(),
                         submitContext.session().getProblem().getId(),
@@ -313,6 +315,7 @@ public class SessionService {
                     int finalPoint = Math.max(0, basePoint - penalty);
 
                     submitContext.session().getUser().increasePoint(finalPoint);
+                    awardedPoints = finalPoint;
                 }
             }
 
@@ -369,7 +372,8 @@ public class SessionService {
             return SubmitSessionResponseDto.success(
                     SubmissionContext.from(result),
                     EvaluationContext.from(submitOutcome),
-                    feedback
+                    feedback,
+                    awardedPoints
             );
         });
     }
