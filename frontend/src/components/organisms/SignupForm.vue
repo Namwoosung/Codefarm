@@ -1,8 +1,8 @@
 <template>
   <div class="signup-form">
-    <p v-if="!embedded" class="text-center text-sm text-gray-600 mb-6">
+    <p v-if="!embedded" class="text-center text-sm text-farm-brown/70 mb-6">
       또는
-      <router-link to="/login" class="font-medium text-farm-point hover:brightness-110">
+      <router-link to="/login" class="font-medium text-farm-point hover:underline">
         로그인
       </router-link>
     </p>
@@ -11,10 +11,10 @@
         
         <!-- 이메일 -->
         <div>
-          <label for="email" class="block text-sm font-medium text-gray-700">
+          <label for="email" class="block text-sm font-medium text-farm-brown-dark">
             이메일
           </label>
-          <p class="mt-0.5 text-xs text-gray-500">정상적인 이메일 형식만 가입 가능합니다 (예: example@gmail.com)</p>
+          <p class="mt-0.5 text-xs text-farm-brown/60">정상적인 이메일 형식만 가입 가능합니다 (예: example@gmail.com)</p>
           <div class="relative">
             <input
               id="email"
@@ -25,24 +25,24 @@
               @blur="onEmailBlur"
               @input="onEmailInput"
               :class="[
-                'mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm placeholder-gray-500 text-gray-900',
-                emailFormatInvalid || emailCheckStatus === 'duplicate' ? 'border-red-500' :
-                emailCheckStatus === 'available' ? 'border-green-500' :
-                'border-gray-300'
+                'signup-input mt-2 block w-full px-4 py-2.5 rounded-xl border bg-farm-paper text-farm-brown-dark placeholder:text-farm-brown/40 focus:outline-none focus:ring-2 focus:z-10 sm:text-sm',
+                emailFormatInvalid || emailCheckStatus === 'duplicate' ? 'border-farm-point focus:border-farm-point focus:ring-farm-point/20' :
+                emailCheckStatus === 'available' ? 'border-farm-green focus:border-farm-green focus:ring-farm-green/20' :
+                'border-farm-brown/20 focus:border-farm-point focus:ring-farm-point/20'
               ]"
               placeholder="example@email.com"
             />
-            <span v-if="isCheckingEmail" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-400">
+            <span v-if="isCheckingEmail" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-farm-brown/50">
               확인 중...
             </span>
           </div>
-          <p v-if="errors.email || emailFormatInvalid" class="mt-1 text-sm text-red-600">
+          <p v-if="errors.email || emailFormatInvalid" class="mt-1 text-sm text-farm-point">
             {{ emailFormatInvalid ? '정상적인 이메일 형식이 아닙니다. (예: example@gmail.com, user@naver.co.kr)' : errors.email }}
           </p>
-          <p v-else-if="emailCheckStatus === 'available'" class="mt-1 text-sm text-green-600">
+          <p v-else-if="emailCheckStatus === 'available'" class="mt-1 text-sm text-farm-green-dark">
             ✓ 사용 가능한 이메일입니다.
           </p>
-          <p v-else-if="emailCheckStatus === 'duplicate'" class="mt-1 text-sm text-red-600">
+          <p v-else-if="emailCheckStatus === 'duplicate'" class="mt-1 text-sm text-farm-point">
             ✗ 이미 사용 중인 이메일입니다.
           </p>
         </div>
@@ -51,11 +51,11 @@
         <div>
           <label
             for="password"
-            class="block text-sm font-medium text-gray-700"
+            class="block text-sm font-medium text-farm-brown-dark"
           >
             비밀번호
           </label>
-          <p class="mt-0.5 text-xs text-gray-500">영문, 숫자, 특수문자 포함 8자 이상 16자 이하</p>
+          <p class="mt-0.5 text-xs text-farm-brown/60">영문, 숫자, 특수문자 포함 8자 이상 16자 이하</p>
           <div class="relative mt-1">
             <input
               id="password"
@@ -66,25 +66,25 @@
               maxlength="16"
               autocomplete="new-password"
               :class="[
-                'appearance-none relative block w-full px-3 py-2 pr-10 border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm placeholder-gray-500 text-gray-900',
-                formData.password && passwordValidation.status === 'invalid' ? 'border-red-500' :
-                formData.password && passwordValidation.status === 'valid' ? 'border-green-500' : 'border-gray-300'
+                'signup-input block w-full px-4 py-2.5 pr-10 rounded-xl border bg-farm-paper text-farm-brown-dark placeholder:text-farm-brown/40 focus:outline-none focus:ring-2 focus:z-10 sm:text-sm',
+                formData.password && passwordValidation.status === 'invalid' ? 'border-farm-point focus:border-farm-point focus:ring-farm-point/20' :
+                formData.password && passwordValidation.status === 'valid' ? 'border-farm-green focus:border-farm-green focus:ring-farm-green/20' : 'border-farm-brown/20 focus:border-farm-point focus:ring-farm-point/20'
               ]"
               placeholder="비밀번호 입력"
             />
             <button
               type="button"
-              class="absolute inset-y-0 right-0 flex items-center justify-center w-10 text-gray-500 hover:text-gray-700 focus:outline-none"
+              class="absolute inset-y-0 right-0 flex items-center justify-center w-10 text-farm-brown/50 hover:text-farm-brown-dark focus:outline-none"
               :aria-label="showPassword ? '비밀번호 숨기기' : '비밀번호 보기'"
               @click="showPassword = !showPassword"
             >
               <iconify-icon :icon="showPassword ? 'mdi:eye-off' : 'mdi:eye'" class="text-xl"></iconify-icon>
             </button>
           </div>
-          <p v-if="errors.password" class="mt-1 text-sm text-red-600">
+          <p v-if="errors.password" class="mt-1 text-sm text-farm-point">
             {{ errors.password }}
           </p>
-          <p v-else-if="passwordValidation.message" class="mt-1 text-sm" :class="passwordValidation.status === 'valid' ? 'text-green-600' : 'text-red-600'">
+          <p v-else-if="passwordValidation.message" class="mt-1 text-sm" :class="passwordValidation.status === 'valid' ? 'text-farm-green-dark' : 'text-farm-point'">
             {{ passwordValidation.message }}
           </p>
         </div>
@@ -93,23 +93,23 @@
         <div>
           <label
             for="passwordConfirm"
-            class="block text-sm font-medium text-gray-700"
+            class="block text-sm font-medium text-farm-brown-dark"
           >
             비밀번호 확인
           </label>
-          <div class="relative mt-1">
+          <div class="relative mt-2">
             <input
               id="passwordConfirm"
               v-model="formData.passwordConfirm"
               :type="showPasswordConfirm ? 'text' : 'password'"
               required
               autocomplete="new-password"
-              class="appearance-none relative block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+              class="signup-input block w-full px-4 py-2.5 pr-10 rounded-xl border border-farm-brown/20 bg-farm-paper text-farm-brown-dark placeholder:text-farm-brown/40 focus:outline-none focus:ring-2 focus:border-farm-point focus:ring-farm-point/20 focus:z-10 sm:text-sm"
               placeholder="비밀번호를 다시 입력해주세요"
             />
             <button
               type="button"
-              class="absolute inset-y-0 right-0 flex items-center justify-center w-10 text-gray-500 hover:text-gray-700 focus:outline-none"
+              class="absolute inset-y-0 right-0 flex items-center justify-center w-10 text-farm-brown/50 hover:text-farm-brown-dark focus:outline-none"
               :aria-label="showPasswordConfirm ? '비밀번호 숨기기' : '비밀번호 보기'"
               @click="showPasswordConfirm = !showPasswordConfirm"
             >
@@ -118,7 +118,7 @@
           </div>
           <p
             v-if="errors.passwordConfirm"
-            class="mt-1 text-sm text-red-600"
+            class="mt-1 text-sm text-farm-point"
           >
             {{ errors.passwordConfirm }}
           </p>
@@ -126,7 +126,7 @@
 
         <!-- 이름 -->
         <div>
-          <label for="name" class="block text-sm font-medium text-gray-700">
+          <label for="name" class="block text-sm font-medium text-farm-brown-dark">
             이름
           </label>
           <input
@@ -139,17 +139,17 @@
             @blur="onNameBlur"
             @input="onNameInput"
             :class="[
-              'mt-1 appearance-none relative block w-full px-3 py-2 border placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm',
-              nameShouldShowValidation && nameValidation.status === 'invalid' ? 'border-red-500' :
-              nameShouldShowValidation && nameValidation.status === 'valid' ? 'border-green-500' :
-              'border-gray-300'
+              'signup-input mt-2 block w-full px-4 py-2.5 rounded-xl border bg-farm-paper text-farm-brown-dark placeholder:text-farm-brown/40 focus:outline-none focus:ring-2 focus:z-10 sm:text-sm',
+              nameShouldShowValidation && nameValidation.status === 'invalid' ? 'border-farm-point focus:ring-farm-point/20' :
+              nameShouldShowValidation && nameValidation.status === 'valid' ? 'border-farm-green focus:ring-farm-green/20' :
+              'border-farm-brown/20 focus:border-farm-point focus:ring-farm-point/20'
             ]"
             placeholder="이름을 입력해주세요"
           />
-          <p v-if="errors.name" class="mt-1 text-sm text-red-600">
+          <p v-if="errors.name" class="mt-1 text-sm text-farm-point">
             {{ errors.name }}
           </p>
-          <p v-else-if="nameShouldShowValidation && nameValidation.message" class="mt-1 text-sm" :class="nameValidation.status === 'valid' ? 'text-green-600' : 'text-red-600'">
+          <p v-else-if="nameShouldShowValidation && nameValidation.message" class="mt-1 text-sm" :class="nameValidation.status === 'valid' ? 'text-farm-green-dark' : 'text-farm-point'">
             {{ nameValidation.message }}
           </p>
         </div>
@@ -158,11 +158,11 @@
         <div>
           <label
             for="nickname"
-            class="block text-sm font-medium text-gray-700"
+            class="block text-sm font-medium text-farm-brown-dark"
           >
             닉네임
           </label>
-          <p class="mt-0.5 text-xs text-gray-500">한글, 영문, 숫자, _, - 만 사용 가능 (2~20자, 특수문자 금지)</p>
+          <p class="mt-0.5 text-xs text-farm-brown/60">한글, 영문, 숫자, _, - 만 사용 가능 (2~20자, 특수문자 금지)</p>
           <div class="relative">
             <input
               id="nickname"
@@ -174,34 +174,34 @@
               @blur="checkNickname"
               @input="onNicknameInput"
               :class="[
-                'mt-1 appearance-none relative block w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm placeholder-gray-500 text-gray-900',
-                nicknameFormatInvalid || nicknameCheckStatus === 'duplicate' ? 'border-red-500' :
-                nicknameCheckStatus === 'available' ? 'border-green-500' :
-                'border-gray-300'
+                'signup-input mt-2 block w-full px-4 py-2.5 rounded-xl border bg-farm-paper text-farm-brown-dark placeholder:text-farm-brown/40 focus:outline-none focus:ring-2 focus:z-10 sm:text-sm',
+                nicknameFormatInvalid || nicknameCheckStatus === 'duplicate' ? 'border-farm-point focus:ring-farm-point/20' :
+                nicknameCheckStatus === 'available' ? 'border-farm-green focus:ring-farm-green/20' :
+                'border-farm-brown/20 focus:border-farm-point focus:ring-farm-point/20'
               ]"
               placeholder="2~20자, 한글/영문/숫자/_, - 만 가능"
             />
-            <span v-if="isCheckingNickname" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-gray-400">
+            <span v-if="isCheckingNickname" class="absolute right-3 top-1/2 transform -translate-y-1/2 text-sm text-farm-brown/50">
               확인 중...
             </span>
           </div>
-          <p v-if="errors.nickname" class="mt-1 text-sm text-red-600">
+          <p v-if="errors.nickname" class="mt-1 text-sm text-farm-point">
             {{ errors.nickname }}
           </p>
-          <p v-else-if="nicknameFormatInvalid" class="mt-1 text-sm text-red-600">
+          <p v-else-if="nicknameFormatInvalid" class="mt-1 text-sm text-farm-point">
             닉네임은 한글, 영문, 숫자, _, - 만 사용 가능하며 2~20자로 입력해주세요.
           </p>
-          <p v-else-if="nicknameCheckStatus === 'available'" class="mt-1 text-sm text-green-600">
+          <p v-else-if="nicknameCheckStatus === 'available'" class="mt-1 text-sm text-farm-green-dark">
             ✓ 사용 가능한 닉네임입니다.
           </p>
-          <p v-else-if="nicknameCheckStatus === 'duplicate'" class="mt-1 text-sm text-red-600">
+          <p v-else-if="nicknameCheckStatus === 'duplicate'" class="mt-1 text-sm text-farm-point">
             ✗ 이미 사용 중인 닉네임입니다.
           </p>
         </div>
 
         <!-- 나이 -->
         <div>
-          <label for="age" class="block text-sm font-medium text-gray-700">
+          <label for="age" class="block text-sm font-medium text-farm-brown-dark">
             나이
           </label>
           <input
@@ -211,10 +211,10 @@
             required
             min="1"
             max="150"
-            class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+            class="signup-input mt-2 block w-full px-4 py-2.5 rounded-xl border border-farm-brown/20 bg-farm-paper text-farm-brown-dark placeholder:text-farm-brown/40 focus:outline-none focus:ring-2 focus:border-farm-point focus:ring-farm-point/20 focus:z-10 sm:text-sm"
             placeholder="나이를 입력해주세요"
           />
-          <p v-if="errors.age" class="mt-1 text-sm text-red-600">
+          <p v-if="errors.age" class="mt-1 text-sm text-farm-point">
             {{ errors.age }}
           </p>
         </div>
@@ -223,7 +223,7 @@
         <div>
           <label
             for="codingLevel"
-            class="block text-sm font-medium text-gray-700"
+            class="block text-sm font-medium text-farm-brown-dark"
           >
             코딩 레벨
           </label>
@@ -231,7 +231,7 @@
             id="codingLevel"
             v-model.number="formData.codingLevel"
             required
-            class="mt-1 block w-full px-3 py-2 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+            class="signup-input mt-2 block w-full px-4 py-2.5 rounded-xl border border-farm-brown/20 bg-farm-paper text-farm-brown-dark focus:outline-none focus:ring-2 focus:border-farm-point focus:ring-farm-point/20 sm:text-sm"
           >
             <option :value="null">선택해주세요</option>
             <option :value="1">LEVEL1</option>
@@ -240,14 +240,14 @@
             <option :value="4">LEVEL4</option>
             <option :value="5">LEVEL5</option>
           </select>
-          <p v-if="errors.codingLevel" class="mt-1 text-sm text-red-600">
+          <p v-if="errors.codingLevel" class="mt-1 text-sm text-farm-point">
             {{ errors.codingLevel }}
           </p>
         </div>
       </div>
 
       <!-- 에러 메시지 -->
-      <div v-if="submitError" class="text-sm text-red-600 text-center">
+      <div v-if="submitError" class="text-sm text-farm-point text-center">
         {{ submitError }}
       </div>
 
@@ -256,7 +256,7 @@
         <button
           type="submit"
           :disabled="authStore.isLoading"
-          class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-farm-paper bg-farm-point hover:brightness-110 active:brightness-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-olive/40 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full flex justify-center py-3 px-4 text-sm font-medium rounded-xl text-farm-paper bg-farm-point hover:bg-farm-point/90 active:scale-[0.99] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-farm-point/40 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span v-if="!authStore.isLoading">회원가입</span>
           <span v-else>처리 중...</span>

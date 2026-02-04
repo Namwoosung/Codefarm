@@ -541,16 +541,13 @@ onBeforeUnmount(() => {
   flex-direction: column;
   border-radius: 28px;
   padding: 18px 20px 20px 20px;
-  /* 가죽 커버 텍스처(그라데이션 레이어로 결/주름 느낌) */
   background:
-    /* 미세한 세로 결 */
     repeating-linear-gradient(
       90deg,
       rgba(255, 255, 255, 0.04) 0 1px,
       rgba(0, 0, 0, 0.03) 1px 3px,
       rgba(255, 255, 255, 0.02) 3px 4px
     ),
-    /* 가죽 하이라이트/음영 */
     radial-gradient(140% 110% at 18% 18%, rgba(255, 255, 255, 0.10), transparent 55%),
     radial-gradient(120% 120% at 88% 82%, rgba(0, 0, 0, 0.28), transparent 60%),
     linear-gradient(145deg, #5b4633 0%, #3f2e22 100%);
@@ -587,13 +584,11 @@ onBeforeUnmount(() => {
 .pageflip {
   width: min(980px, 100%);
   border-radius: 16px;
-  /* 리사이즈 순간 0 높이로 접히는 현상 방지 */
   min-height: 0;
   height: 100%;
 }
 
 .page {
-  /* StPageFlip이 내부에서 사이즈를 잡지만, 배경/여백을 위해 기본값 */
   background: transparent;
 }
 
@@ -603,14 +598,11 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(78, 59, 42, 0.15);
   border-radius: 14px;
   padding: 18px;
-
-  /* texture */
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='rgba(122,92,62,0.08)' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'/%3E%3C/svg%3E");
   background-size: 4px 4px;
 }
 
 .diary__tab {
-  /* 인덱스(테이프) 컬러: 미선택=연한 갈색, 선택=진한 올리브 */
   --tape-inactive: var(--color-farm-brown, #7A5C3E);
   --tape-active: var(--color-farm-olive, #4A4A29);
   --tape-edge: rgba(33, 24, 20, 0.28);
@@ -619,25 +611,20 @@ onBeforeUnmount(() => {
   pointer-events: auto;
   width: 92px;
   height: 44px;
-  /* 기본(미선택) 컬러/라벨 컬러 */
   --tape-base: var(--tape-inactive);
   --tab-label-color: rgba(255, 255, 255, 0.94);
   border-radius: 10px 18px 18px 10px;
   border: 1px solid var(--tape-edge);
-  /* 질감 제거: 단색 테이프 */
   background: var(--tape-base);
   box-shadow:
     0 10px 18px rgba(0, 0, 0, 0.18),
     0 2px 0 rgba(0, 0, 0, 0.06),
     inset 0 1px 0 rgba(255, 255, 255, 0.35);
-  /* 기본(비활성)은 바깥쪽으로 더 나가게 */
   --tab-tx: 10px;
   --tab-rot: -0.6deg;
   transform: translateX(var(--tab-tx)) rotate(var(--tab-rot));
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, filter 180ms ease;
   overflow: hidden;
-
-  /* 우측 가운데를 "<" 모양으로 잘라낸 노치 */
   clip-path: polygon(
     0% 0%,
     100% 0%,
@@ -652,7 +639,6 @@ onBeforeUnmount(() => {
 }
 
 .diary__tab:hover {
-  /* hover 시 위치는 고정, 질감/명암만 살짝 */
   filter: saturate(1.05) brightness(1.02);
   box-shadow:
     0 12px 20px rgba(0, 0, 0, 0.20),
@@ -661,9 +647,7 @@ onBeforeUnmount(() => {
 }
 
 .diary__tab.is-active {
-  /* 선택된 탭은 "붙어있는" 느낌을 더 강하게 */
-  border-color: rgba(33, 24, 20, 0.34);
-  /* 선택된 탭만 안쪽(종이 쪽)으로 들어오게 */
+  border-color: rgba(33, 24, 20,   0.34);
   --tape-base: var(--tape-active);
   --tab-label-color: rgba(255, 255, 255, 0.96);
   --tab-tx: -10px;
@@ -683,8 +667,6 @@ onBeforeUnmount(() => {
     left: 12px;
     width: 18px;
   }
-
-  /* 좁은 화면에서는 인덱스를 더 바깥(나무 커버 영역)으로 빼고, 탭 크기도 줄임 */
   .diary__tab {
     width: 78px;
     height: 40px;

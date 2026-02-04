@@ -24,43 +24,43 @@
         @dblclick.stop.prevent
       >
         <!-- 상단 배너 -->
-        <section class="card-hero relative w-full px-20 py-3 md:py-4 overflow-visible flex-shrink-0">
-      <!-- 배경 장식 -->
-      <div class="absolute inset-0 opacity-20 pointer-events-none z-0">
-        <div class="absolute top-0 left-0 w-32 h-32 bg-farm-yellow/30 rounded-full blur-3xl"></div>
-        <div class="absolute bottom-0 right-0 w-40 h-40 bg-farm-green/30 rounded-full blur-3xl"></div>
-      </div>
-      
-      <div class="absolute inset-0 opacity-10 pointer-events-none z-0" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px);"></div>
-      
-      <div class="relative z-10 min-h-[96px] md:min-h-[120px] flex flex-col justify-center px-10 pr-40 sm:pr-52 md:pr-72">
-          <p class="mt-2 text-2xl md:text-4xl text-farm-cream font-dnf tracking-tight">
-            <!-- {{ bannerNickname }}의 Farm Crew -->
-            Gacha ! 새로운 크루 뽑으러 가기 
-          </p>
-      </div>
+        <section class="card-hero relative w-full overflow-visible flex-shrink-0">
+          <div class="absolute inset-0 opacity-20 pointer-events-none z-0">
+            <div class="absolute top-0 left-0 w-32 h-32 bg-farm-yellow/30 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-0 right-0 w-40 h-40 bg-farm-green/30 rounded-full blur-3xl"></div>
+          </div>
+          <div class="absolute inset-0 opacity-[0.06] pointer-events-none z-0" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 8px, rgba(255,255,255,0.15) 8px, rgba(255,255,255,0.15) 16px);"></div>
 
-      <!-- 배너 포인트 일러스트 + 데코 (우측 하단 고정) -->
-      <div class="absolute right-16 md:right-50 bottom-1 md:bottom-0 translate-y-1 z-10 pointer-events-none select-none">
-        <div class="hero-blob absolute -right-2 md:-right-6 -bottom-8 w-40 h-40 md:w-56 md:h-56 rounded-full blur-2xl"></div>
-        <div class="absolute right-[86px] -top-1.5 w-[42px] h-[42px] rounded-full items-center justify-center bg-white/25 border border-white/28 text-white/95 backdrop-blur-[6px] shadow-[0_12px_22px_rgba(0,0,0,0.18)] hidden sm:flex hero-spark--1">
-          <iconify-icon icon="mdi:sparkles" class="text-xl"></iconify-icon>
-        </div>
-        <div class="absolute right-4 top-6 w-[42px] h-[42px] rounded-full items-center justify-center bg-white/25 border border-white/28 text-white/95 backdrop-blur-[6px] shadow-[0_12px_22px_rgba(0,0,0,0.18)] hidden sm:flex hero-spark--2">
-          <iconify-icon icon="mdi:star-four-points" class="text-xl"></iconify-icon>
-        </div>
-        <img
-          :src="farmerImg"
-          alt="farmer"
-          draggable="false"
-          class="hero-farmer h-[108px] md:h-[150px] opacity-95 drop-shadow-[0_12px_18px_rgba(0,0,0,0.28)]"
-        />
-      </div>
-    </section>
+          <div class="relative z-10 h-[120px] md:h-[140px] flex items-center justify-between px-6 sm:px-10 md:px-16">
+            <div class="flex flex-col justify-center pl-2 pr-4 sm:pr-8">
+              <p class="text-xl md:text-3xl font-dnf text-farm-cream drop-shadow-lg tracking-tight leading-tight">
+                Gacha ! 새로운 크루 뽑으러 가기
+              </p>
+              <p class="mt-1 text-sm md:text-base text-farm-cream/85 font-dnf">
+                {{ bannerNickname }}의 Farm Crew
+              </p>
+            </div>
+            <div class="absolute right-4 sm:right-8 md:right-12 -bottom-1.5 z-10 pointer-events-none select-none flex items-end">
+              <div class="hero-blob absolute -right-4 -bottom-6 w-32 h-32 md:w-48 md:h-48 rounded-full blur-2xl"></div>
+              <div class="absolute right-20 -top-2 w-9 h-9 rounded-full flex items-center justify-center bg-white/25 border border-white/30 text-white/95 backdrop-blur-sm shadow-lg hero-spark--1">
+                <iconify-icon icon="mdi:sparkles" class="text-lg"></iconify-icon>
+              </div>
+              <div class="absolute right-2 top-4 w-9 h-9 rounded-full flex items-center justify-center bg-white/25 border border-white/30 text-white/95 backdrop-blur-sm shadow-lg hero-spark--2 hidden sm:flex">
+                <iconify-icon icon="mdi:star-four-points" class="text-lg"></iconify-icon>
+              </div>
+              <img
+                :src="farmerImg"
+                alt="farmer"
+                draggable="false"
+                class="hero-farmer h-[100px] md:h-[130px] w-auto opacity-95 drop-shadow-[0_12px_24px_rgba(0,0,0,0.25)] relative"
+              />
+            </div>
+          </div>
+        </section>
 
     <div class="w-full flex flex-1 min-h-0 overflow-hidden">
-      <aside class="w-2/7 h-full border-r-2 border-farm-brown-dark/50 px-5 py-5 flex flex-col items-center justify-center relative overflow-hidden flex-shrink-0">
-        <div class="gacha-panel w-full max-w-[340px] h-full max-h-full flex flex-col">
+      <aside class="w-72 md:w-80 h-full border-r border-farm-brown/20 bg-farm-paper/50 px-4 py-5 flex flex-col items-center justify-center relative overflow-hidden flex-shrink-0">
+        <div class="gacha-panel w-full h-full max-h-full flex flex-col">
           
           <div class="gacha-stage gacha-stage--panel relative w-full flex justify-center items-end" :class="{ 'gacha-stage--ready': canDraw }" aria-hidden="true">
             <div class="gacha-shadow"></div>
@@ -79,7 +79,7 @@
                 :style="{ width: `${Math.max(0, Math.min(100, chargeProgress * 100))}%` }"
               ></div>
             </div>
-            <div class="text-md text-farm-brown-dark/70 relative z-10 w-full text-center font-dnf">보유 포인트 : {{ points.toLocaleString() }}P</div>
+            <div class="text-sm text-farm-brown-dark/80 relative z-10 w-full text-center font-dnf font-semibold">보유 포인트 <span class="text-farm-point font-bold">{{ points.toLocaleString() }}P</span></div>
           </div>
 
           <button type="button" class="gacha-draw-btn gacha-draw-btn--wide font-dnf" @click="gachaCard" :disabled="!canDraw">
@@ -96,34 +96,34 @@
         </div>
       </aside>
 
-      <main class="flex-1 h-full min-w-0 flex flex-col min-h-0 bg-farm-cream/30 relative overflow-hidden">
+      <main class="flex-1 h-full min-w-0 flex flex-col min-h-0 bg-farm-cream/40 relative overflow-hidden">
         <div
-          class="absolute inset-0 bg-center bg-cover opacity-20 pointer-events-none"
+          class="absolute inset-0 bg-center bg-cover opacity-[0.18] pointer-events-none"
           :style="{ backgroundImage: `url(${cardListBg})` }"
         />
-        <div class="relative z-10 flex-shrink-0 flex flex-wrap items-center gap-2 px-6 py-3 border-b border-farm-brown/15 bg-farm-cream/50">
-          <span class="text-xs font-bold text-farm-brown-dark/80 mr-1">등급별 보유</span>
+        <div class="relative z-10 flex-shrink-0 flex flex-wrap items-center gap-2 px-4 sm:px-6 py-3 border-b border-farm-brown/15 bg-farm-cream/60 backdrop-blur-sm">
+          <span class="text-xs font-bold text-farm-brown-dark/90">등급별 보유</span>
           <template v-for="grade in GRADES" :key="grade">
             <span
-              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-dnf bg-white/80 border border-farm-brown/20 text-farm-brown-dark shadow-sm"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-dnf bg-farm-paper/95 border border-farm-brown/15 text-farm-brown-dark shadow-sm"
             >
               <span :class="gradeMeta[grade].color" class="w-2 h-2 rounded-full flex-shrink-0"></span>
               {{ gradeMeta[grade].name }} {{ cardCountByGrade[grade] }}/{{ gradeMeta[grade].slots }}
             </span>
           </template>
         </div>
-        <div class="relative z-10 flex-1 min-h-0 overflow-y-auto scrollbar-hide snap-y snap-mandatory scroll-py-2 px-6 py-4">
+        <div class="relative z-10 flex-1 min-h-0 overflow-y-auto scrollbar-hide snap-y snap-mandatory scroll-py-2 px-4 sm:px-6 py-4">
           <section
             v-for="grade in GRADES"
             :key="grade"
-            class="snap-center min-h-[48%] my-2 flex flex-col justify-center px-4 py-4 rounded-2xl"
+            class="snap-center min-h-[48%] my-3 flex flex-col justify-center px-3 sm:px-4 py-4 rounded-xl bg-farm-paper/30"
           >
-                <div class="flex items-center justify-between mb-2">
-                  <h3 class="text-xl font-dnf text-farm-brown-dark flex items-center gap-3">
-                    <span :class="gradeMeta[grade].color" class="w-3 h-8 rounded-lg shadow-sm"></span>
+                <div class="flex items-center justify-between mb-3">
+                  <h3 class="text-lg md:text-xl font-dnf text-farm-brown-dark font-bold flex items-center gap-2">
+                    <span :class="gradeMeta[grade].color" class="w-2.5 h-7 rounded-md shadow-sm"></span>
                     {{ gradeMeta[grade].name }}
                   </h3>
-                  <span class="px-3 py-1 rounded-lg bg-farm-cream text-sm font-bold text-farm-brown">
+                  <span class="px-2.5 py-1 rounded-lg bg-farm-cream/90 border border-farm-brown/10 text-sm font-bold text-farm-brown-dark">
                     {{ cardCountByGrade[grade] }} / {{ gradeMeta[grade].slots }}
                   </span>
                 </div>
@@ -133,18 +133,18 @@
                     v-if="grade !== 'SPECIAL'"
                     type="button"
                     @click="scroll(grade, 'left')"
-                    class="absolute -left-4 top-1/2 -translate-y-1/2 z-[80] w-10 h-10 bg-transparent rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:bg-white/25 active:bg-white/35"
+                    class="absolute -left-2 sm:-left-4 top-1/2 -translate-y-1/2 z-[80] w-9 h-9 sm:w-10 sm:h-10 bg-farm-paper/80 hover:bg-farm-paper border border-farm-brown/15 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-sm"
                   >
-                    <iconify-icon icon="mdi:chevron-left" class="text-2xl text-farm-brown-dark"></iconify-icon>
+                    <iconify-icon icon="mdi:chevron-left" class="text-xl sm:text-2xl text-farm-brown-dark"></iconify-icon>
                   </button>
 
                   <button
                     v-if="grade !== 'SPECIAL'"
                     type="button"
                     @click="scroll(grade, 'right')"
-                    class="absolute -right-4 top-1/2 -translate-y-1/2 z-[80] w-10 h-10 bg-transparent rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 hover:bg-white/25 active:bg-white/35"
+                    class="absolute -right-2 sm:-right-4 top-1/2 -translate-y-1/2 z-[80] w-9 h-9 sm:w-10 sm:h-10 bg-farm-paper/80 hover:bg-farm-paper border border-farm-brown/15 rounded-full flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 shadow-sm"
                   >
-                    <iconify-icon icon="mdi:chevron-right" class="text-2xl text-farm-brown-dark"></iconify-icon>
+                    <iconify-icon icon="mdi:chevron-right" class="text-xl sm:text-2xl text-farm-brown-dark"></iconify-icon>
                   </button>
 
                   <div
@@ -171,12 +171,12 @@
                       <div
                         v-else
                         :class="[
-                          'bg-transparent border-2 border-dashed border-base-content/35 rounded-xl shadow-md flex items-center justify-center',
+                          'bg-farm-cream/40 border-2 border-dashed border-farm-brown/25 rounded-xl flex items-center justify-center',
                           'w-full',
                           grade === 'SPECIAL' ? 'aspect-[1024/723]' : 'aspect-[1872/2613]',
                         ]"
                       >
-                        <span class="text-4xl font-extrabold text-base-content/20">?</span>
+                        <span class="text-3xl md:text-4xl font-bold text-farm-brown/30">?</span>
                       </div>
                     </div>
                   </div>
@@ -295,12 +295,10 @@ watch(
   (msg) => {
     if (!msg) return
     const text = String(msg)
-    // "이미 보유 중" 안내는 짧게 노출
-    if (text.includes('이미 보유')) {
-      toastStore.showToast(text, { durationMs: 900 })
-      return
-    }
-    toastStore.showToast(text)
+    const durationMs = text.includes('이미 보유') ? 900 : 2600
+    setTimeout(() => {
+      toastStore.showToast(text, { durationMs })
+    }, 350)
   }
 )
 
@@ -459,9 +457,9 @@ const modalPointerStyle = computed(() => {
 </script>
 
 <style scoped>
-/* Card hero banner */
 .card-hero {
   background: linear-gradient(120deg, rgba(255, 210, 95, 0.98), rgba(143, 193, 96, 0.95) 55%, rgba(124, 187, 103, 0.95));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
 }
 .card-hero::before {
   content: '';
@@ -510,14 +508,10 @@ const modalPointerStyle = computed(() => {
     transform: translate3d(0, -6px, 0);
   }
 }
-
-/* 3D 기울임 시 카드가 잘리지 않도록 overflow 제거 */
 .modal-card-3d,
 .modal-card-3d > :first-child {
   overflow: visible !important;
 }
-
-/* Charge bar: 100%일 때만 반짝임 */
 .gacha-bar {
   position: relative;
 }
@@ -560,11 +554,8 @@ const modalPointerStyle = computed(() => {
     box-shadow: 0 0 14px rgba(255, 214, 93, 0.55);
   }
 }
-
-/* Gacha aside panel (screenshot-like structure) */
 .gacha-panel {
   width: 100%;
-  max-width: 340px;
   padding: clamp(20px, 3%, 14px) clamp(12px, 4%, 16px);
   border-radius: 26px;
   background:
@@ -646,10 +637,8 @@ const modalPointerStyle = computed(() => {
   width: 100%;
   max-width: 260px;
 }
-
-/* Gacha image: 카드 뽑기 연출(플로팅 + 바닥 그림자) */
 .gacha-stage {
-  padding-bottom: clamp(2px, 0.6%, 4px); /* 그림자 공간 */
+  padding-bottom: clamp(2px, 0.6%, 4px);
   user-select: none;
   -webkit-user-select: none;
   isolation: isolate;
@@ -747,8 +736,6 @@ const modalPointerStyle = computed(() => {
     animation: none !important;
   }
 }
-
-/* 뽑기 버튼 */
 .gacha-draw-btn {
   position: relative;
   display: inline-flex;
@@ -801,7 +788,7 @@ const modalPointerStyle = computed(() => {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 22%; /* 샤인 너비(더 좁게) */
+  width: 22%;
   left: -30%;
   border-radius: inherit;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.78), transparent);
@@ -830,8 +817,6 @@ const modalPointerStyle = computed(() => {
   box-shadow: 4px 4px 0 var(--color-farm-yellow);
   filter: saturate(1.04) brightness(1.05);
 }
-
-/* 반짝(샤인) */
 .gacha-draw-btn:hover:not(:disabled)::before {
   opacity: 0.7;
 }

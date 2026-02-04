@@ -9,7 +9,7 @@ const { message } = storeToRefs(toastStore)
 <template>
   <Teleport to="body">
     <Transition name="toast">
-      <div v-if="message" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100] w-[min(520px,calc(100vw-2rem))]">
+      <div v-if="message" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[9999] w-[min(520px,calc(100vw-2rem))]">
         <div
           role="alert"
           class="flex items-center gap-3 rounded-2xl px-4 py-3 shadow-lg border border-farm-brown/20 bg-[var(--color-farm-paper)] text-[var(--color-farm-point)]"
@@ -35,14 +35,12 @@ const { message } = storeToRefs(toastStore)
   will-change: opacity, transform;
 }
 .toast-leave-active {
-  /* 사라질 때는 더 부드럽고 길게 */
   transition: opacity 360ms ease-in, transform 360ms ease-in;
   will-change: opacity, transform;
 }
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  /* Tailwind transform 변수만 변경 (X는 -translate-x-1/2 유지) */
   --tw-translate-y: 0.75rem;
 }
 .toast-enter-to,

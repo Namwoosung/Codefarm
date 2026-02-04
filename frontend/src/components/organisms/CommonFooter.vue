@@ -25,7 +25,6 @@
 </script>
 
 <style scoped>
-/* 패턴을 별도 레이어로 두고 opacity로 라인 색 조절 (background-image는 currentColor 미상속) */
 .footer-with-pattern {
   position: relative;
 }
@@ -36,7 +35,7 @@
   background-image: url('../../assets/common/patterns/brick-wall.svg');
   background-repeat: repeat;
   background-size: 42px 44px;
-  opacity: 0.12;  /* 여기 숫자 바꾸면 패턴 라인 진하기 (0.06~0.2 권장) */
+  opacity: 0.12;
   pointer-events: none;
   z-index: 0;
 }

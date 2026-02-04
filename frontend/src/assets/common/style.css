@@ -1,7 +1,4 @@
-/* PrimeIcons - CDN 사용 */
 @import url('https://cdn.jsdelivr.net/npm/primeicons@6.0.1/primeicons.css');
-
-/* Fonts - D2Coding 폰트 직접 정의 */
 @font-face {
   font-family: 'D2Coding';
   src: url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/D2Coding.woff2') format('woff2'),
@@ -18,21 +15,16 @@
   font-style: normal;
   font-display: swap;
 }
-
-/* DNF 비트비트 v2 */
 @font-face {
   font-family: 'Dnf';
   src: url('https://cdn.df.nexon.com/img/common/font/DNFBitBitv2.otf') format('opentype');
   font-weight: 400;
   font-display: swap;
 }
-
-/* 머니그래피 픽셀 */
 @font-face {
   font-family: 'pixel';
   src: url('https://cdn.jsdelivr.net/gh/fontbee/font@main/Toss/Moneygraphy-Pixel.woff2') format('woff2');
 }
-/* Tailwind v4에서 config(플러그인 포함) 적용 */
 @config "../../../tailwind.config.js";
 @import "tailwindcss";
 
@@ -41,7 +33,6 @@
   --font-sans: "pixel", sans-serif;
   --font-dnf: "Dnf", sans-serif;
   --font-pixel: "pixel", sans-serif;
-  /* Theme Colors */
   --color-farm-green-light: #B5D99C;
   --color-farm-green: #7BAE5F;
   --color-farm-green-dark: #5E8D48;
@@ -52,7 +43,6 @@
   --color-farm-paper: #FFFDF5;
   --color-farm-olive: #4A4A29;
   --color-farm-point: #E07A5F;
-  /* 문제 패널 다크 영역 (제출 내역 등, 프로그래머스 스타일) */
   --color-panel-dark-bg: #2d2a26;
   --color-panel-dark-surface: #38342e;
   --color-panel-dark-border: #4a4540;
@@ -67,10 +57,9 @@
 }
 
 @layer base {
-  /* Global: hide scrollbars but keep scroll */
   * {
-    -ms-overflow-style: none; /* IE/old Edge */
-    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
   *::-webkit-scrollbar {
     width: 0;
@@ -79,7 +68,6 @@
 }
 
 @layer utilities {
-  /* DNF 비트비트 / 머니그래피 픽셀 폰트 유틸리티 */
   .font-dnf-bitbit,
   .font-dnf {
     font-family: "Dnf", sans-serif;
@@ -87,7 +75,6 @@
   .font-pixel {
     font-family: "pixel", sans-serif;
   }
-  /* Hide horizontal scrollbar (optional) */
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
@@ -95,20 +82,14 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-
-  /* Global loading spinner color */
   .app-loading-spinner {
     color: var(--color-farm-point);
   }
-  
-  /* Hero Patterns - Brick Wall 패턴 (색상 제거, currentColor 사용) */
   .pattern-brick-wall {
     background-image: url('./patterns/brick-wall.svg');
     background-repeat: repeat;
     background-size: 42px 44px;
   }
-  
-  /* Dot Pattern 텍스처 (색상 제거, currentColor 사용) */
   .pattern-dot {
     background-image: url('./patterns/dot-pattern.svg');
     background-repeat: repeat;

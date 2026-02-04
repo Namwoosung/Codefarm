@@ -1,37 +1,32 @@
 <template>
-  <div 
-    class="relative w-full overflow-visible" 
+  <div
     ref="containerRef"
+    class="roadmap-map relative w-full overflow-visible"
     :style="{ height: containerHeight + 'px' }"
   >
-    <!-- 배경 이미지 레이어 -->
-    <img 
-      :src="backgroundImage" 
-      class="absolute inset-0 w-full h-full object-contain pointer-events-none"
+    <img
+      :src="backgroundImage"
+      class="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
       decoding="async"
       fetchpriority="high"
       @load="onBgLoad"
     />
-    
-    <!-- 레벨 선택 영역들 -->
-    <div
+
+    <!-- 레벨 선택 버튼 -->
+    <button
       v-for="level in levels"
       :key="level.id"
-      class="absolute cursor-pointer flex items-center justify-center transition-all duration-300 z-10 hover:scale-110 active:scale-95 group"
+      type="button"
+      class="roadmap-level-btn absolute flex items-center justify-center z-10 focus:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/40 focus-visible:ring-offset-2 rounded-full"
       :style="level.style"
+      :aria-label="`레벨 ${level.id} 선택`"
       @click="$emit('select-level', level.id)"
     >
-      <div class="relative flex items-center justify-center w-14 h-9 pointer-events-auto">
-        <!-- 배경 타원 (색상 #EAD7B5, 투명도 적용, 입체감 추가) -->
-        <div class="absolute inset-0 bg-[#EAD7B5]/85 rounded-[100%] border-b-4 border-[#D7C4A3] shadow-lg group-hover:bg-[#EAD7B5] group-active:border-b-0 group-active:translate-y-0.5 transition-all"></div>
-        
-        <!-- 숫자 텍스트 -->
-        <span class="relative font-dnf text-[#4E3B2A] text-xl drop-shadow-[0_1px_0_rgba(255,255,255,0.4)]">
-          {{ level.id }}
-        </span>
+      <div class="roadmap-level-pill">
+        <span class="roadmap-level-num">{{ level.id }}</span>
       </div>
-    </div>
-    <slot></slot>
+    </button>
+    <slot />
   </div>
 </template>
 
@@ -111,15 +106,63 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-@keyframes bounce-slow {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-15px); }
+.roadmap-level-btn {
+  transition: transform 0.25s ease;
 }
-.animate-bounce-slow {
-  animation: bounce-slow 3s infinite ease-in-out;
+.roadmap-level-btn:hover {
+  transform: scale(1.1);
 }
-/* 핀 꼬리 색상 상속을 위한 설정 */
-.border-t-inherit {
-  border-top-color: inherit;
+.roadmap-level-btn:active {
+  transform: scale(0.98);
+}
+.roadmap-level-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;
+  height: 3.5rem;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 253, 245, 1), transparent 50%),
+    radial-gradient(circle at 70% 70%, rgba(181, 217, 156, 0.4), transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(255, 235, 180, 0.9), rgba(220, 235, 180, 0.7));
+  border-radius: 50%;
+  border: 2px solid rgba(123, 174, 95, 0.5);
+  box-shadow:
+    0 4px 14px rgba(94, 141, 72, 0.25),
+    0 2px 4px rgba(78, 59, 42, 0.12),
+    inset 0 2px 0 rgba(255, 255, 255, 0.7),
+    inset 0 -1px 0 rgba(123, 174, 95, 0.2);
+  transition: all 0.2s ease;
+  pointer-events: auto;
+}
+.roadmap-level-btn:hover .roadmap-level-pill {
+  background:
+    radial-gradient(circle at 30% 30%, rgba(255, 253, 245, 1), transparent 50%),
+    radial-gradient(circle at 70% 70%, rgba(181, 217, 156, 0.55), transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(255, 240, 190, 0.95), rgba(200, 230, 170, 0.8));
+  border-color: rgba(123, 174, 95, 0.75);
+  box-shadow:
+    0 6px 20px rgba(94, 141, 72, 0.35),
+    0 3px 8px rgba(78, 59, 42, 0.15),
+    inset 0 2px 0 rgba(255, 255, 255, 0.8);
+}
+.roadmap-level-btn:active .roadmap-level-pill {
+  box-shadow:
+    0 2px 8px rgba(94, 141, 72, 0.2),
+    inset 0 2px 4px rgba(123, 174, 95, 0.15);
+}
+
+.roadmap-level-num {
+  position: relative;
+  font-family: var(--font-dnf);
+  font-size: 1.4rem;
+  color: #3d3228;
+  text-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.8),
+    0 1px 2px rgba(78, 59, 42, 0.15);
+}
+.roadmap-level-btn:hover .roadmap-level-num {
+  color: #2e251d;
 }
 </style>

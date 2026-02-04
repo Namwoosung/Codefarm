@@ -1,5 +1,5 @@
 <template>
-  <section class="ranking-banner relative w-full bg-farm-olive px-24 overflow-hidden h-[140px] md:h-[160px] flex items-center justify-center">
+  <section class="ranking-banner relative w-full overflow-hidden h-[120px] md:h-[140px] flex items-center justify-center px-4 sm:px-8 md:px-12 lg:px-16">
     <div class="absolute inset-0 opacity-20 pointer-events-none">
       <div class="absolute top-0 left-0 w-32 h-32 bg-farm-yellow/30 rounded-full blur-3xl"></div>
       <div class="absolute bottom-0 right-0 w-40 h-40 bg-farm-green/30 rounded-full blur-3xl"></div>
@@ -10,65 +10,94 @@
     
     <div class="relative z-10 w-full h-full flex items-center">
       <transition name="banner-slide-up" mode="out-in">
-        <div :key="currentSlide.key" class="w-full h-full flex flex-col justify-center px-10 box-border">
+        <div :key="currentSlide.key" class="w-full max-w-5xl h-full flex flex-col justify-center mx-auto">
           <template v-if="currentSlide.type === 'intro'">
             <div class="flex items-center gap-2 mb-1">
-              <iconify-icon icon="mdi:trophy" class="text-farm-yellow text-lg"></iconify-icon>
-              <p v-if="currentSlide.kicker" class="text-xs font-bold tracking-[0.2em] text-farm-cream/80">
+              <iconify-icon icon="mdi:trophy" class="text-farm-yellow text-lg shrink-0"></iconify-icon>
+              <p v-if="currentSlide.kicker" class="text-xs font-bold tracking-[0.2em] text-farm-cream/85">
                 {{ currentSlide.kicker }}
               </p>
             </div>
-            <h1 class="mt-1 text-2xl md:text-3xl font-dnf text-farm-cream drop-shadow-lg">
+            <h1 class="text-xl md:text-2xl font-dnf text-farm-cream font-bold drop-shadow-lg leading-tight">
               {{ currentSlide.title }}
             </h1>
-            <p v-if="currentSlide.description" class="mt-2 text-xs md:text-base text-farm-cream/90 flex items-center gap-2">
-              <iconify-icon icon="mdi:cards" class="text-farm-yellow/80"></iconify-icon>
+            <p v-if="currentSlide.description" class="mt-2 text-xs md:text-sm text-farm-cream/90 flex items-center gap-2">
+              <iconify-icon icon="mdi:cards" class="text-farm-yellow/80 shrink-0"></iconify-icon>
               {{ currentSlide.description }}
             </p>
-            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-              <span class="text-[11px] md:text-xs text-farm-cream/80 font-medium">문제별 포인트</span>
-              <span class="text-farm-cream/50 text-[10px]">·</span>
-              <span
-                v-for="n in 5"
-                :key="n"
-                class="inline-flex items-center gap-0.5 rounded-md bg-farm-cream/20 px-2 py-0.5 text-[11px] md:text-xs font-semibold text-farm-cream/90"
-              >
-                Lv.{{ n }}<span class="text-farm-yellow/95 px-1">{{ levelPoints[n - 1] }}pt</span>
-              </span>
-            </div>
           </template>
 
-          <!-- 랭킹 슬라이드: 좌측 RANKING 타이틀 + 순위, 우측 랭킹 이미지·닉네임 -->
+          <!-- 랭킹 슬라이드 -->
           <template v-else>
-            <div class="flex items-center justify-between gap-4 px-5">
-              <!-- 좌측: RANKING 타이틀 + 1위/2위/3위 -->
-              <div class="flex flex-col items-start justify-center gap-1 shrink-0">
+            <div class="flex items-center justify-between gap-4 sm:gap-6 w-full">
+              <!-- 좌측: RANKING -->
+              <div class="flex flex-col items-start justify-center shrink-0">
                 <div class="flex items-center gap-2">
-                  <iconify-icon icon="mdi:trophy-variant" class="text-farm-yellow text-base md:text-lg animate-pulse"></iconify-icon>
-                  <p class="text-sm md:text-base font-dnf tracking-[0.2em] text-farm-cream font-bold drop-shadow-lg">RANKING</p>
+                  <iconify-icon icon="mdi:trophy-variant" class="text-farm-yellow text-lg md:text-xl shrink-0"></iconify-icon>
+                  <p class="text-xs md:text-sm font-dnf tracking-[0.25em] text-[#D4E6A8] font-bold rank-text-shadow uppercase">RANKING</p>
                 </div>
-                <p class="text-xl md:text-3xl font-dnf text-farm-cream font-bold drop-shadow-lg">
+                <p class="text-2xl md:text-4xl font-dnf text-white font-black rank-text-shadow tabular-nums leading-tight mt-0.5 pl-9 md:pl-10">
                   {{ currentSlide.title }}
                 </p>
               </div>
 
-              <!-- 우측: 랭킹 이미지 + 닉네임·카드정보 (이미지 중앙 오버레이, center에서 살짝 아래) -->
-              <div class="flex justify-end items-center shrink-0 flex-1">
-                <div class="relative inline-block leading-[0] translate-y-4 md:translate-y-8">
+              <!-- 중간: 구분선 + 포인트 뱃지 -->
+              <div class="hidden sm:flex flex-1 flex-col items-center justify-center min-w-0 px-4">
+                <div class="w-full flex flex-col items-center gap-3">
+                  <div class="w-full flex justify-between items-center">
+                    <span class="w-2 h-2 rounded-full bg-farm-yellow/70 ring-2 ring-farm-cream/40 shrink-0"></span>
+                    <span class="flex-1 mx-2 border-t border-dashed border-farm-cream/35"></span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                      <iconify-icon icon="mdi:star-four-points" class="text-farm-yellow/90 text-xs shrink-0"></iconify-icon>
+                      <span class="text-[10px] md:text-xs font-dnf font-bold tracking-[0.15em] text-farm-cream/95 uppercase whitespace-nowrap">문제별 포인트</span>
+                    </div>
+                    <span class="flex-1 mx-2 border-t border-dashed border-farm-cream/35"></span>
+                    <span class="w-2 h-2 rounded-full bg-farm-yellow/70 ring-2 ring-farm-cream/40 shrink-0"></span>
+                  </div>
+                  <div class="flex flex-col items-center gap-2">
+                    <div class="flex items-center justify-center gap-2 md:gap-2.5">
+                      <div
+                        v-for="n in 3"
+                        :key="n"
+                        class="level-point-badge flex items-center gap-1.5 px-2 py-1 rounded-full"
+                      >
+                        <span class="text-[10px] md:text-xs font-bold text-farm-cream/90 tabular-nums">Lv.{{ n }}</span>
+                        <span class="w-px h-3 bg-farm-cream/40 rounded-full"></span>
+                        <span class="text-farm-yellow font-black text-xs tabular-nums drop-shadow-sm">{{ levelPoints[n - 1] }}<span class="text-[9px] font-semibold text-farm-cream/70 ml-0.5">pt</span></span>
+                      </div>
+                    </div>
+                    <div class="flex items-center justify-center gap-2 md:gap-2.5">
+                      <div
+                        v-for="n in [4, 5]"
+                        :key="n"
+                        class="level-point-badge flex items-center gap-1.5 px-2 py-1 rounded-full"
+                      >
+                        <span class="text-[10px] md:text-xs font-bold text-farm-cream/90 tabular-nums">Lv.{{ n }}</span>
+                        <span class="w-px h-3 bg-farm-cream/40 rounded-full"></span>
+                        <span class="text-farm-yellow font-black text-xs tabular-nums drop-shadow-sm">{{ levelPoints[n - 1] }}<span class="text-[9px] font-semibold text-farm-cream/70 ml-0.5">pt</span></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 우측: 랭킹 이미지 -->
+              <div class="flex justify-end items-center shrink-0 flex-1 min-w-0">
+                <div class="relative inline-block leading-[0] translate-y-3 md:translate-y-5">
                   <img
                     :src="rankImg"
                     alt="rank"
-                    class="h-16 md:h-20 w-auto select-none pointer-events-none opacity-95 filter drop-shadow-2xl block"
+                    class="h-16 md:h-20 w-auto select-none pointer-events-none opacity-95 drop-shadow-2xl block"
                     draggable="false"
                   />
-                  <div class="absolute inset-0 flex items-center justify-center text-center pb-20">
+                  <div class="absolute inset-0 flex items-center justify-center text-center pb-10 md:pb-17">
                     <div>
-                      <div class="text-base md:text-xl font-dnf text-white leading-tight font-bold text-glow-olive">
+                      <div class="text-base md:text-2xl font-dnf text-white leading-tight font-bold text-glow-olive">
                         {{ currentSlide.nickname ?? '—' }}
                       </div>
                       <div v-if="currentSlide.cardCount != null" class="mt-1 flex items-center justify-center gap-1.5 text-xs md:text-sm font-semibold text-white/95 leading-tight drop-shadow-lg">
                         <span>{{ currentSlide.cardCount }}장</span>
-                        <span class="text-farm-white/70">·</span>
+                        <span class="text-white/60">·</span>
                         <span>{{ (currentSlide.cardCount ?? 0) * 100 }}pt</span>
                       </div>
                     </div>
@@ -200,5 +229,16 @@ watch(
     0 2px 4px rgba(0, 0, 0, 0.5);
 }
 
+.rank-text-shadow {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.level-point-badge {
+  background: linear-gradient(135deg, rgba(255, 250, 240, 0.28) 0%, rgba(255, 224, 130, 0.15) 100%);
+  border: 1px solid rgba(255, 250, 240, 0.4);
+  box-shadow: 
+    0 1px 4px rgba(78, 59, 42, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
 </style>
 
