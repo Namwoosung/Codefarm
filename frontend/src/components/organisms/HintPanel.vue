@@ -48,14 +48,14 @@
                 <button
                   type="button"
                   class="btn btn-xs h-7 px-2 rounded-md bg-[var(--color-farm-green)] text-white border-none"
-                  @click="viewPendingHint(idx)"
+                  @click="viewPendingHint(msg)"
                 >
                   볼게요
                 </button>
                 <button
                   type="button"
                   class="btn btn-xs h-7 px-2 rounded-md btn-ghost border border-base-300"
-                  @click="dismissPendingHint(idx)"
+                  @click="dismissPendingHint(msg)"
                 >
                   괜찮아요
                 </button>
@@ -100,7 +100,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useIdeStore } from '@/stores/ide'
 import * as hintApi from '@/api/hint'
@@ -110,15 +110,16 @@ const props = defineProps({
   hintRemaining: { type: Number, default: 3 },
   hintMax: { type: Number, default: 3 }
 })
-const emit = defineEmits(['hint-used', 'hint-exhausted', 'close', 'auto-hint-arrived', 'dismiss-hint-toast'])
+const emit = defineEmits(['hint-used', 'hint-exhausted', 'close', 'dismiss-hint-toast'])
 
 const route = useRoute()
 const ideStore = useIdeStore()
 const chatInput = ref('')
-const chatMessages = ref([])
 const hintLoading = ref(false)
-/** SSE 수신 힌트 hintId 중복 방지용 (세션 변경 시 초기화) */
-const seenHintIds = ref(new Set())
+/** API에서 로드한 힌트 목록 (MANUAL + AUTO) */
+const apiHints = ref([])
+/** 수동 힌트 전송 후 API 응답까지의 임시 메시지 (아직 apiHints에 없음) */
+const optimisticMessages = ref([])
 
 /** 힌트 목록을 채팅 메시지 형태로 변환 (과거순). AUTO는 세션 생성 이후 것만 표시 */
 function hintsToMessages(hints) {
@@ -141,71 +142,61 @@ function hintsToMessages(hints) {
   return messages
 }
 
-/** 힌트 목록 로드 후 채팅에 반영, 미열람 힌트는 열람 처리 */
+/** store의 SSE 힌트를 pending 메시지 형태로 변환 (API에 아직 없는 것만) */
+function storeHintsToMessages(storeHints, apiHintIds) {
+  if (!Array.isArray(storeHints)) return []
+  return storeHints
+    .filter((h) => !apiHintIds.has(h.hintId ?? h.hint_id))
+    .map((h) => ({
+      role: 'assistant',
+      type: 'pending_auto_hint',
+      content: h.content ?? '',
+      hintId: h.hintId ?? h.hint_id,
+      createdAt: h.createdAt ?? '',
+      viewed: h.viewed ?? false,
+      dismissed: h.dismissed ?? false
+    }))
+}
+
+/** API 힌트 + store SSE 힌트 + 수동 힌트 임시 메시지 병합 → 채팅 메시지 (store에서 렌더링) */
+const chatMessages = computed(() => {
+  const apiMsgs = hintsToMessages(apiHints.value)
+  const apiIds = new Set(apiHints.value.map((h) => h.hintId ?? h.hint_id))
+  const storeMsgs = storeHintsToMessages(ideStore.hints ?? [], apiIds)
+  return [...apiMsgs, ...storeMsgs, ...optimisticMessages.value]
+})
+
+/** 힌트 목록 로드 후 apiHints에 반영, 미열람 힌트는 열람 처리 */
 async function loadHintList() {
   const sid = ideStore.sessionId
   if (sid == null) return
   try {
     const hints = await hintApi.getHintList(sid)
-    chatMessages.value = hintsToMessages(hints)
-    for (const h of hints) {
-      if (h.hintId != null) {
-        seenHintIds.value.add(h.hintId)
-        if (h.isViewed === false) {
-          hintApi.markHintViewed(sid, h.hintId).catch(() => {})
-        }
+    apiHints.value = hints ?? []
+    for (const h of apiHints.value) {
+      if (h.hintId != null && h.isViewed === false) {
+        hintApi.markHintViewed(sid, h.hintId).catch(() => {})
       }
     }
   } catch (_) {
-    chatMessages.value = []
+    apiHints.value = []
   }
 }
 
-/** SSE 자동 힌트 수신 시: 알림 + pending 말풍선 (볼게요/괜찮아요) */
-function handleAutoHint(data) {
-  if (!data?.content) return
-  emit('auto-hint-arrived')
-  chatMessages.value.push({
-    role: 'assistant',
-    type: 'pending_auto_hint',
-    content: data.content,
-    hintId: data.hintId,
-    createdAt: data.createdAt ?? new Date().toISOString(),
-    viewed: false,
-    dismissed: false
-  })
-}
-
-/**
- * IdeView SSE에서 호출: 자동 힌트 추가 (hintId 중복 방지)
- * @param {object} data - { hintId, content, createdAt, ... }
- */
-function addAutoHint(data) {
-  if (!data?.content) return
-  const hid = data.hintId ?? data.hint_id
-  if (hid != null && seenHintIds.value.has(hid)) return
-  if (hid != null) seenHintIds.value.add(hid)
-  handleAutoHint(data)
-}
-
-defineExpose({ addAutoHint })
-
-/** pending 자동 힌트 "볼게요" 클릭: 내용 표시 + 열람 처리 */
-function viewPendingHint(idx) {
-  const msg = chatMessages.value[idx]
+/** pending 자동 힌트 "볼게요" 클릭: 내용 표시 + 열람 처리 (store 업데이트) */
+function viewPendingHint(msg) {
   if (!msg || msg.type !== 'pending_auto_hint' || msg.viewed || msg.dismissed) return
-  msg.viewed = true
+  ideStore.updateHintState(msg.hintId, { viewed: true })
   const sid = ideStore.sessionId
   if (sid != null && msg.hintId != null) {
     hintApi.markHintViewed(sid, msg.hintId).catch(() => {})
   }
 }
 
-/** pending 자동 힌트 "괜찮아요" 클릭: 비활성화 + 토스트 */
-function dismissPendingHint(idx) {
-  const msg = chatMessages.value[idx]
+/** pending 자동 힌트 "괜찮아요" 클릭: 비활성화 + 토스트 (store 업데이트) */
+function dismissPendingHint(msg) {
   if (!msg || msg.type !== 'pending_auto_hint' || msg.dismissed) return
-  msg.dismissed = true
+  ideStore.updateHintState(msg.hintId, { dismissed: true })
   emit('dismiss-hint-toast')
 }
 
@@ -213,11 +204,11 @@ watch(
   () => ideStore.sessionId,
   (sid) => {
     if (sid != null) {
-      seenHintIds.value = new Set()
       loadHintList()
+      optimisticMessages.value = []
     } else {
-      chatMessages.value = []
-      seenHintIds.value = new Set()
+      apiHints.value = []
+      optimisticMessages.value = []
     }
   },
   { immediate: true }
@@ -230,7 +221,7 @@ async function sendHint() {
   }
   const q = chatInput.value?.trim()
   if (!q || hintLoading.value) return
-  chatMessages.value.push({ role: 'user', text: q, createdAt: new Date().toISOString() })
+  optimisticMessages.value = [...optimisticMessages.value, { role: 'user', text: q, createdAt: new Date().toISOString() }]
   chatInput.value = ''
   hintLoading.value = true
   try {
@@ -239,13 +230,30 @@ async function sendHint() {
     const res = await hintApi.requestManualHint(sid, { userQuestion: q, code })
     const d = res?.data ?? res
     if (d) {
-      chatMessages.value.push({ role: 'assistant', text: d.content, createdAt: d.createdAt })
+      apiHints.value = [
+        ...apiHints.value,
+        {
+          hintType: 'MANUAL',
+          userQuestion: q,
+          content: d.content ?? '',
+          createdAt: d.createdAt ?? new Date().toISOString(),
+          hintId: d.hintId,
+          isViewed: true
+        }
+      ]
+      optimisticMessages.value = optimisticMessages.value.filter((m) => m.role !== 'user' || m.text !== q)
       emit('hint-used', { usedHint: d.usedHint ?? 0, maxHint: d.maxHint ?? 3 })
     } else {
-      chatMessages.value.push({ role: 'assistant', text: '힌트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', createdAt: new Date().toISOString() })
+      optimisticMessages.value = [
+        ...optimisticMessages.value,
+        { role: 'assistant', text: '힌트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', createdAt: new Date().toISOString() }
+      ]
     }
   } catch (_) {
-    chatMessages.value.push({ role: 'assistant', text: '힌트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', createdAt: new Date().toISOString() })
+    optimisticMessages.value = [
+      ...optimisticMessages.value,
+      { role: 'assistant', text: '힌트를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.', createdAt: new Date().toISOString() }
+    ]
   } finally {
     hintLoading.value = false
   }
