@@ -10,19 +10,22 @@ public record SubmitSessionResponseDto(
     ResultType resultType,
     EvaluationContext evaluationContext,
     SubmissionContext submissionContext,
-    String feedback
+    String feedback,
+    Integer awardedPoints
 ) {
 
     public static SubmitSessionResponseDto success(
         SubmissionContext submissionContext,
         EvaluationContext evaluationContext,
-        String feedback
+        String feedback,
+        Integer awardedPoints
     ) {
         return new SubmitSessionResponseDto(
             ResultType.SUCCESS,
             evaluationContext,
             submissionContext,
-            feedback
+            feedback,
+            awardedPoints
         );
     }
 
@@ -32,6 +35,7 @@ public record SubmitSessionResponseDto(
         return new SubmitSessionResponseDto(
             ResultType.FAIL,
             evaluationContext,
+            null,
             null,
             null
         );

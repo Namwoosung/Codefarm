@@ -190,13 +190,13 @@
               <TerminalPanel ref="terminalPanel" />
             </div>
 
-            <div v-if="!isLoggedIn" class="absolute inset-0 flex items-center justify-center bg-[rgba(245,242,232,0.8)] z-10">
+            <div v-if="!isLoggedIn" class="absolute inset-0 flex items-center justify-center bg-[rgba(245,242,232,0.8)] z-10 pointer-events-auto">
               <div class="card bg-base-100 shadow-xl rounded-2xl p-8 max-w-md text-center">
                 <p class="text-lg font-bold text-[var(--color-farm-brown-dark)] mb-2">로그인이 필요해요</p>
                 <p class="text-sm text-[#7a6a4a] mb-5">문제를 풀고 제출 결과를 확인하려면 먼저 로그인해주세요.</p>
                 <div class="flex gap-3 justify-center">
                   <router-link to="/login" class="btn btn-sm rounded-full bg-[var(--color-farm-green)] text-white border-none hover:bg-[var(--color-farm-green-dark)]">로그인하러 가기</router-link>
-                  <router-link to="/signup" class="btn btn-sm btn-outline rounded-full">회원가입</router-link>
+                  <router-link to="/signup" class="btn btn-sm btn-outline rounded-full border-[var(--color-farm-green)] text-[var(--color-farm-green)] hover:bg-[var(--color-farm-green)]/10">회원가입</router-link>
                 </div>
               </div>
             </div>
@@ -737,6 +737,16 @@ async function closeSessionOnLeave() {
   ideStore.clearSession()
 }
 
+/** 라우트 이탈 시 공통 정리(세션 종료 + 스냅샷 인터벌 해제) 후 next 호출 */
+async function cleanupOnLeaveAndProceed(next) {
+  if (snapshotIntervalId) {
+    clearInterval(snapshotIntervalId)
+    snapshotIntervalId = null
+  }
+  await closeSessionOnLeave()
+  next()
+}
+
 /** FR-CODE-010: 브라우저 닫기/새로고침 시 작성 중인 코드 있으면 확인 (beforeunload) */
 function onBeforeUnload(e) {
   const code = ideStore.getCode(route.params.id)
@@ -934,12 +944,12 @@ watch(
 onBeforeRouteLeave(async (to, from, next) => {
   if (skipLeaveConfirm.value) {
     skipLeaveConfirm.value = false
-    await closeSessionOnLeave()
-    if (snapshotIntervalId) {
-      clearInterval(snapshotIntervalId)
-      snapshotIntervalId = null
-    }
-    next()
+    await cleanupOnLeaveAndProceed(next)
+    return
+  }
+  // 로그인 필요 모달에서 로그인/회원가입 버튼으로 갈 때는 확인 생략
+  if (!authStore.isLoggedIn && (to.path === '/login' || to.path === '/signup')) {
+    await cleanupOnLeaveAndProceed(next)
     return
   }
   const code = ideStore.getCode(route.params.id)
@@ -958,12 +968,7 @@ onBeforeRouteLeave(async (to, from, next) => {
     next(false)
     return
   }
-  await closeSessionOnLeave()
-  if (snapshotIntervalId) {
-    clearInterval(snapshotIntervalId)
-    snapshotIntervalId = null
-  }
-  next()
+  await cleanupOnLeaveAndProceed(next)
 })
 
 onUnmounted(() => {

@@ -1,4 +1,4 @@
-import api from './index'
+import api, { SKIP_AUTH_ON_401 } from './index'
 
 /**
  * 코딩 레벨 정규화 함수
@@ -32,7 +32,7 @@ export const login = async (payload) => {
  * @returns {Promise}
  */
 export const logout = async () => {
-  return api.post('/users/logout')
+  return api.post('/users/logout', undefined, { [SKIP_AUTH_ON_401]: true })
 }
 
 /**
