@@ -116,7 +116,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, nextTick } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useRouter } from 'vue-router'
 import SignupForm from '@/components/organisms/SignupForm.vue'
@@ -133,9 +133,15 @@ const password = ref('')
 const isSignup = ref(false)
 const signupSuccessMessage = ref('')
 
-onMounted(() => {
-  isSignup.value = props.initialMode === 'signup'
-})
+watch(
+  () => props.initialMode,
+  (mode) => {
+    isSignup.value = mode === 'signup'
+    // 화면 진입 모드가 바뀌면, 이전 성공 메시지는 UX상 초기화
+    signupSuccessMessage.value = ''
+  },
+  { immediate: true }
+)
 
 const login = async () => {
   try {

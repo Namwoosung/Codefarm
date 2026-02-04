@@ -12,15 +12,26 @@
         <form class="profile-edit-modal-body" @submit.prevent="submitIfCan">
           <label class="profile-edit-field">
             <span class="profile-edit-label">닉네임</span>
-            <input
-              v-model.trim="form.nickname"
-              type="text"
-              class="profile-edit-input"
-              placeholder="닉네임"
-              :disabled="isSaving"
-              autocomplete="nickname"
-              maxlength="30"
-            />
+            <div class="profile-edit-input-wrap">
+              <input
+                v-model.trim="form.nickname"
+                type="text"
+                class="profile-edit-input"
+                placeholder="2~20자, 한글/영문/숫자/_, - 만 가능"
+                :disabled="isSaving"
+                autocomplete="nickname"
+                maxlength="20"
+                @blur="onNicknameBlur"
+                @input="onNicknameInput"
+              />
+              <span v-if="isCheckingNickname" class="profile-edit-checking">확인 중...</span>
+            </div>
+            <p v-if="nicknameFormatInvalid" class="profile-edit-error">
+              닉네임은 한글, 영문, 숫자, _, - 만 사용 가능하며 2~20자로 입력해주세요.
+            </p>
+            <p v-else-if="nicknameCheckStatus === 'available'" class="profile-edit-ok">✓ 사용 가능한 닉네임입니다.</p>
+            <p v-else-if="nicknameCheckStatus === 'duplicate'" class="profile-edit-error">✗ 이미 사용 중인 닉네임입니다.</p>
+            <p v-if="displayErrorMessage" class="profile-edit-error">{{ displayErrorMessage }}</p>
           </label>
 
           <label class="profile-edit-field">
@@ -59,8 +70,6 @@
             </label>
           </div>
 
-          <p v-if="errorMessage" class="profile-edit-error">{{ errorMessage }}</p>
-
           <div class="profile-edit-actions">
             <button type="button" class="profile-edit-btn profile-edit-btn-secondary" :disabled="isSaving" @click="emit('close')">
               취소
@@ -76,17 +85,38 @@
 </template>
 
 <script setup>
-import { reactive, ref, watch, onUnmounted } from 'vue'
+import { computed, reactive, ref, watch, onUnmounted } from 'vue'
+import { checkNicknameDuplicate as apiCheckNicknameDuplicate } from '@/api/auth'
+
+// 닉네임: 한글, 영문, 숫자, _, - 만 가능, 2~20자 (SignupForm과 동일)
+const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9_-]{2,20}$/
 
 const props = defineProps({
   show: { type: Boolean, default: false },
   user: { type: Object, default: null },
-  isSaving: { type: Boolean, default: false }
+  isSaving: { type: Boolean, default: false },
+  externalErrorMessage: { type: String, default: null }
 })
 
 const emit = defineEmits(['close', 'submit'])
 
 const errorMessage = ref(null)
+const displayErrorMessage = computed(() => {
+  const local = errorMessage.value
+  if (local && String(local).trim()) return local
+  const ext = props.externalErrorMessage
+  if (ext && String(ext).trim()) return ext
+  return null
+})
+
+const isCheckingNickname = ref(false)
+const nicknameCheckStatus = ref('') // '' | checking | available | duplicate
+let nicknameCheckTimer = null
+const nicknameFormatInvalid = computed(() => {
+  const trimmed = String(form.nickname ?? '').trim()
+  return trimmed.length > 0 && !NICKNAME_REGEX.test(trimmed)
+})
+
 const form = reactive({
   age: '',
   name: '',
@@ -101,10 +131,19 @@ function resetFromUser() {
   form.age = u.age ?? ''
   const lv = Number(u.codingLevel)
   form.codingLevel = Number.isFinite(lv) && lv >= 1 && lv <= 5 ? lv : 1
+
+  nicknameCheckStatus.value = ''
+  if (nicknameCheckTimer) {
+    clearTimeout(nicknameCheckTimer)
+    nicknameCheckTimer = null
+  }
 }
 
 function validate() {
   if (!form.nickname || !String(form.nickname).trim()) return '닉네임을 입력해주세요.'
+  if (!NICKNAME_REGEX.test(String(form.nickname).trim())) {
+    return '닉네임은 한글, 영문, 숫자, _, - 만 사용 가능하며 2~20자로 입력해주세요.'
+  }
   if (!form.name || !String(form.name).trim()) return '이름을 입력해주세요.'
 
   const ageNum = Number(form.age)
@@ -114,6 +153,54 @@ function validate() {
   if (!Number.isFinite(lv) || lv < 1 || lv > 5) return '코딩 레벨은 1~5 사이여야 합니다.'
 
   return null
+}
+
+const onNicknameInput = () => {
+  if (nicknameCheckTimer) clearTimeout(nicknameCheckTimer)
+  nicknameCheckStatus.value = ''
+  if (nicknameFormatInvalid.value) return
+  const nickname = String(form.nickname ?? '').trim()
+  if (NICKNAME_REGEX.test(nickname)) {
+    nicknameCheckTimer = setTimeout(() => {
+      checkNickname()
+    }, 500)
+  }
+}
+
+const onNicknameBlur = () => {
+  if (nicknameFormatInvalid.value) return
+  const nickname = String(form.nickname ?? '').trim()
+  if (NICKNAME_REGEX.test(nickname)) checkNickname()
+}
+
+async function checkNickname() {
+  if (props.isSaving || isCheckingNickname.value) return
+
+  const nickname = String(form.nickname ?? '').trim()
+  if (!nickname || !NICKNAME_REGEX.test(nickname)) {
+    nicknameCheckStatus.value = ''
+    return
+  }
+
+  // 원래 닉네임이면 중복검사 의미가 없으니 통과 처리
+  const originalNickname = String(props.user?.nickname ?? '').trim()
+  if (originalNickname && nickname === originalNickname) {
+    nicknameCheckStatus.value = 'available'
+    return
+  }
+
+  try {
+    isCheckingNickname.value = true
+    nicknameCheckStatus.value = 'checking'
+
+    const res = await apiCheckNicknameDuplicate(nickname)
+    const isAvailable = res?.data?.data?.isAvailable ?? false
+    nicknameCheckStatus.value = isAvailable ? 'available' : 'duplicate'
+  } catch (_) {
+    nicknameCheckStatus.value = ''
+  } finally {
+    isCheckingNickname.value = false
+  }
 }
 
 function submitIfCan() {
@@ -147,6 +234,18 @@ watch(
     } else {
       window.removeEventListener('keydown', onKeyDown)
     }
+  }
+)
+
+watch(
+  () => form.nickname,
+  () => {
+    nicknameCheckStatus.value = ''
+    if (nicknameCheckTimer) {
+      clearTimeout(nicknameCheckTimer)
+      nicknameCheckTimer = null
+    }
+    if (errorMessage.value) errorMessage.value = null
   }
 )
 
@@ -232,6 +331,19 @@ onUnmounted(() => {
   background: #fff;
   color: var(--color-farm-brown-dark, #2d2a26);
 }
+.profile-edit-input-wrap {
+  position: relative;
+}
+.profile-edit-checking {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.8rem;
+  color: var(--color-farm-brown, #4e3b2a);
+  opacity: 0.7;
+  pointer-events: none;
+}
 .profile-edit-input:focus {
   outline: none;
   border-color: var(--color-farm-green, #5e8d48);
@@ -256,6 +368,17 @@ onUnmounted(() => {
   margin: 0.25rem 0 0;
   font-size: 0.85rem;
   color: #c0392b;
+}
+.profile-edit-ok {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: #2e7d32;
+}
+.profile-edit-hint {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--color-farm-brown, #4e3b2a);
+  opacity: 0.85;
 }
 
 .profile-edit-actions {

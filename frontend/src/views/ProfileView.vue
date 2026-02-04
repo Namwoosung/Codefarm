@@ -58,6 +58,7 @@
       :show="showEditModal"
       :user="user"
       :is-saving="isSaving"
+      :external-error-message="editErrorMessage"
       @close="showEditModal = false"
       @submit="handleSubmitEdit"
     />
@@ -75,6 +76,7 @@ const profile = useProfileStore()
 const { user } = storeToRefs(profile)
 const showEditModal = ref(false)
 const isSaving = ref(false)
+const editErrorMessage = ref(null)
 
 onMounted(async () => {
   try {
@@ -86,16 +88,18 @@ onMounted(async () => {
 
 const openEditModal = () => {
   if (!user.value) return
+  editErrorMessage.value = null
   showEditModal.value = true
 }
 
 const handleSubmitEdit = async (payload) => {
+  editErrorMessage.value = null
   isSaving.value = true
   try {
     await profile.updateUser(payload)
     showEditModal.value = false
   } catch (err) {
-    console.log(err)
+    editErrorMessage.value = err?.response?.data?.message ?? err?.message ?? '프로필 수정에 실패했습니다.'
   } finally {
     isSaving.value = false
   }

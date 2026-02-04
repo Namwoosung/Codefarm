@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-farm-cream/20">
     <!-- 최상단 배너: 전체 화면 폭 -->
     <MainHeroBanner :top3="top3" />
-    <div class="min-h-screen p-10 px-15">
+    <div class="min-h-screen p-10 px-10">
     <!-- 30분 무입력 강제 종료 후 메인 진입 시 안내 모달 (X로 닫기) -->
     <Teleport to="body">
       <Transition name="modal">
@@ -52,7 +52,7 @@
       </Transition>
     </Teleport>
 
-    <div class="max-w-7xl mx-auto">
+    <div class="max-w-6xl mx-auto">
       <!-- 필터 / 정렬 UI -->
       <div class="mb-6 flex flex-wrap items-center gap-3 ">
         <!-- 문제 유형 -->
@@ -177,7 +177,7 @@
 
         <!-- 초기화 -->
         <button
-          class="btn btn-sm h-10 min-h-10 ml-auto rounded-3xl border-farm-brown/30 bg-white px-4 mx-10 text-sm font-semibold text-farm-brown-dark shadow-sm hover:bg-farm-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30"
+          class="btn btn-sm h-10 min-h-10 ml-auto rounded-3xl border-farm-brown/30 bg-white ms-auto text-sm font-semibold text-farm-brown-dark shadow-sm hover:bg-farm-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30"
           @click="resetFilters"
           type="button"
         >
@@ -192,7 +192,7 @@
       <!-- 문제 카드 리스트 (로딩 시에도 유지 + 오버레이만 표시) -->
       <div class="relative" :aria-busy="loading ? 'true' : 'false'">
         <div
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-4 pt-10 transition-opacity"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pt-10 transition-opacity"
           :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard

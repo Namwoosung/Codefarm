@@ -142,6 +142,7 @@ const props = defineProps({
   show: { type: Boolean, default: false },
   report: { type: Object, default: null },
   reportLoading: { type: Boolean, default: false },
+  reportLoadFailed: { type: Boolean, default: false },
   backButtonText: { type: String, default: '' }
 })
 defineEmits(['close'])

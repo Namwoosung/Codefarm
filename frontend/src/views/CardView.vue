@@ -45,7 +45,7 @@
           <div class="gacha-stage gacha-stage--panel relative w-full flex justify-center items-end" :class="{ 'gacha-stage--ready': canDraw }" aria-hidden="true">
             <div class="gacha-shadow"></div>
             <div class="gacha-float h-full flex items-center justify-center">
-              <img :src="gachaImg" class="gacha-card-img w-full max-w-[17rem] h-auto max-h-full object-contain select-none" alt="gacha" draggable="false" />
+              <img :src="gachaImg" class="gacha-card-img w-full max-w-[16rem] h-auto max-h-full object-contain select-none" alt="gacha" draggable="false" />
             </div>
           </div>
 
@@ -59,7 +59,7 @@
                 :style="{ width: `${Math.max(0, Math.min(100, chargeProgress * 100))}%` }"
               ></div>
             </div>
-            <div class="text-lg text-farm-brown-dark/70 relative z-10 w-full text-center font-dnf">보유 포인트 : {{ points.toLocaleString() }}P</div>
+            <div class="text-md text-farm-brown-dark/70 relative z-10 w-full text-center font-dnf">보유 포인트 : {{ points.toLocaleString() }}P</div>
           </div>
 
           <button type="button" class="gacha-draw-btn gacha-draw-btn--wide font-dnf" @click="gachaCard" :disabled="!canDraw">
@@ -69,7 +69,8 @@
               aria-hidden="true"
             ></span>
             <span class="relative z-[2] inline-flex items-center gap-2.5">
-              <span class="gacha-draw-btn__label">카드뽑기 | 100P</span>
+              <span class="gacha-draw-btn__label">Gacha !</span>
+              <span class="gacha-draw-btn__cost bg-white/55 border border-farm-brown/20 shadow-sm">100P</span>
             </span>
           </button>
         </div>
@@ -197,18 +198,6 @@
           @pointerleave="onModalPointerLeave"
         >
           <figure class="w-full h-full rounded-2xl overflow-visible relative block m-0">
-            <Transition
-              enter-active-class="transition-opacity duration-500 ease-out delay-1000"
-              enter-from-class="opacity-0"
-              enter-to-class="opacity-100"
-            >
-              <div
-                v-if="isGachaModal && drawMessage"
-                class="absolute top-15 left-1/2 whitespace-nowrap -translate-x-1/2 z-10 px-4 py-2 rounded-full text-farm-olive text-sm font-bold"
-              >
-                {{ drawMessage }}
-              </div>
-            </Transition>
             <img
               :src="modalCardImage"
               :alt="selectedCard.name"
@@ -226,7 +215,8 @@
 import { useProfileStore } from '@/stores/profile'
 import { useCardStore } from '@/stores/card'
 import { storeToRefs } from 'pinia'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useToastStore } from '@/stores/toast'
 import CardDetail from '@/components/organisms/CardDetail.vue'
 import cardListBg from '@/assets/card/cardlist.png'
 import gachaImg from '@/assets/card/Gacha.png'
@@ -236,6 +226,7 @@ const profile = useProfileStore()
 const cardStore = useCardStore()
 const { user } = storeToRefs(profile)
 const { cards, drawMessage } = storeToRefs(cardStore)
+const toastStore = useToastStore()
 
 const points = computed(() => Number(user.value?.point ?? 0))
 const bannerNickname = computed(() => user.value?.nickname ?? 'Farm')
@@ -261,7 +252,7 @@ onBeforeUnmount(() => {
 // 카드 뽑기
 const gachaCard = async () => {
   if ((user.value?.point ?? 0) < 100) {
-    alert('포인트가 부족합니다.')
+    toastStore.showToast('포인트가 부족합니다.')
     return
   } else {
     await cardStore.cardDraw()
@@ -272,6 +263,14 @@ const gachaCard = async () => {
     lockScroll()
   }
 }
+
+watch(
+  () => drawMessage.value,
+  (msg) => {
+    if (!msg) return
+    toastStore.showToast(msg)
+  }
+)
 
 // 카드 상세 팝업
 const openCardModal = (card) => {
@@ -284,6 +283,7 @@ const closeCardModal = () => {
   drawMessage.value = ''
   isGachaModal.value = false
   selectedCard.value = null
+  toastStore.clearToast()
   unlockScroll()
 }
 const selectedCard = ref(null)
@@ -612,7 +612,7 @@ const modalPointerStyle = computed(() => {
 
 .gacha-draw-btn--wide {
   width: 100%;
-  max-width: 280px;
+  max-width: 260px;
 }
 
 /* Gacha image: 카드 뽑기 연출(플로팅 + 바닥 그림자) */
@@ -722,8 +722,8 @@ const modalPointerStyle = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 12px 18px;
-  min-width: 220px;
+  padding: 10px 18px;
+  min-width: 120px;
   border-radius: 9999px;
   border: 3px solid var(--color-farm-yellow);
   color: var(--color-farm-olive);

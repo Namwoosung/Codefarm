@@ -10,6 +10,9 @@ export const useProfileStore = defineStore('profile', () => {
     //report
     const report = ref(null)
     const reports = ref([])
+    // report list cache (마이페이지에서 최초 1회만 로드)
+    const reportsFetched = ref(false)
+    const lastReportListKey = ref('')
 
     const userinfo = async () => {
         try {   
@@ -63,13 +66,25 @@ export const useProfileStore = defineStore('profile', () => {
     }
     const reportList = async (params) => {
         try {
+            const key = params ? JSON.stringify(params) : ''
+            // 동일 params로 이미 로드했다면 재호출하지 않음
+            if (reportsFetched.value && lastReportListKey.value === key) return
+
             const res = await getMyReports(params)
             reports.value = res.data.data
+            reportsFetched.value = true
+            lastReportListKey.value = key
             console.log(res.data.message)
             console.log(res.data.data)
         } catch (err) {
-            console.log(err.data.message)
+            console.log(err?.response?.data?.message ?? err?.message ?? err)
         }
+    }
+
+    // 다른 화면에서 리포트가 추가되는 케이스가 생기면 이걸 호출해서 다음 마이페이지 진입 시 재조회 가능
+    const invalidateReportList = () => {
+        reportsFetched.value = false
+        lastReportListKey.value = ''
     }
 
     const resportDetail = async (reportId) => {
@@ -87,6 +102,7 @@ export const useProfileStore = defineStore('profile', () => {
         reports,
         userinfo,
         reportList,
+        invalidateReportList,
         resportDetail,
         updateUser,
     }

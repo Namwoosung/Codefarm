@@ -508,28 +508,8 @@ function resultTypeLabel(type) {
 }
 
 // 다른 화면에서 리포트가 추가된 뒤, 다시 마이페이지로 돌아오면 최신 목록을 재조회
-const refreshLatestReports = async () => {
-  try {
-    await profile.reportList({ page: 0, size: 10, sort: 'createdAt,DESC' })
-  } catch (_) {
-    // ignore
-  }
-}
-
-const onVisibilityChange = () => {
-  if (document.visibilityState === 'visible') refreshLatestReports()
-}
-const onWindowFocus = () => refreshLatestReports()
-
-onMounted(() => {
-  document.addEventListener('visibilitychange', onVisibilityChange)
-  window.addEventListener('focus', onWindowFocus)
-})
-
-onBeforeUnmount(() => {
-  document.removeEventListener('visibilitychange', onVisibilityChange)
-  window.removeEventListener('focus', onWindowFocus)
-})
+// NOTE: 마이페이지 리포트 목록은 "최초 1회 로딩"만 필요하므로
+// focus/visibilitychange 기반 자동 재조회는 제거합니다.
 
 onBeforeUnmount(() => {
   if (rafId.value) cancelAnimationFrame(rafId.value)
