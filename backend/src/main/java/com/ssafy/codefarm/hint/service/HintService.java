@@ -2,6 +2,8 @@ package com.ssafy.codefarm.hint.service;
 
 import com.ssafy.codefarm.common.exception.CustomException;
 import com.ssafy.codefarm.common.exception.ErrorCode;
+import com.ssafy.codefarm.hint.dto.ai.AIHintRequest;
+import com.ssafy.codefarm.hint.dto.ai.AIHintResponse;
 import com.ssafy.codefarm.hint.dto.requset.ManualHintRequestDto;
 import com.ssafy.codefarm.hint.dto.response.HintItemResponseDto;
 import com.ssafy.codefarm.hint.dto.response.HintListResponseDto;
@@ -36,6 +38,7 @@ public class HintService {
     private static final Long DEFAULT_TIMEOUT = 24 * 60L * 60 * 1000L; // 24시간
 
     private final SessionCodeRedisService sessionCodeRedisService;
+    private final AIHintServerClient aiHintServerClient;
 
     private final SessionRepository sessionRepository;
     private final SseEmitterRepository emitterRepository;
@@ -103,7 +106,7 @@ public class HintService {
 
     public ManualHintResponseDto createManualHint(Long sessionId, Long userId, ManualHintRequestDto requestDto) {
 
-        Session session = sessionRepository.findById(sessionId)
+        Session session = sessionRepository.findByIdWithUserAndProblem(sessionId)
                 .orElseThrow(() ->
                         new CustomException("세션을 찾을 수 없습니다.", ErrorCode.RESOURCE_NOT_FOUND)
                 );
@@ -127,36 +130,39 @@ public class HintService {
         List<PreviousJudgementRedisDto> previousJudgements =
                 sessionCodeRedisService.getPreviousJudgements(sessionId);
 
-        // AI 요청 DTO 구성 (현재는 더미 처리)
-        // AIHintRequest request = buildManualRequest(...);
+        List<CodeSnapshotRedisDto> filtered = filterRecentHistory(codeHistory);
 
-        // =====================================
-        // 실제 AI 호출 (현재는 주석)
-        // AIHintResponse response = feedbackServerClient.requestManualHint(request);
-        // =====================================
+        AIHintRequest request = AIHintRequest.of(
+                session,
+                session.getUser(),
+                session.getProblem(),
+                requestDto.getUserQuestion(),
+                filtered,
+                previousJudgements
+        );
 
-        // 테스트용 더미 응답
-        String analysis = "아직 코드 작성이 충분하지 않습니다.";
-        List<String> mistakeTypes = List.of("NoCode_Early");
-        String hintContent = "입력 처리 순서를 다시 확인해보세요.";
+        AIHintResponse response = aiHintServerClient.request(sessionId, request);
+
+        String hintContent = response.hint();
+        AIHintResponse.CurrentJudgement cj = response.current_judgement();
 
         // judgement는 무조건 Redis 저장
         sessionCodeRedisService.appendJudgement(
                 sessionId,
                 PreviousJudgementRedisDto.builder()
-                        .analysis(analysis)
-                        .mistakeType(mistakeTypes)
-                        .judgedAt(LocalDateTime.now())
+                        .analysis(cj.analysis())
+                        .mistakeType(cj.mistake_type())
+                        .judgedAt(java.time.LocalDateTime.now())
+                        .hint(hintContent)
                         .build()
         );
 
-        // Hint 저장
         Hint hint = Hint.builder()
                 .session(session)
                 .hintType(HintType.MANUAL)
                 .userQuestion(requestDto.getUserQuestion())
-                .content(hintContent)
-                .isViewed(Boolean.TRUE)
+                .content(hintContent != null ? hintContent : "")
+                .isViewed(true)
                 .build();
 
         hintRepository.save(hint);
@@ -223,5 +229,25 @@ public class HintService {
         }
 
         return HintItemResponseDto.from(hint);
+    }
+
+    private List<CodeSnapshotRedisDto> filterRecentHistory(List<CodeSnapshotRedisDto> history) {
+
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(5);
+
+        List<CodeSnapshotRedisDto> filtered =
+                history.stream()
+                        .filter(h -> h.getSavedAt().isAfter(threshold))
+                        .toList();
+
+        if (filtered.isEmpty()) {
+            return List.of(history.get(history.size() - 1));
+        }
+
+        return filtered;
     }
 }

@@ -35,6 +35,15 @@ public class HttpClientConfig {
     @Value("${feedback.server.read-timeout-ms}")
     private int feedbackReadTimeoutMs;
 
+    @Value("${ai-hint.server.base-url}")
+    private String aiHintBaseUrl;
+
+    @Value("${ai-hint.server.connect-timeout-ms}")
+    private int aiHintConnectTimeoutMs;
+
+    @Value("${ai-hint.server.read-timeout-ms}")
+    private int aiHintReadTimeoutMs;
+
     private ClientHttpRequestFactory createRequestFactory(int connectTimeout, int readTimeout) {
         JdkClientHttpRequestFactory factory =
                 new JdkClientHttpRequestFactory(
@@ -65,6 +74,17 @@ public class HttpClientConfig {
                 .requestFactory(createRequestFactory(
                         feedbackConnectTimeoutMs,
                         feedbackReadTimeoutMs
+                ))
+                .build();
+    }
+
+    @Bean
+    public RestClient aiHintRestClient() {
+        return RestClient.builder()
+                .baseUrl(aiHintBaseUrl)
+                .requestFactory(createRequestFactory(
+                        aiHintConnectTimeoutMs,
+                        aiHintReadTimeoutMs
                 ))
                 .build();
     }
