@@ -65,13 +65,11 @@ onMounted(() => {
   opacity: 0;
 }
 
-/* 라우트 전환: 전체 화면이 "천천히" 등장 */
 .page-enter-active {
   transition: opacity 650ms ease, transform 850ms cubic-bezier(0.22, 1, 0.36, 1);
   will-change: opacity, transform;
 }
 .page-leave-active {
-  /* 이전 화면은 천천히 사라지지 않게 즉시 제거 */
   transition: none;
 }
 .page-enter-from {
@@ -82,8 +80,6 @@ onMounted(() => {
   opacity: 0;
   transform: none;
 }
-
-/* 라우트 전환 순간(leave 직후 ~ 새 화면 reveal 전) 빈 UI 노출 방지 */
 .route-changing {
   position: fixed;
   inset: 0;

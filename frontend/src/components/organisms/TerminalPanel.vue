@@ -187,8 +187,6 @@ defineExpose({
   display: block;
   user-select: text;
 }
-
-/* xterm.js 스타일 오버라이드 */
 :deep(.xterm) {
   width: 100% !important;
   height: 100% !important;
@@ -229,8 +227,6 @@ defineExpose({
 :deep(.xterm-cursor-layer) {
   z-index: 2;
 }
-
-/* 출력 전용 터미널: 커서 숨김 */
 :deep(.xterm-cursor) {
   visibility: hidden;
 }

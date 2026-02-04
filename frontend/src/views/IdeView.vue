@@ -1313,7 +1313,6 @@ function showToast(msg) {
 </script>
 
 <style scoped>
-/* 다크모드에서도 빈 영역이 흰색으로 보이도록 고정 */
 .ide-view-root {
   color-scheme: light;
   background-color: #ffffff;
@@ -1333,7 +1332,6 @@ function showToast(msg) {
 .ide-editor-container {
   min-height: 200px;
 }
-/* 힌트 패널 접기/펼치기 트랜지션 */
 .hint-panel-enter-active,
 .hint-panel-leave-active {
   transition: width 0.2s ease, min-width 0.2s ease, opacity 0.2s ease;
@@ -1362,8 +1360,6 @@ function showToast(msg) {
   opacity: 0;
   transform: translateY(-4px);
 }
-
-/* FR-CODE-002-1: 에디터 우측 하단 저장 상태 */
 .ide-save-status {
   position: absolute;
   bottom: 8px;
@@ -1382,8 +1378,6 @@ function showToast(msg) {
 .ide-save-status-stopped {
   color: var(--color-farm-point, #e07c4a);
 }
-
-/* 실행/제출 버튼 영역 */
 .ide-action-buttons {
   display: flex;
   gap: 0.75rem;
@@ -1392,16 +1386,16 @@ function showToast(msg) {
   border-top: 1px solid var(--color-farm-cream);
   border-bottom: 1px solid var(--color-farm-cream);
   flex-shrink: 0;
-  justify-content: flex-start; /* 왼쪽 정렬 */
+  justify-content: flex-start;
 }
 
 .ide-submit-button {
-  width: 119px; /* 디자인 목업 기준 */
+  width: 119px;
   padding: 0.5rem 1.25rem;
   background: linear-gradient(90deg, #7A5C3E 0%, #CDFF86 100%);
   color: white;
   border: none;
-  border-radius: 18px; /* 매우 둥근 모서리 */
+  border-radius: 18px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -1428,12 +1422,12 @@ function showToast(msg) {
 }
 
 .ide-run-button {
-  width: 119px; /* 제출하기와 동일한 크기 */
+  width: 119px;
   padding: 0.5rem 1.25rem;
   background-color: white;
   color: var(--color-farm-brown-dark);
   border: 1px solid #E0E0E0;
-  border-radius: 18px; /* 매우 둥근 모서리 */
+  border-radius: 18px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -1470,7 +1464,7 @@ function showToast(msg) {
   background-color: white;
   color: var(--color-farm-brown-dark);
   border: 1px solid #E0E0E0;
-  border-radius: 18px; /* 매우 둥근 모서리 */
+  border-radius: 18px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -1488,13 +1482,9 @@ function showToast(msg) {
   border-color: var(--color-farm-point);
   color: var(--color-farm-point);
 }
-
-/* 탈주 아이콘 크기 조정 */
 .ide-escape-button .escape-icon {
   font-size: 1.1rem;
 }
-
-/* 메인→IDE 진입 시 로딩 모달 */
 .ide-loading-overlay {
   position: fixed;
   inset: 0;

@@ -158,7 +158,6 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 스크롤바 스타일링 */
 .overflow-y-auto::-webkit-scrollbar {
   width: 8px;
 }

@@ -1,22 +1,22 @@
 <template>
-  <div class="min-h-screen bg-farm-cream/20">
-    <!-- 최상단 배너: 전체 화면 폭 -->
+  <div class="min-h-screen bg-farm-cream">
+    <!-- 최상단 배너 -->
     <MainHeroBanner :top3="top3" />
-    <div class="min-h-screen p-10 px-10">
+    <main class="px-4 py-8 sm:px-6 lg:px-8">
     <!-- 30분 무입력 강제 종료 후 메인 진입 시 안내 모달 (X로 닫기) -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showIdleCancelModal" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]">
-          <div class="card bg-base-100 shadow-2xl rounded-xl p-6 min-w-[320px] max-w-[90vw] border border-base-300 relative">
+        <div v-if="showIdleCancelModal" class="fixed inset-0 flex items-center justify-center bg-farm-brown-dark/30 backdrop-blur-sm z-[9999]">
+          <div class="bg-farm-paper shadow-2xl rounded-2xl p-6 min-w-[320px] max-w-[90vw] border border-farm-brown/20 relative">
             <button
               type="button"
-              class="btn btn-ghost btn-sm btn-square absolute top-3 right-3 text-[var(--color-farm-brown)]"
+              class="absolute top-3 right-3 p-1.5 rounded-lg text-farm-brown/70 hover:bg-farm-cream hover:text-farm-brown-dark transition-colors"
               aria-label="닫기"
               @click="closeIdleCancelModal"
             >
               <iconify-icon icon="mdi:close" class="text-xl"></iconify-icon>
             </button>
-            <p class="text-lg font-semibold text-[var(--color-farm-brown-dark)] pr-8">문제를 장시간동안 풀지 않아 자동으로 문제풀기가 취소되었습니다.</p>
+            <p class="text-base font-medium text-farm-brown-dark pr-10">문제를 장시간동안 풀지 않아 자동으로 문제풀기가 취소되었습니다.</p>
           </div>
         </div>
       </Transition>
@@ -25,22 +25,22 @@
     <!-- 풀고 있는 문제가 있을 때 다른 문제 클릭 시 확인 모달 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showActiveSessionModal && activeSessionPayload" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]">
-          <div class="card bg-base-100 shadow-2xl rounded-xl p-6 min-w-[320px] max-w-[90vw] border border-base-300">
-            <p class="text-lg font-semibold text-[var(--color-farm-brown-dark)] mb-4">
+        <div v-if="showActiveSessionModal && activeSessionPayload" class="fixed inset-0 flex items-center justify-center bg-farm-brown-dark/30 backdrop-blur-sm z-[9999]">
+          <div class="bg-farm-paper shadow-2xl rounded-2xl p-6 min-w-[320px] max-w-[90vw] border border-farm-brown/20">
+            <p class="text-base font-medium text-farm-brown-dark mb-5">
               풀고 있는 문제가 있습니다. (현재 {{ activeSessionPayload.otherProblemId }}번 문제)
             </p>
-            <div class="flex justify-end gap-3">
+            <div class="flex justify-end gap-2">
               <button
                 type="button"
-                class="btn btn-sm btn-ghost border border-base-300"
+                class="px-4 py-2 rounded-xl text-sm font-medium text-farm-brown-dark border border-farm-brown/30 hover:bg-farm-cream transition-colors"
                 @click="goToExistingProblem"
               >
                 기존 문제로
               </button>
               <button
                 type="button"
-                class="btn btn-sm bg-[var(--color-farm-green)] text-white border-none hover:bg-[var(--color-farm-green-dark)]"
+                class="px-4 py-2 rounded-xl text-sm font-medium text-farm-paper bg-farm-green hover:bg-farm-green-dark disabled:opacity-50 transition-colors"
                 :disabled="activeSessionLoading"
                 @click="goToNewProblem"
               >
@@ -54,7 +54,7 @@
 
     <div class="max-w-6xl mx-auto">
       <!-- 필터 / 정렬 UI -->
-      <div class="mb-6 flex flex-wrap items-center gap-3 ">
+      <div class="mb-6 flex flex-wrap items-center gap-3">
         <!-- 문제 유형 -->
         <div class="relative" data-filter-dropdown>
           <button
@@ -185,20 +185,17 @@
         </button>
       </div>
 
-      <!-- 필터/리스트 구분선 -->
-      <div class="my-6 flex items-center gap-3">
-        <div class="h-px flex-1 bg-gradient-to-r from-transparent via-farm-brown/25 to-transparent"></div>
-        <div class="h-px flex-1 bg-gradient-to-r from-transparent via-farm-brown/25 to-transparent"></div>
-      </div>
+      <!-- 구분선 -->
+      <hr class="my-6 border-0 h-px bg-gradient-to-r from-transparent via-farm-brown/20 to-transparent" />
       <!-- 에러 -->
-      <div v-if="error" class="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+      <div v-if="error" class="mb-6 rounded-xl border border-farm-point/40 bg-farm-point/10 px-4 py-3 text-sm text-farm-point">
         {{ error }}
       </div>
 
-      <!-- 문제 카드 리스트 (로딩 시에도 유지 + 오버레이만 표시) -->
+      <!-- 문제 카드 리스트 -->
       <div class="relative" :aria-busy="loading ? 'true' : 'false'">
         <div
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 transition-opacity"
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 transition-opacity"
           :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard
@@ -213,14 +210,17 @@
           <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
 
-        <div v-if="!loading && !error && filteredProblems.length === 0" class="py-16 text-center text-farm-brown/80">
-          조건에 맞는 문제가 없어요.
+        <div v-if="!loading && !error && filteredProblems.length === 0" class="py-20 text-center">
+          <p class="text-farm-brown/70 text-sm">조건에 맞는 문제가 없어요.</p>
+          <button type="button" class="mt-3 text-sm font-medium text-farm-point hover:underline" @click="resetFilters">
+            필터 초기화
+          </button>
         </div>
       </div>
       <!-- 페이지네이션 -->
       <nav
         v-if="totalPages > 1"
-        class="mt-10 rounded-2xl px-4 py-4"
+        class="mt-12 pt-6 border-t border-farm-brown/10"
         aria-label="Pagination"
       >
         <div class="flex items-center justify-between gap-4">
@@ -270,7 +270,7 @@
         </div>
       </nav>
     </div>
-    </div>
+    </main>
   </div>
 </template>
 
