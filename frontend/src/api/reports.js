@@ -19,7 +19,7 @@ export const getReportDetail = async (reportId) => {
 
 /**
  * 제출 API 응답으로 리포트 객체 구성 (채점·결과용 evaluationContext 포함)
- * @param {{ data?: { resultId?, resultType?, language?, solveTime?, execTime?, memory?, feedback?, submittedAt?, evaluationContext? } }} res - submit 응답
+ * @param {{ data?: { resultId?, resultType?, language?, solveTime?, execTime?, memory?, feedback?, submittedAt?, evaluationContext?, awardedPoints? } }} res - submit 응답
  * @param {string} [problemTitle] - 문제 제목
  * @returns {{ result: object, evaluationContext?: object, xp?: number }}
  */
@@ -41,12 +41,27 @@ export const buildReportFromSubmitResponse = (res, problemTitle = '문제 풀이
     hintContents: [],
     improvementDirection: null
   }
-  const report = { result, evaluationContext: evalCtx }
-  // 성공 시: xp = 100
+  const report = {
+    result,
+    evaluationContext: evalCtx,
+    // API에서 내려주는 실제 획득 포인트 (없으면 null)
+    awardedPoints: d.awardedPoints ?? null
+  }
+  // 성공 시: xp = awardedPoints (없으면 기존 로직 사용)
   if (d.resultType === 'SUCCESS') {
-    report.xp = 100
-  } else if (evalCtx && evalCtx.totalCount != null && evalCtx.totalCount > 0 && evalCtx.passedCount != null) {
-    // 실패 시: 통과율 기반 xp
+    if (d.awardedPoints != null) {
+      report.xp = d.awardedPoints
+    } else {
+      report.xp = 100
+    }
+  } else if (
+    d.resultType !== 'GIVE_UP' &&
+    evalCtx &&
+    evalCtx.totalCount != null &&
+    evalCtx.totalCount > 0 &&
+    evalCtx.passedCount != null
+  ) {
+    // 실패(오답 등) 시: 통과율 기반 xp, 탈주(GIVE_UP)는 xp 없음
     report.xp = Math.round((evalCtx.passedCount / evalCtx.totalCount) * 100)
   }
   return report

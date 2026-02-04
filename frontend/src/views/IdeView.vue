@@ -42,7 +42,6 @@
             :hint-max="hintMax"
             @hint-used="onHintUsedFromPanel"
             @hint-exhausted="onHintExhausted"
-            @auto-hint-arrived="onAutoHintArrived"
             @dismiss-hint-toast="onDismissHintToast"
             @close="hintPanelOpen = false"
           />
@@ -92,8 +91,12 @@
                 <span class="font-mono text-sm font-black text-[var(--color-farm-brown-dark)] tabular-nums">{{ elapsedDisplay }}</span>
               </div>
 
-              <!-- right: carrots + bell -->
+              <!-- right: carrots + bell + SSE 연결 상태 -->
               <div class="flex items-center gap-3">
+                <div v-if="sseIsConnecting" class="flex items-center gap-1 text-xs text-[var(--color-farm-brown)]" title="재연결 중">
+                  <span class="loading loading-spinner loading-xs"></span>
+                  <span>재연결 중</span>
+                </div>
                 <div class="flex items-center gap-0.5" aria-label="힌트 잔여 횟수">
                   <span v-for="i in 3" :key="`codebar-carrot-${i}`" class="inline-flex transition-all duration-200" :class="{ 'grayscale opacity-55': hintUsed >= i }">
                     <CarrotIcon />
@@ -156,7 +159,13 @@
               </div>
             </Transition>
             <div class="flex-1 min-h-0 relative ide-editor-container" :class="{ 'blur-sm': !isLoggedIn }">
-              <MonacoEditor />
+              <!-- 초기 세션/문제 로딩 동안 가벼운 스켈레톤만 먼저 표시 -->
+              <div
+                v-if="isInitializing"
+                class="w-full h-full bg-gradient-to-b from-base-200/80 to-base-100/60 animate-pulse rounded-t-lg"
+              ></div>
+              <!-- 세션 초기화가 끝난 뒤에만 Monaco 에디터 마운트 -->
+              <MonacoEditor v-else />
             </div>
             <div v-if="isLoggedIn" class="absolute bottom-2 right-3 text-xs text-[var(--color-farm-brown)] text-right pointer-events-none">
               <div>{{ saveStatusText }}</div>
@@ -271,9 +280,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
-import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import HintPanel from '@/components/organisms/HintPanel.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
@@ -288,14 +296,16 @@ import { useIdeStore } from '@/stores/ide'
 import { useToastStore } from '@/stores/toast'
 import * as sessionApi from '@/api/session'
 import { getReportDetail, buildReportFromSubmitResponse } from '@/api/reports'
-import { subscribeHintSSE } from '@/api/hint'
+import { useSSE } from '@/composables/useSSE'
+
+// Monaco 에디터는 비동기 로딩하여 초기 진입 시 번들 로딩 부담을 줄인다.
+const MonacoEditor = defineAsyncComponent(() => import('@/components/organisms/MonacoEditor.vue'))
 
 const router = useRouter()
 const route = useRoute()
 const terminalPanel = ref(null)
 const notificationContainerRef = ref(null)
 const hintPanelRef = ref(null)
-let sseUnsubscribe = null
 const authStore = useAuthStore()
 const ideStore = useIdeStore()
 const toastStore = useToastStore()
@@ -724,16 +734,18 @@ function startSnapshotInterval() {
   }, SNAPSHOT_INTERVAL_MS)
 }
 
-/** 페이지 이탈 시 세션 종료 */
+/** 페이지 이탈 시 세션 종료 (SSE 해제 + hints 비우기) */
 async function closeSessionOnLeave() {
   const sid = ideStore.sessionId
   justCreatedSessionId.value = null
-  if (!sid) return
-  try {
-    await sessionApi.closeSession(sid)
-  } catch (_) {
-    // 이탈 중이므로 무시
+  if (sid) {
+    try {
+      await sessionApi.closeSession(sid)
+    } catch (_) {
+      // 이탈 중이므로 무시
+    }
   }
+  // clearSession: sessionId=null, hints=[] → useSSE watch가 cleanup()으로 SSE 연결 해제
   ideStore.clearSession()
 }
 
@@ -911,35 +923,13 @@ watch(
   { immediate: true }
 )
 
-/** 400/403/404 등 SSE 재연결 중단 대상 */
-const FATAL_SSE_STATUS_CODES = [400, 403, 404]
-// SSE 힌트 구독: sessionId 준비 시 구독, null 시 해제
-watch(
-  () => ideStore.sessionId,
-  (sid) => {
-    if (sseUnsubscribe) {
-      sseUnsubscribe()
-      sseUnsubscribe = null
-    }
-    if (sid != null && isLoggedIn.value) {
-      console.log('[SSE] IDE 세션 진입으로 인해 SSE 구독을 시작합니다. sessionId=', sid)
-      sseUnsubscribe = subscribeHintSSE(sid, {
-        onConnected(data) {
-          console.log('[SSE] CONNECTED', data)
-        },
-        onAutoHint(data) {
-          hintPanelRef.value?.addAutoHint?.(data)
-        },
-        onError(options) {
-          if (options?.fatal || FATAL_SSE_STATUS_CODES.includes(options?.status)) {
-            showToast('힌트 알림 연결에 실패했습니다. 다시 로그인해 주세요.')
-          }
-        }
-      })
-    }
-  },
-  { immediate: true }
+// SSE 힌트 구독: sessionId 준비 시 구독 (useSSE 훅이 내부에서 관리)
+const sseSessionIdRef = computed(() =>
+  isLoggedIn.value && ideStore.sessionId != null ? ideStore.sessionId : null
 )
+const { isConnecting: sseIsConnecting } = useSSE(sseSessionIdRef, {
+  onFatalError: (msg) => showToast(msg)
+})
 
 onBeforeRouteLeave(async (to, from, next) => {
   if (skipLeaveConfirm.value) {
@@ -991,10 +981,6 @@ onUnmounted(() => {
   window.removeEventListener('unload', onUnload)
   document.removeEventListener('visibilitychange', onVisibilityChange)
   closeIdeBroadcastChannel()
-  if (sseUnsubscribe) {
-    sseUnsubscribe()
-    sseUnsubscribe = null
-  }
   clearIdleCheck()
 
   // confirm 대기 중이면 안전하게 취소 처리
@@ -1283,15 +1269,20 @@ function onHintExhausted() {
   showToast('힌트가 모두 사용되었습니다')
 }
 
-/** 자동 힌트 도착 시 종 빨간 점 + 알림 목록에 추가 */
-function onAutoHintArrived() {
-  hasUnreadAutoHint.value = true
-  notificationItems.value.push({
-    id: Date.now(),
-    text: '자동 힌트가 왔습니다.',
-    type: 'auto_hint'
-  })
-}
+// store에 새 AUTO_HINT 추가 시 알림 (HintPanel 닫혀 있어도 동작)
+watch(
+  () => ideStore.hints?.length ?? 0,
+  (len, prev) => {
+    if (len > (prev ?? 0)) {
+      hasUnreadAutoHint.value = true
+      notificationItems.value.push({
+        id: Date.now(),
+        text: '자동 힌트가 왔습니다.',
+        type: 'auto_hint'
+      })
+    }
+  }
+)
 
 /** 힌트 "괜찮아요" 클릭 시 토스트 */
 function onDismissHintToast() {

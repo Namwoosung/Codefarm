@@ -40,6 +40,7 @@ export const useIdeStore = defineStore('ide', () => {
 
   // 세션 설정 (진입 시 생성/활성 조회 후 저장)
   const setSessionId = (id) => {
+    if (sessionId.value !== id) hints.value = []
     sessionId.value = id
   }
 
@@ -52,6 +53,37 @@ export const useIdeStore = defineStore('ide', () => {
   const clearSession = () => {
     sessionId.value = null
     sessionStartedAt.value = null
+    hints.value = []
+  }
+
+  /** SSE로 수신한 AUTO_HINT 배열 (UI 닫혀 있어도 유지) */
+  const hints = ref([])
+
+  /** AUTO_HINT 수신 시 store에 추가 (중복 hintId 방지) */
+  const addHint = (data) => {
+    if (!data?.content) return
+    const hid = data.hintId ?? data.hint_id
+    const exists = hints.value.some((h) => (h.hintId ?? h.hint_id) === hid)
+    if (hid != null && exists) return
+    hints.value = [
+      ...hints.value,
+      {
+        hintId: hid,
+        content: data.content,
+        createdAt: data.createdAt ?? new Date().toISOString(),
+        viewed: false,
+        dismissed: false
+      }
+    ]
+  }
+
+  /** 힌트 viewed/dismissed 상태 업데이트 */
+  const updateHintState = (hintId, updates) => {
+    const idx = hints.value.findIndex((h) => (h.hintId ?? h.hint_id) === hintId)
+    if (idx < 0) return
+    hints.value = hints.value.map((h, i) =>
+      i === idx ? { ...h, ...updates } : h
+    )
   }
 
   // 메인/커리큘럼 → IDE 진입 시 전역 로딩 오버레이용
@@ -62,6 +94,7 @@ export const useIdeStore = defineStore('ide', () => {
     sessionId,
     sessionStartedAt,
     lastCodeInputAt,
+    hints,
     ideRouteLoading,
     touchCodeInput,
     getCode,
@@ -69,8 +102,12 @@ export const useIdeStore = defineStore('ide', () => {
     setCodeToDefault,
     setSessionId,
     setSessionStartedAt,
-    clearSession
+    clearSession,
+    addHint,
+    updateHintState
   }
 }, {
-  persist: true // localStorage에 codeByProblemId 자동 저장
+  persist: {
+    pick: ['codeByProblemId'] // hints는 메모리만, 새로고침 시 API로 재로드
+  }
 })

@@ -135,12 +135,22 @@
             type="text"
             required
             minlength="2"
-            maxlength="50"
-            class="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
+            maxlength="20"
+            @blur="onNameBlur"
+            @input="onNameInput"
+            :class="[
+              'mt-1 appearance-none relative block w-full px-3 py-2 border placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm',
+              nameShouldShowValidation && nameValidation.status === 'invalid' ? 'border-red-500' :
+              nameShouldShowValidation && nameValidation.status === 'valid' ? 'border-green-500' :
+              'border-gray-300'
+            ]"
             placeholder="이름을 입력해주세요"
           />
           <p v-if="errors.name" class="mt-1 text-sm text-red-600">
             {{ errors.name }}
+          </p>
+          <p v-else-if="nameShouldShowValidation && nameValidation.message" class="mt-1 text-sm" :class="nameValidation.status === 'valid' ? 'text-green-600' : 'text-red-600'">
+            {{ nameValidation.message }}
           </p>
         </div>
 
@@ -268,6 +278,9 @@ const PASSWORD_HAS_LETTER = /[a-zA-Z]/
 const PASSWORD_HAS_NUMBER = /[0-9]/
 const PASSWORD_HAS_SPECIAL = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/
 
+// 이름: 한글, 영문, 띄어쓰기 가능, 2~20자 (숫자/특수문자 불가)
+const NAME_REGEX = /^[가-힣a-zA-Z\s]{2,20}$/
+
 // 닉네임: 한글, 영문, 숫자, _, - 만 가능, 2~20자
 const NICKNAME_REGEX = /^[가-힣a-zA-Z0-9_-]{2,20}$/
 
@@ -315,6 +328,12 @@ const isCheckingNickname = ref(false)
 // Debounce를 위한 타이머
 let emailCheckTimer = null
 let nicknameCheckTimer = null
+let nameDebounceTimer = null
+
+// 이름 검증 표시 시점: blur 또는 500ms 입력 대기 후
+const nameHasBeenBlurred = ref(false)
+const nameDebounceFired = ref(false)
+const nameShouldShowValidation = computed(() => nameHasBeenBlurred.value || nameDebounceFired.value)
 
 // 입력 단 실시간 형식 검증용 (표시만, 제출 시 validateForm에서도 검사)
 const emailFormatInvalid = computed(() => {
@@ -324,6 +343,22 @@ const emailFormatInvalid = computed(() => {
 const nicknameFormatInvalid = computed(() => {
   const trimmed = (formData.nickname || '').trim()
   return trimmed.length > 0 && !NICKNAME_REGEX.test(trimmed)
+})
+
+// 이름 실시간 검증 (2~20자, 한글/영문/띄어쓰기만 허용)
+const nameValidation = computed(() => {
+  const trimmed = (formData.name || '').trim()
+  if (!trimmed) return { status: '', message: '' }
+
+  if (trimmed.length < 2 || trimmed.length > 20) {
+    return { status: 'invalid', message: '이름은 2자 이상 20자 이하여야 합니다.' }
+  }
+
+  if (!NAME_REGEX.test(trimmed)) {
+    return { status: 'invalid', message: '이름에는 한글, 영문, 띄어쓰기만 사용할 수 있습니다.' }
+  }
+
+  return { status: 'valid', message: '✓ 사용 가능한 이름입니다.' }
 })
 
 // 비밀번호 보기/숨기기 토글
@@ -423,13 +458,16 @@ const validateForm = () => {
     isValid = false
   }
 
-  // 이름 필수 검사
-  if (!formData.name.trim()) {
+  // 이름: 2~20자, 숫자/특수문자 불가
+  const trimmedName = formData.name.trim()
+  if (!trimmedName) {
     errors.name = '이름을 입력해주세요'
     isValid = false
-  } else if (formData.name.trim().length < 2 || formData.name.trim().length > 50) {
-    // 이름 길이 검사: 공백 제거 후 2자 이상 50자 이하
-    errors.name = '이름은 2자 이상 50자 이하여야 합니다'
+  } else if (trimmedName.length < 2 || trimmedName.length > 20) {
+    errors.name = '이름은 2자 이상 20자 이하여야 합니다'
+    isValid = false
+  } else if (!NAME_REGEX.test(trimmedName)) {
+    errors.name = '이름에는 한글, 영문, 띄어쓰기만 사용할 수 있습니다'
     isValid = false
   }
 
@@ -527,6 +565,20 @@ const onEmailInput = () => {
   if (formData.email.trim() && isValidEmailFormat(formData.email)) {
     emailCheckTimer = setTimeout(() => checkEmail(), 500)
   }
+}
+
+/** 이름 blur 시 검증 결과 표시 */
+const onNameBlur = () => {
+  nameHasBeenBlurred.value = true
+}
+
+/** 이름 입력 시 500ms debounce 후 검증 결과 표시 */
+const onNameInput = () => {
+  if (nameDebounceTimer) clearTimeout(nameDebounceTimer)
+  nameDebounceTimer = setTimeout(() => {
+    nameDebounceTimer = null
+    nameDebounceFired.value = true
+  }, 500)
 }
 
 /** 이메일 blur 시 형식이 유효할 때만 중복 확인 요청 */
