@@ -124,7 +124,7 @@ app = FastAPI(title="Hint Server (M1->M2(prompt)->GMS) v8-pipeline+p95p99", vers
 # ============================================================
 
 class UserInformation(BaseModel):
-    age: int = Field(ge=6, le=18)
+    age: int = Field(ge=6, le=200)
     coding_level: int = Field(ge=1, le=5)
     user_id: str
 
