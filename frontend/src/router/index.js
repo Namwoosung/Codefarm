@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
+import { useUiStore } from '@/stores/ui'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -81,6 +82,11 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const ideStore = useIdeStore()
+  const uiStore = useUiStore()
+
+  // 모든 화면 이동: 새 화면이 "완성본"으로 준비될 때까지 오버레이 유지
+  if (to.fullPath !== from.fullPath) uiStore.startRouteChange()
+
   if (to.path.startsWith('/ide/')) {
     ideStore.ideRouteLoading = true
   }

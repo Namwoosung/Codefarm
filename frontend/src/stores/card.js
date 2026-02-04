@@ -5,6 +5,8 @@ import { getCardList, drawCard, getCardRankings, normalizeCard } from '@/api/car
 export const useCardStore = defineStore('card', () => {
   // 내 카드 목록
   const cards = ref([])
+  // 목록 캐시 (마이페이지/카드페이지 이동 시 반복 호출 방지)
+  const cardsFetched = ref(false)
   // 카드 뽑기
   const newcard = ref([])
   const drawMessage = ref('')
@@ -12,11 +14,14 @@ export const useCardStore = defineStore('card', () => {
   //랭킹리스트
   const rankingList = ref([])
 
-  const cardList = async () => {
+  const cardList = async (opts = {}) => {
     try {
+      const force = opts?.force === true
+      if (cardsFetched.value && !force) return
       const res = await getCardList()
       const raw = res.data.data?.cards ?? []
       cards.value = (Array.isArray(raw) ? raw : Object.values(raw)).map(normalizeCard).filter(Boolean)
+      cardsFetched.value = true
     } catch (err) {
       console.warn('[card.cardList] failed:', err?.response?.status, err?.response?.data ?? err)
     }
@@ -73,6 +78,7 @@ export const useCardStore = defineStore('card', () => {
 
   return {
     cards,
+    cardsFetched,
     newcard,
     drawMessage,
     rankingList,

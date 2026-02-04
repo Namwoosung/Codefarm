@@ -1,10 +1,30 @@
 <template>
-  <div
-    class="flex flex-col w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 overflow-hidden bg-farm-cream"
-    @dblclick.stop.prevent
-  >
-    <!-- 상단 배너 -->
-    <section class="card-hero relative w-full px-20 py-3 md:py-4 overflow-visible flex-shrink-0">
+  <div>
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="isInitialLoading"
+          class="fixed inset-0 z-[9998] flex items-center justify-center bg-[rgba(245,242,232,0.92)]"
+        >
+          <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <template v-if="!isInitialLoading">
+      <div
+        class="flex flex-col w-full h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-0 overflow-hidden bg-farm-cream"
+        @dblclick.stop.prevent
+      >
+        <!-- 상단 배너 -->
+        <section class="card-hero relative w-full px-20 py-3 md:py-4 overflow-visible flex-shrink-0">
       <!-- 배경 장식 -->
       <div class="absolute inset-0 opacity-20 pointer-events-none z-0">
         <div class="absolute top-0 left-0 w-32 h-32 bg-farm-yellow/30 rounded-full blur-3xl"></div>
@@ -165,50 +185,52 @@
         </div>
       </main>
     </div>
-  </div>
+      </div>
 
-  <Transition
-    enter-active-class="transition-opacity duration-150 ease-out"
-    enter-from-class="opacity-0"
-    enter-to-class="opacity-100"
-    leave-active-class="transition-opacity duration-100 ease-in"
-    leave-from-class="opacity-100"
-    leave-to-class="opacity-0"
-  >
-    <div
-      v-if="selectedCard"
-      class="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 backdrop-blur-[1px] p-4"
-      @click.self="closeCardModal"
-    >
       <Transition
-        enter-active-class="transition duration-200 ease-out"
-        enter-from-class="opacity-0 scale-95 translate-y-2"
-        enter-to-class="opacity-100 scale-100 translate-y-0"
-        leave-active-class="transition duration-150 ease-in"
-        leave-from-class="opacity-100 scale-100 translate-y-0"
-        leave-to-class="opacity-0 scale-95 translate-y-2"
+        enter-active-class="transition-opacity duration-150 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-100 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
       >
         <div
-          ref="modalCardEl"
-          class="modal-card-3d"
-          :class="popupCardContainerClass"
-          :style="modalPointerStyle"
-          @pointerenter="onModalPointerMove"
-          @pointermove="onModalPointerMove"
-          @pointerleave="onModalPointerLeave"
+          v-if="selectedCard"
+          class="fixed inset-0 z-[999] flex items-center justify-center bg-black/50 backdrop-blur-[1px] p-4"
+          @click.self="closeCardModal"
         >
-          <figure class="w-full h-full rounded-2xl overflow-visible relative block m-0">
-            <img
-              :src="modalCardImage"
-              :alt="selectedCard.name"
-              class="w-full h-full object-contain block"
-              loading="lazy"
-            />
-          </figure>
+          <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="opacity-0 scale-95 translate-y-2"
+            enter-to-class="opacity-100 scale-100 translate-y-0"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="opacity-100 scale-100 translate-y-0"
+            leave-to-class="opacity-0 scale-95 translate-y-2"
+          >
+            <div
+              ref="modalCardEl"
+              class="modal-card-3d"
+              :class="popupCardContainerClass"
+              :style="modalPointerStyle"
+              @pointerenter="onModalPointerMove"
+              @pointermove="onModalPointerMove"
+              @pointerleave="onModalPointerLeave"
+            >
+              <figure class="w-full h-full rounded-2xl overflow-visible relative block m-0">
+                <img
+                  :src="modalCardImage"
+                  :alt="selectedCard.name"
+                  class="w-full h-full object-contain block"
+                  loading="lazy"
+                />
+              </figure>
+            </div>
+          </Transition>
         </div>
       </Transition>
-    </div>
-  </Transition>
+    </template>
+  </div>
 </template>
 
 <script setup>
@@ -233,6 +255,8 @@ const bannerNickname = computed(() => user.value?.nickname ?? 'Farm')
 const totalOwnedCards = computed(() => (Array.isArray(cards.value) ? cards.value.length : 0))
 const canDraw = computed(() => points.value >= 100)
 
+const isInitialLoading = ref(true)
+
 // Charge: 100P 기준(0~100%), 100P 이상이면 100%
 const chargeProgress = computed(() => Math.min(1, Math.max(0, points.value / 100)))
 
@@ -242,6 +266,8 @@ onMounted(async () => {
     await cardStore.cardList()
   } catch (err) {
     console.warn('[CardView] mounted fetch failed:', err)
+  } finally {
+    isInitialLoading.value = false
   }
 })
 
@@ -268,7 +294,13 @@ watch(
   () => drawMessage.value,
   (msg) => {
     if (!msg) return
-    toastStore.showToast(msg)
+    const text = String(msg)
+    // "이미 보유 중" 안내는 짧게 노출
+    if (text.includes('이미 보유')) {
+      toastStore.showToast(text, { durationMs: 900 })
+      return
+    }
+    toastStore.showToast(text)
   }
 )
 

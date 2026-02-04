@@ -4,16 +4,16 @@
 /* Fonts - D2Coding 폰트 직접 정의 */
 @font-face {
   font-family: 'D2Coding';
-  src: url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/d2coding/D2Coding.woff2') format('woff2'),
-       url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/d2coding/D2Coding.woff') format('woff');
+  src: url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/D2Coding.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/D2Coding.woff') format('woff');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'D2Coding';
-  src: url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/d2coding/D2CodingBold.woff2') format('woff2'),
-       url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/d2coding/D2CodingBold.woff') format('woff');
+  src: url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/D2CodingBold.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/D2CodingBold.woff') format('woff');
   font-weight: bold;
   font-style: normal;
   font-display: swap;
@@ -94,6 +94,11 @@
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+
+  /* Global loading spinner color */
+  .app-loading-spinner {
+    color: var(--color-farm-point);
   }
   
   /* Hero Patterns - Brick Wall 패턴 (색상 제거, currentColor 사용) */

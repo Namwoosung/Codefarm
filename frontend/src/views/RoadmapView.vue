@@ -1,5 +1,21 @@
 <template>
   <div class="bg-farm-cream min-h-screen">
+    <!-- 커리큘럼(로드맵) 진입/렌더링 로딩 오버레이 -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition-opacity duration-200 ease-out"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity duration-150 ease-in"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div v-if="showRoadmapLoading" class="fixed inset-0 z-[9999] flex items-center justify-center bg-[rgba(245,242,232,0.92)]">
+          <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
+        </div>
+      </Transition>
+    </Teleport>
+
     <main :class="[!selectedLevel ? 'mx-auto max-w-7xl px-6 py-12' : 'w-full h-screen overflow-hidden']">
       <!-- 메인 로드맵 이미지 영역 (레벨 미선택 시) -->
       <section v-if="!selectedLevel" class="relative w-full flex flex-col items-center">
@@ -27,6 +43,7 @@
             <!-- RoadmapMap: z-10으로 설정하여 캐릭터와 마스크 뒤로 보냄 -->
             <RoadmapMap
               :background-image="roadmapMainImage"
+              @bg-loaded="mainMapLoaded = true"
               @select-level="(id) => selectedLevel = id"
               class="w-full relative z-10"
             />
@@ -105,8 +122,12 @@
 
             <img
               class="cf-roadmap-img"
+              :key="`lvl-${selectedLevel}`"
               :src="roadmapImages[selectedLevel - 1]"
               :alt="`레벨 ${selectedLevel} roadmap`"
+              decoding="async"
+              fetchpriority="high"
+              @load="levelBgLoaded = true"
             />
             <div class="cf-roadmap-levels">
               <div
@@ -349,6 +370,20 @@ const modalContext = ref(null)
 const recommendedErrorByLevel = ref({})
 const selectedLevel = ref(null)
 
+// 로딩 상태 (진입 시 렌더링 + 이미지/데이터 로드 대기)
+const initialPaintDone = ref(false)
+const mainMapLoaded = ref(false)
+const levelBgLoaded = ref(false)
+const curriculumsLoading = ref(false)
+
+const showRoadmapLoading = computed(() => {
+  if (!initialPaintDone.value) return true
+  // 메인 로드맵 화면: 지도 배경 이미지 로드까지 로딩
+  if (!selectedLevel.value) return !mainMapLoaded.value
+  // 레벨(커리큘럼) 화면: 배경 이미지 + 커리큘럼 데이터 로드까지 로딩
+  return !levelBgLoaded.value || curriculumsLoading.value
+})
+
 const roadmapImages = [
   roadmapImage1,
   roadmapImage2,
@@ -430,6 +465,7 @@ function normalizeCurriculumList(raw) {
 }
 
 async function fetchCurriculums() {
+  curriculumsLoading.value = true
   try {
     const res = await api.get('/curriculums/lists', {
       params: { _t: Date.now() },
@@ -464,6 +500,8 @@ async function fetchCurriculums() {
   } catch (error) {
     console.error('Failed to fetch curriculums', error)
     curriculums.value = []
+  } finally {
+    curriculumsLoading.value = false
   }
 }
 
@@ -528,9 +566,28 @@ async function fetchRecommendedForCurriculum(curriculumIdx) {
   }
 }
 
-onMounted(() => {
-  fetchCurriculums()
+onMounted(async () => {
+  // 첫 렌더/레이아웃이 끝난 뒤에 로딩 오버레이를 걷기 위해 1프레임 대기
+  await nextTick()
+  requestAnimationFrame(() => {
+    initialPaintDone.value = true
+  })
+
+  // 초기 진입 시에는 이미지 디코딩/레이아웃이 우선이라, API 로드는 idle로 미룸 (진입 버벅임 완화)
+  const run = () => fetchCurriculums()
+  if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+    window.requestIdleCallback(run, { timeout: 1200 })
+  } else {
+    setTimeout(run, 250)
+  }
 })
+
+watch(
+  () => selectedLevel.value,
+  (lvl) => {
+    if (lvl) levelBgLoaded.value = false
+  }
+)
 
 watch(
   () => route.query.refresh,

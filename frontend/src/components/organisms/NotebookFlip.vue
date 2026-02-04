@@ -320,8 +320,10 @@ const getTabIndexForPage = (pageIndex) => {
 
 onMounted(async () => {
   // API로 불러온 리포트 목록을 첫 페이지(목록 페이지)에 노출
-  await profile.reportList({ page: 0, size: 10, sort: 'createdAt,DESC' })
-  await cardStore.cardList()
+  await Promise.all([
+    profile.reportList({ page: 0, size: 10, sort: 'createdAt,DESC' }),
+    cardStore.cardList(),
+  ])
 
   solvedCount.value = reportResults.value.filter((report) => report?.resultType === 'SUCCESS').length
   const cardList = cardStore.cards ?? []
@@ -331,8 +333,8 @@ onMounted(async () => {
     return sum + cnt
   }, 0)
 
-  // 리포트/카드 로딩 후 페이지 수가 바뀌므로 PageFlip에 반영
-  await refreshPages()
+  // 데이터 로딩 후, 최종 페이지 DOM 기준으로 1회 초기화
+  await initIfNeeded()
 })
 
 const bookEl = ref(null)
@@ -458,7 +460,7 @@ const goToTab = (idx) => {
 
 onMounted(() => {
   syncCompactMode()
-  initIfNeeded()
+  // PageFlip 초기화는 데이터 로딩 후 1회만 수행 (초기화 + updateFromHtml 중복 비용 제거)
 
   // breakpoint 변경(= 모드 변경)은 matchMedia로 감지해서 페이지 목록/탭 매핑을 갱신
   mql.value = window.matchMedia(`(max-width: ${BREAKPOINT_PX}px)`)

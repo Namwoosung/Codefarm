@@ -5,7 +5,9 @@
       <div class="flex flex-col flex-1 min-h-0">
         <div class="flex-1 min-h-0 overflow-y-auto p-8 bg-base-100 mx-6 mt-3 mb-3 rounded-4xl shadow-sm border border-[rgba(128,80,160,0.18)] text-sm font-normal text-[#1a1a1a]">
           <template v-if="problemLoading">
-            <p class="text-[var(--color-farm-brown)]">불러오는 중...</p>
+            <div class="w-full flex items-center justify-center py-10">
+              <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
+            </div>
           </template>
           <template v-else>
           <h2 class="text-xl font-bold text-[var(--color-farm-brown-dark)] mb-6">
@@ -146,7 +148,9 @@
               </td>
             </tr>
             <tr v-if="resultsLoading">
-              <td colspan="3" class="text-center text-[var(--color-farm-brown)] py-8">불러오는 중...</td>
+              <td colspan="3" class="text-center py-10">
+                <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
+              </td>
             </tr>
             <tr v-else-if="resultsList.length === 0">
               <td colspan="3" class="text-center text-[var(--color-farm-brown)] py-8">제출 내역이 없습니다.</td>
