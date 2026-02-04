@@ -120,9 +120,9 @@ public class HintService {
         }
 
         // 힌트 사용 횟수 체크
-        if (session.getUsedHint() >= session.getMaxHint()) {
-            throw new CustomException("사용 가능한 힌트 횟수를 초과했습니다.", ErrorCode.BAD_REQUEST);
-        }
+        // if (session.getUsedHint() >= session.getMaxHint()) {
+        //    throw new CustomException("사용 가능한 힌트 횟수를 초과했습니다.", ErrorCode.BAD_REQUEST);
+        // }
 
         // Redis 데이터 조회
         List<CodeSnapshotRedisDto> codeHistory =
