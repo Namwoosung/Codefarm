@@ -130,12 +130,14 @@ public class HintService {
         List<PreviousJudgementRedisDto> previousJudgements =
                 sessionCodeRedisService.getPreviousJudgements(sessionId);
 
+        List<CodeSnapshotRedisDto> filtered = filterRecentHistory(codeHistory);
+
         AIHintRequest request = AIHintRequest.of(
                 session,
                 session.getUser(),
                 session.getProblem(),
                 requestDto.getUserQuestion(),
-                codeHistory,
+                filtered,
                 previousJudgements
         );
 
@@ -227,5 +229,25 @@ public class HintService {
         }
 
         return HintItemResponseDto.from(hint);
+    }
+
+    private List<CodeSnapshotRedisDto> filterRecentHistory(List<CodeSnapshotRedisDto> history) {
+
+        if (history == null || history.isEmpty()) {
+            return List.of();
+        }
+
+        LocalDateTime threshold = LocalDateTime.now().minusMinutes(5);
+
+        List<CodeSnapshotRedisDto> filtered =
+                history.stream()
+                        .filter(h -> h.getSavedAt().isAfter(threshold))
+                        .toList();
+
+        if (filtered.isEmpty()) {
+            return List.of(history.get(history.size() - 1));
+        }
+
+        return filtered;
     }
 }

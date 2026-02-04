@@ -37,7 +37,7 @@ public class HintProcessingService {
 
         log.debug("Starting auto hint processing. sessionId={}", sessionId);
 
-        Session session = sessionRepository.findById(sessionId).orElse(null);
+        Session session = sessionRepository.findByIdWithUserAndProblem(sessionId).orElse(null);
 
         if (session == null) {
             log.warn("Session not found during auto hint processing. sessionId={}", sessionId);
