@@ -103,7 +103,7 @@
             </div>
 
             <!-- 채점·결과 -->
-            <div v-if="report?.evaluationContext || report?.xp != null" class="mb-5 p-4 rounded-xl bg-[var(--color-farm-green)]/10 border border-[var(--color-farm-green)]/30">
+            <div v-if="report?.evaluationContext || report?.xp != null || report?.awardedPoints != null" class="mb-5 p-4 rounded-xl bg-[var(--color-farm-green)]/10 border border-[var(--color-farm-green)]/30">
               <h4 class="text-sm font-bold text-[var(--color-farm-green-dark)] mb-2">채점·결과</h4>
               <div v-if="report.evaluationContext" class="text-[var(--color-farm-brown-dark)]">
                 <span class="font-semibold">{{ report.evaluationContext.passedCount ?? 0 }} / {{ report.evaluationContext.totalCount ?? 0 }}개 통과</span>
@@ -115,6 +115,10 @@
                 <p v-if="report.evaluationContext.expectedLine != null" class="mt-1 m-0 text-[var(--color-farm-brown)]">기대값: {{ report.evaluationContext.expectedLine }}</p>
                 <p v-if="report.evaluationContext.actualLine != null" class="mt-0.5 m-0 text-[var(--color-farm-point)]">출력: {{ report.evaluationContext.actualLine }}</p>
               </div>
+              <p v-if="report.awardedPoints != null" class="text-sm text-[var(--color-farm-brown-dark)] mt-3 m-0">
+                획득 포인트:
+                <strong class="text-[var(--color-farm-green-dark)]">{{ report.awardedPoints }}</strong>
+              </p>
               <p v-if="report.xp != null" class="text-sm text-[var(--color-farm-brown-dark)] mt-3 m-0">획득 XP: <strong class="text-[var(--color-farm-green-dark)]">{{ report.xp }}</strong></p>
             </div>
             <p v-else-if="report?.result" class="text-sm text-[var(--color-farm-brown)] mb-5">채점 결과 없음</p>
