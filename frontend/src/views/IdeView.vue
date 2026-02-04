@@ -156,7 +156,13 @@
               </div>
             </Transition>
             <div class="flex-1 min-h-0 relative ide-editor-container" :class="{ 'blur-sm': !isLoggedIn }">
-              <MonacoEditor />
+              <!-- 초기 세션/문제 로딩 동안 가벼운 스켈레톤만 먼저 표시 -->
+              <div
+                v-if="isInitializing"
+                class="w-full h-full bg-gradient-to-b from-base-200/80 to-base-100/60 animate-pulse rounded-t-lg"
+              ></div>
+              <!-- 세션 초기화가 끝난 뒤에만 Monaco 에디터 마운트 -->
+              <MonacoEditor v-else />
             </div>
             <div v-if="isLoggedIn" class="absolute bottom-2 right-3 text-xs text-[var(--color-farm-brown)] text-right pointer-events-none">
               <div>{{ saveStatusText }}</div>
@@ -271,9 +277,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, reactive, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, reactive, watch, nextTick, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute, onBeforeRouteLeave } from 'vue-router'
-import MonacoEditor from '@/components/organisms/MonacoEditor.vue'
 import HintPanel from '@/components/organisms/HintPanel.vue'
 import ProblemPanel from '@/components/organisms/ProblemPanel.vue'
 import TerminalPanel from '@/components/organisms/TerminalPanel.vue'
@@ -289,6 +294,9 @@ import { useToastStore } from '@/stores/toast'
 import * as sessionApi from '@/api/session'
 import { getReportDetail, buildReportFromSubmitResponse } from '@/api/reports'
 import { subscribeHintSSE } from '@/api/hint'
+
+// Monaco 에디터는 비동기 로딩하여 초기 진입 시 번들 로딩 부담을 줄인다.
+const MonacoEditor = defineAsyncComponent(() => import('@/components/organisms/MonacoEditor.vue'))
 
 const router = useRouter()
 const route = useRoute()
