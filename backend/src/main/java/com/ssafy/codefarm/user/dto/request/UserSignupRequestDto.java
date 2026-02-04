@@ -21,6 +21,7 @@ public class UserSignupRequestDto {
     private String password;
 
     @NotBlank(message = "name is required")
+    @Pattern(regexp = "^[가-힣a-zA-Z]{2,20}$", message = "name must be 2~20 characters (Korean, English)")
     private String name;
 
     @NotBlank(message = "nickname is required")
@@ -31,6 +32,8 @@ public class UserSignupRequestDto {
     private String nickname;
 
     @NotNull(message = "age is required")
+    @Min(value = 0, message = "age must be greater than or equal to 0")
+    @Max(value = 150, message = "age must be less than or equal to 150")
     private Integer age;
 
     @NotNull(message = "codingLevel is required")
