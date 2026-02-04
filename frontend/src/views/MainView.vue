@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-farm-cream/20">
     <!-- 최상단 배너: 전체 화면 폭 -->
     <MainHeroBanner :top3="top3" />
-    <div class="min-h-screen p-10">
+    <div class="min-h-screen p-10 px-15">
     <!-- 30분 무입력 강제 종료 후 메인 진입 시 안내 모달 (X로 닫기) -->
     <Teleport to="body">
       <Transition name="modal">
@@ -53,10 +53,6 @@
     </Teleport>
 
     <div class="max-w-7xl mx-auto">
-          <div class="max-w-7xl mx-auto pb-10">
-        <h2 class="text-2xl font-bold text-farm-brown-dark"> 모든 문제</h2>
-        <p class="text-sm text-farm-brown/80">필터로 원하는 유형/난이도를 빠르게 골라보세요.</p>
-    </div>
       <!-- 필터 / 정렬 UI -->
       <div class="mb-6 flex flex-wrap items-center gap-3 ">
         <!-- 문제 유형 -->
@@ -163,9 +159,25 @@
           </div>
         </div>
 
+        <!-- 풀이 상태 필터: 해결 / 미해결 / 도전중 -->
+        <div class="flex items-center gap-1.5 rounded-3xl border border-farm-brown/25 bg-white p-1 shadow-sm">
+          <button
+            v-for="opt in statusFilterOptions"
+            :key="opt.value"
+            type="button"
+            class="rounded-2xl px-3 py-1.5 text-xs font-semibold transition-colors"
+            :class="statusFilter === opt.value
+              ? 'bg-farm-brown text-white'
+              : 'text-farm-brown-dark/70 hover:bg-farm-paper hover:text-farm-brown-dark'"
+            @click="statusFilter = opt.value"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
         <!-- 초기화 -->
         <button
-          class="btn btn-sm h-10 min-h-10 ml-auto rounded-3xl border-farm-brown/30 bg-white px-4 text-sm font-semibold text-farm-brown-dark shadow-sm hover:bg-farm-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30"
+          class="btn btn-sm h-10 min-h-10 ml-auto rounded-3xl border-farm-brown/30 bg-white px-4 mx-10 text-sm font-semibold text-farm-brown-dark shadow-sm hover:bg-farm-paper focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30"
           @click="resetFilters"
           type="button"
         >
@@ -180,11 +192,11 @@
       <!-- 문제 카드 리스트 (로딩 시에도 유지 + 오버레이만 표시) -->
       <div class="relative" :aria-busy="loading ? 'true' : 'false'">
         <div
-          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 transition-opacity"
+          class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-1 gap-y-4 pt-10 transition-opacity"
           :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard
-            v-for="problem in problems"
+            v-for="problem in filteredProblems"
             :key="problem.problemId ?? problem.id"
             :problem="problem"
             @click="onClickProblem"
@@ -195,7 +207,7 @@
           <span class="loading loading-spinner loading-lg text-farm-brown-dark"></span>
         </div>
 
-        <div v-if="!loading && !error && problems.length === 0" class="py-16 text-center text-farm-brown/80">
+        <div v-if="!loading && !error && filteredProblems.length === 0" class="py-16 text-center text-farm-brown/80">
           조건에 맞는 문제가 없어요.
         </div>
       </div>
@@ -219,9 +231,7 @@
           <!-- Page numbers -->
           <div class="flex items-center justify-center gap-2 text-sm">
             <template v-for="item in paginationItems" :key="item.key">
-              <span v-if="item.type === 'ellipsis'" class="px-2 text-farm-brown/50">…</span>
               <button
-                v-else
                 type="button"
                 class="min-w-8 rounded-lg px-2 py-2 text-sm font-semibold transition-colors"
                 :class="
@@ -296,9 +306,17 @@ function closeIdleCancelModal() {
 }
 
 // 필터/정렬 상태
-const sortBy = ref('createdAt') // UI는 제거됐지만, 파라미터는 통합 관리
-const difficultySelected = ref([]) // ['LEVEL1','LEVEL2', ...]
-const algorithmSelected = ref([]) // ['완전탐색','그래프', ...]
+const sortBy = ref('createdAt')
+const difficultySelected = ref([])
+const algorithmSelected = ref([])
+const statusFilter = ref('') // '' | 'solved' | 'unsolved' | 'tried'
+
+const statusFilterOptions = [
+  { value: '', label: '전체' },
+  { value: 'solved', label: '해결' },
+  { value: 'unsolved', label: '미해결' },
+  { value: 'tried', label: '도전중' },
+]
 
 // 옵션 (필요 시 여기만 수정)
 const difficultyOptions = ['1', '2', '3', '4', '5']
@@ -310,11 +328,22 @@ const algorithmOptions = [
 
 const buildQueryParams = () => ({
   size: postsPerPage.value,
-  // 백엔드는 0-based page 사용 (PageRequest.of(page, ...))
   page: Math.max(0, currentPage.value - 1),
   sortBy: sortBy.value || undefined,
   algorithm: algorithmSelected.value.length ? algorithmSelected.value.join(',') : undefined,
   difficulty: difficultySelected.value.length ? difficultySelected.value.join(',') : undefined,
+  problemType: 'NORMAL',
+})
+
+const filteredProblems = computed(() => {
+  const list = problems.value ?? []
+  const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
+  const status = statusFilter.value
+  if (!status) return normalOnly
+  if (status === 'solved') return normalOnly.filter((p) => p?.userStatus?.isSolved)
+  if (status === 'unsolved') return normalOnly.filter((p) => !p?.userStatus?.isSolved && !p?.userStatus?.isTried)
+  if (status === 'tried') return normalOnly.filter((p) => p?.userStatus?.isTried && !p?.userStatus?.isSolved)
+  return normalOnly
 })
 
 // 드롭다운 상태
@@ -397,6 +426,7 @@ const resetFilters = () => {
   sortBy.value = 'createdAt'
   difficultySelected.value = []
   algorithmSelected.value = []
+  statusFilter.value = ''
   currentPage.value = 1
 }
 
@@ -449,23 +479,15 @@ const paginationItems = computed(() => {
   const items = []
 
   const pushPage = (p) => items.push({ type: 'page', page: p, key: `p-${p}` })
-  const pushEllipsis = (k) => items.push({ type: 'ellipsis', key: `e-${k}` })
 
-  if (total <= 9) {
-    for (let p = 1; p <= total; p += 1) pushPage(p)
-    return items
+  // 5쪽씩 묶어서 표시. 현재 페이지가 속한 구간의 5개만 표시 (1~5, 6~10, …)
+  const startPage = Math.floor((current - 1) / 5) * 5 + 1
+  const endPage = Math.min(startPage + 4, total)
+
+  for (let p = startPage; p <= endPage; p += 1) {
+    pushPage(p)
   }
 
-  pushPage(1)
-
-  const left = Math.max(2, current - 1)
-  const right = Math.min(total - 1, current + 1)
-
-  if (left > 2) pushEllipsis('l')
-  for (let p = left; p <= right; p += 1) pushPage(p)
-  if (right < total - 1) pushEllipsis('r')
-
-  pushPage(total)
   return items
 })
 

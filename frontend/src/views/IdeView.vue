@@ -209,6 +209,7 @@
       :show="showReportModal"
       :report="reportData"
       :report-loading="reportDetailLoading"
+      :back-button-text="route.query.from === 'roadmap' ? '이전화면으로' : ''"
       @close="onReportModalClose"
     />
 
@@ -1266,7 +1267,16 @@ const onReportModalClose = (goToMain = false) => {
   reportDetailLoading.value = false
   if (goToMain && !reportModalFromHistory.value) {
     skipLeaveConfirm.value = true
-    router.push('/')
+    // 로드맵에서 온 경우 로드맵으로 돌아가기 (레벨 정보 포함)
+    if (route.query.from === 'roadmap') {
+      const query = {}
+      if (route.query.level != null) {
+        query.level = route.query.level
+      }
+      router.push({ path: '/roadmap', query })
+    } else {
+      router.push('/')
+    }
   }
   reportModalFromHistory.value = false
 }

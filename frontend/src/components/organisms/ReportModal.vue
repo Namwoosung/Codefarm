@@ -126,7 +126,7 @@
             class="btn w-full mt-2 text-white border-none rounded-xl font-semibold bg-[var(--color-farm-green)] hover:bg-[var(--color-farm-green-dark)]"
             @click="$emit('close', true)"
           >
-            메인 화면으로
+            {{ backButtonText || '메인 화면으로' }}
           </button>
         </div>
       </div>
@@ -141,7 +141,8 @@ import { computed } from 'vue'
 const props = defineProps({
   show: { type: Boolean, default: false },
   report: { type: Object, default: null },
-  reportLoading: { type: Boolean, default: false }
+  reportLoading: { type: Boolean, default: false },
+  backButtonText: { type: String, default: '' }
 })
 defineEmits(['close'])
 

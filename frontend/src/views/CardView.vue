@@ -4,80 +4,82 @@
     @dblclick.stop.prevent
   >
     <!-- 상단 배너 -->
-    <section class="relative w-full bg-farm-olive px-20 py-3 md:py-4 overflow-hidden flex-shrink-0">
-      <div class="min-h-[92px] md:min-h-[112px] flex flex-col justify-center px-10">
-        <div class="flex items-center justify-between">
-          <h1 class="text-2xl md:text-3xl font-bold text-farm-cream font-dnf tracking-tight">
-            {{ user?.nickname ?? 'Farm' }}'s Farm Crew
-          </h1>
-          <span class="text-sm md:text-base font-black text-farm-cream/95 tracking-tight">
-            {{ (cards?.length ?? 0) }} / {{ GRADES.reduce((sum, g) => sum + gradeMeta[g].slots, 0) }} 개
-          </span>
+    <section class="card-hero relative w-full px-20 py-3 md:py-4 overflow-visible flex-shrink-0">
+      <!-- 배경 장식 -->
+      <div class="absolute inset-0 opacity-20 pointer-events-none z-0">
+        <div class="absolute top-0 left-0 w-32 h-32 bg-farm-yellow/30 rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 right-0 w-40 h-40 bg-farm-green/30 rounded-full blur-3xl"></div>
+      </div>
+      
+      <div class="absolute inset-0 opacity-10 pointer-events-none z-0" style="background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px);"></div>
+      
+      <div class="relative z-10 min-h-[96px] md:min-h-[120px] flex flex-col justify-center px-10 pr-40 sm:pr-52 md:pr-72">
+          <p class="mt-2 text-2xl md:text-4xl text-farm-cream font-dnf tracking-tight">
+            <!-- {{ bannerNickname }}의 Farm Crew -->
+            Gacha ! 새로운 크루 뽑으러 가기 
+          </p>
+      </div>
+
+      <!-- 배너 포인트 일러스트 + 데코 (우측 하단 고정) -->
+      <div class="absolute right-16 md:right-50 bottom-1 md:bottom-0 translate-y-1 z-10 pointer-events-none select-none">
+        <div class="hero-blob absolute -right-2 md:-right-6 -bottom-8 w-40 h-40 md:w-56 md:h-56 rounded-full blur-2xl"></div>
+        <div class="absolute right-[86px] -top-1.5 w-[42px] h-[42px] rounded-full items-center justify-center bg-white/25 border border-white/28 text-white/95 backdrop-blur-[6px] shadow-[0_12px_22px_rgba(0,0,0,0.18)] hidden sm:flex hero-spark--1">
+          <iconify-icon icon="mdi:sparkles" class="text-xl"></iconify-icon>
         </div>
+        <div class="absolute right-4 top-6 w-[42px] h-[42px] rounded-full items-center justify-center bg-white/25 border border-white/28 text-white/95 backdrop-blur-[6px] shadow-[0_12px_22px_rgba(0,0,0,0.18)] hidden sm:flex hero-spark--2">
+          <iconify-icon icon="mdi:star-four-points" class="text-xl"></iconify-icon>
+        </div>
+        <img
+          :src="farmerImg"
+          alt="farmer"
+          draggable="false"
+          class="hero-farmer h-[108px] md:h-[150px] opacity-95 drop-shadow-[0_12px_18px_rgba(0,0,0,0.28)]"
+        />
       </div>
     </section>
 
-    <!-- 카드 목록 영역: 남은 화면을 전부 사용 -->
     <div class="w-full flex flex-1 min-h-0 overflow-hidden">
-      <!-- 좌측: 카드 뽑기 영역 (1) -->
-      <aside class="w-2/7 h-full border-r-2 border-farm-brown-dark/50 px-8 pt-6 pb-10 flex flex-col items-center justify-start relative overflow-hidden flex-shrink-0">
-        <div class="relative z-10 w-full flex flex-col items-center gap-4">
-          <div class="text-center">
-            <div class="inline-flex items-center gap-3 mb-4">
-              <span class="px-2.5 py-1 rounded-full bg-farm-olive text-farm-paper text-[11px] font-black tracking-wider shadow-sm">
-                GACHA CONSOLE
-              </span>
-              <span class="px-2.5 py-1 rounded-full bg-farm-yellow/30 text-farm-brown-dark text-[11px] font-black tracking-wider border border-farm-brown/15">
-                DAILY
-              </span>
-            </div>
-            <h2 class="text-3xl font-dnf text-farm-olive mb-2">Gacha!</h2>
-            <p class="text-farm-olive font-bold opacity-75">새로운 크루를 영입해보세요</p>
-          </div>
-
-          <!-- 카드 뽑기 버튼 (이미지 형태나 큰 버튼) -->
-          <img :src="gachaImg" class="w-120 h-50 object-contain select-none" alt="gacha" draggable="false" />
-
-          <!-- 버튼 하단 HUD 박스 -->
-          <div class="w-full rounded-2xl p-4">
-            <!-- Charge: 버튼 바로 아래 -->
-            <div class="flex flex-col items-center w-full">
-              <div class="w-[88%] max-w-[260px] h-3.5 rounded-full bg-farm-brown/20 overflow-hidden border border-farm-brown/30 flex-shrink-0">
-                <div
-                  :class="[
-                    'gacha-bar h-full rounded-full bg-gradient-to-r from-farm-yellow to-farm-green transition-[width] duration-200 ease-out',
-                    { 'gacha-bar--full': chargeProgress >= 1 },
-                  ]"
-                  :style="{ width: `${Math.max(0, Math.min(100, chargeProgress * 100))}%` }"
-                ></div>
-              </div>
-              <p class="mt-3 text-xs font-bold text-farm-brown-dark/80 text-center w-full block">
-                보유 포인트 : {{ points.toLocaleString() }}P
-              </p>
+      <aside class="w-2/7 h-full border-r-2 border-farm-brown-dark/50 px-5 py-5 flex flex-col items-center justify-center relative overflow-hidden flex-shrink-0">
+        <div class="gacha-panel w-full max-w-[340px] h-full max-h-full flex flex-col">
+          
+          <div class="gacha-stage gacha-stage--panel relative w-full flex justify-center items-end" :class="{ 'gacha-stage--ready': canDraw }" aria-hidden="true">
+            <div class="gacha-shadow"></div>
+            <div class="gacha-float h-full flex items-center justify-center">
+              <img :src="gachaImg" class="gacha-card-img w-full max-w-[17rem] h-auto max-h-full object-contain select-none" alt="gacha" draggable="false" />
             </div>
           </div>
-          <button
-            type="button"
-            class="mx-auto inline-flex items-center justify-center bg-farm-paper text-farm-brown-dark py-2 px-10 rounded-3xl font-black text-center cursor-pointer border-4 border-farm-brown-dark shadow-[4px_6px_0_var(--color-farm-brown-dark)] transition-all hover:translate-y-1 hover:translate-x-1 hover:shadow-[3px_3px_0_var(--color-farm-brown-dark)] hover:brightness-95 active:translate-y-2 active:translate-x-2 active:shadow-[1px_1px_0_var(--color-farm-brown-dark)] active:brightness-90 focus:outline-none focus-visible:ring-4 focus-visible:ring-farm-brown-dark/50"
-            @click="gachaCard"
-          >
-            카드뽑기 | 100P
+
+          <div class="w-full max-w-[280px] flex flex-col items-center gap-2.5 relative z-10">
+            <div class="gacha-panel__track w-full" aria-hidden="true">
+              <div
+                :class="[
+                  'gacha-bar h-full rounded-full bg-gradient-to-r from-farm-yellow to-farm-green transition-[width] duration-200 ease-out',
+                  { 'gacha-bar--full': chargeProgress >= 1 },
+                ]"
+                :style="{ width: `${Math.max(0, Math.min(100, chargeProgress * 100))}%` }"
+              ></div>
+            </div>
+            <div class="text-lg text-farm-brown-dark/70 relative z-10 w-full text-center font-dnf">보유 포인트 : {{ points.toLocaleString() }}P</div>
+          </div>
+
+          <button type="button" class="gacha-draw-btn gacha-draw-btn--wide font-dnf" @click="gachaCard" :disabled="!canDraw">
+            <span
+              class="gacha-draw-btn__fill"
+              :style="{ width: `${Math.max(0, Math.min(100, chargeProgress * 100))}%` }"
+              aria-hidden="true"
+            ></span>
+            <span class="relative z-[2] inline-flex items-center gap-2.5">
+              <span class="gacha-draw-btn__label">카드뽑기 | 100P</span>
+            </span>
           </button>
         </div>
-        
-        <!-- 배경 장식 -->
-        <div class="absolute -bottom-10 -left-10 w-40 h-40 bg-farm-green/10 rounded-full blur-3xl"></div>
-        <div class="absolute -top-10 -right-10 w-40 h-40 bg-farm-yellow/10 rounded-full blur-3xl"></div>
       </aside>
 
-      <!-- 우측: 카드 리스트 영역 - 너비·높이 꽉 채움 -->
       <main class="flex-1 h-full min-w-0 flex flex-col min-h-0 bg-farm-cream/30 relative overflow-hidden">
-        <!-- 배경 텍스처 (선택) -->
         <div
           class="absolute inset-0 bg-center bg-cover opacity-20 pointer-events-none"
           :style="{ backgroundImage: `url(${cardListBg})` }"
         />
-        <!-- 등급별 보유 개수 요약: 카드 목록 시작점을 내려서 상단 잘림 방지 -->
         <div class="relative z-10 flex-shrink-0 flex flex-wrap items-center gap-2 px-6 py-3 border-b border-farm-brown/15 bg-farm-cream/50">
           <span class="text-xs font-bold text-farm-brown-dark/80 mr-1">등급별 보유</span>
           <template v-for="grade in GRADES" :key="grade">
@@ -89,7 +91,6 @@
             </span>
           </template>
         </div>
-        <!-- 등급별 리스트: 오른쪽 전체 채움 -->
         <div class="relative z-10 flex-1 min-h-0 overflow-y-auto scrollbar-hide snap-y snap-mandatory scroll-py-2 px-6 py-4">
           <section
             v-for="grade in GRADES"
@@ -106,9 +107,7 @@
                   </span>
                 </div>
 
-                <!-- 가로 스크롤 슬롯 -->
                 <div class="relative group">
-                  <!-- 좌우 이동 버튼 -->
                   <button
                     v-if="grade !== 'SPECIAL'"
                     type="button"
@@ -142,7 +141,6 @@
                       <div v-if="slotCard" class="w-full flex flex-col items-center">
                         <CardDetail class="w-full" :card="slotCard" @showcard="openCardModal" />
 
-                        <!-- 카드 아래 count 표시 -->
                         <div
                           class="mt-2 inline-flex items-center rounded-full bg-farm-cream/90 border border-farm-brown/15 px-2 py-0.5 text-xs font-black text-farm-brown-dark shadow-sm"
                         >
@@ -168,7 +166,6 @@
     </div>
   </div>
 
-  <!-- 카드 확대 팝업 -->
   <Transition
     enter-active-class="transition-opacity duration-150 ease-out"
     enter-from-class="opacity-0"
@@ -200,12 +197,18 @@
           @pointerleave="onModalPointerLeave"
         >
           <figure class="w-full h-full rounded-2xl overflow-visible relative block m-0">
-            <div
-              v-if="isGachaModal && drawMessage"
-              class="absolute top-3 left-1/2 -translate-x-1/2 z-10 px-4 py-2 rounded-full bg-black/70 text-white text-sm font-bold shadow-lg backdrop-blur-sm"
+            <Transition
+              enter-active-class="transition-opacity duration-500 ease-out delay-1000"
+              enter-from-class="opacity-0"
+              enter-to-class="opacity-100"
             >
-              {{ drawMessage }}
-            </div>
+              <div
+                v-if="isGachaModal && drawMessage"
+                class="absolute top-15 left-1/2 whitespace-nowrap -translate-x-1/2 z-10 px-4 py-2 rounded-full text-farm-olive text-sm font-bold"
+              >
+                {{ drawMessage }}
+              </div>
+            </Transition>
             <img
               :src="modalCardImage"
               :alt="selectedCard.name"
@@ -225,8 +228,9 @@ import { useCardStore } from '@/stores/card'
 import { storeToRefs } from 'pinia'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import CardDetail from '@/components/organisms/CardDetail.vue'
-import cardListBg from '@/assets/cardlist.png'
-import gachaImg from '@/assets/Gacha.png'
+import cardListBg from '@/assets/card/cardlist.png'
+import gachaImg from '@/assets/card/Gacha.png'
+import farmerImg from '@/assets/roadmap/farmer.png'
 
 const profile = useProfileStore()
 const cardStore = useCardStore()
@@ -234,6 +238,9 @@ const { user } = storeToRefs(profile)
 const { cards, drawMessage } = storeToRefs(cardStore)
 
 const points = computed(() => Number(user.value?.point ?? 0))
+const bannerNickname = computed(() => user.value?.nickname ?? 'Farm')
+const totalOwnedCards = computed(() => (Array.isArray(cards.value) ? cards.value.length : 0))
+const canDraw = computed(() => points.value >= 100)
 
 // Charge: 100P 기준(0~100%), 100P 이상이면 100%
 const chargeProgress = computed(() => Math.min(1, Math.max(0, points.value / 100)))
@@ -420,6 +427,58 @@ const modalPointerStyle = computed(() => {
 </script>
 
 <style scoped>
+/* Card hero banner */
+.card-hero {
+  background: linear-gradient(120deg, rgba(255, 210, 95, 0.98), rgba(143, 193, 96, 0.95) 55%, rgba(124, 187, 103, 0.95));
+}
+.card-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background:
+    radial-gradient(1200px 260px at 10% 0%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(900px 260px at 95% 15%, rgba(255, 255, 255, 0.35), transparent 62%),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 10px);
+  mix-blend-mode: soft-light;
+}
+.card-hero::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  pointer-events: none;
+  opacity: 0.22;
+  background: radial-gradient(600px 220px at 30% 100%, rgba(0, 0, 0, 0.25), transparent 60%);
+}
+.hero-blob {
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.0) 60%),
+    radial-gradient(circle at 70% 70%, rgba(255, 214, 93, 0.55), rgba(255, 214, 93, 0.0) 65%);
+  opacity: 0.85;
+}
+.hero-farmer {
+  animation: none;
+}
+.hero-spark--1,
+.hero-spark--2 {
+  animation: hero-float 5.4s ease-in-out infinite;
+}
+.hero-spark--1 {
+  animation-delay: -1.2s;
+}
+.hero-spark--2 {
+  animation-delay: -2.6s;
+}
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -6px, 0);
+  }
+}
+
 /* 3D 기울임 시 카드가 잘리지 않도록 overflow 제거 */
 .modal-card-3d,
 .modal-card-3d > :first-child {
@@ -467,6 +526,314 @@ const modalPointerStyle = computed(() => {
   50% {
     filter: saturate(1.15) brightness(1.08);
     box-shadow: 0 0 14px rgba(255, 214, 93, 0.55);
+  }
+}
+
+/* Gacha aside panel (screenshot-like structure) */
+.gacha-panel {
+  width: 100%;
+  max-width: 340px;
+  padding: clamp(20px, 3%, 14px) clamp(12px, 4%, 16px);
+  border-radius: 26px;
+  background:
+    radial-gradient(520px 260px at 50% 0%, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0) 62%),
+    linear-gradient(180deg, rgba(255, 253, 245, 0.92), rgba(245, 242, 232, 0.72));
+  border: 1px solid rgba(122, 92, 62, 0.14);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.08);
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(4px, 2%, 8px);
+  min-height: 0;
+}
+
+.gacha-panel::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 2px;
+  background: linear-gradient(135deg, rgba(167, 139, 250, 0.55), rgba(56, 189, 248, 0.55), rgba(255, 224, 130, 0.40));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.75;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.gacha-panel__headline {
+  font-size: 45px;
+  line-height: 1;
+  color: rgba(74, 74, 41, 0.95);
+  letter-spacing: -0.03em;
+}
+
+.gacha-panel__sub {
+  margin-top: 8px;
+  font-size: 18px;
+  color: rgba(78, 59, 42, 0.55);
+}
+
+.gacha-stage--panel {
+  margin-top: 0;
+  margin-bottom: 0;
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.gacha-panel__track {
+  width: 100%;
+  height: 16px;
+  border-radius: 9999px;
+  background: rgba(122, 92, 62, 0.14);
+  border: 1px solid rgba(122, 92, 62, 0.18);
+  overflow: hidden;
+  position: relative;
+  z-index: 1;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.gacha-panel__track::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 50%;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.55), transparent);
+  pointer-events: none;
+  opacity: 0.65;
+}
+
+.gacha-draw-btn--wide {
+  width: 100%;
+  max-width: 280px;
+}
+
+/* Gacha image: 카드 뽑기 연출(플로팅 + 바닥 그림자) */
+.gacha-stage {
+  padding-bottom: clamp(2px, 0.6%, 4px); /* 그림자 공간 */
+  user-select: none;
+  -webkit-user-select: none;
+  isolation: isolate;
+}
+
+.gacha-float {
+  position: relative;
+  transform-origin: 50% 100%;
+  animation: gacha-float 2.8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.gacha-card-img {
+  display: block;
+  transform-origin: 50% 85%;
+  animation: gacha-wiggle 6.2s ease-in-out infinite;
+  will-change: transform, filter;
+  filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.25));
+}
+
+.gacha-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translateX(-50%);
+  width: min(78%, 380px);
+  height: 19px;
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.34), rgba(0, 0, 0, 0) 72%);
+  filter: blur(3px);
+  opacity: 0.72;
+  animation: gacha-shadow 2.8s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+.gacha-stage--ready .gacha-card-img {
+  filter: drop-shadow(0 18px 18px rgba(0, 0, 0, 0.25)) saturate(1.05) brightness(1.02);
+}
+.gacha-stage--ready::after {
+  content: '';
+  position: absolute;
+  inset: 10% 12% 24% 12%;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 62%);
+  mix-blend-mode: soft-light;
+  opacity: 0.0;
+  animation: gacha-ready-glow 2.4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes gacha-float {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) scale(1.06);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0) scale(1.06);
+  }
+}
+
+@keyframes gacha-wiggle {
+  0%, 100% {
+    transform: rotate(-1.2deg) translate3d(-1px, 0, 0);
+  }
+  50% {
+    transform: rotate(1.2deg) translate3d(1px, 0, 0);
+  }
+}
+
+@keyframes gacha-shadow {
+  0%, 100% {
+    transform: translateX(-50%) scaleX(0.92);
+    opacity: 0.62;
+  }
+  50% {
+    transform: translateX(-50%) scaleX(1.05);
+    opacity: 0.82;
+  }
+}
+
+@keyframes gacha-ready-glow {
+  0%, 100% {
+    opacity: 0.08;
+  }
+  50% {
+    opacity: 0.22;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gacha-float,
+  .gacha-card-img,
+  .gacha-shadow,
+  .gacha-stage--ready::after {
+    animation: none !important;
+  }
+}
+
+/* 뽑기 버튼 */
+.gacha-draw-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 18px;
+  min-width: 220px;
+  border-radius: 9999px;
+  border: 3px solid var(--color-farm-yellow);
+  color: var(--color-farm-olive);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), var(--color-farm-yellow));
+  box-shadow: 5px 6px 0 var(--color-farm-yellow);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
+  isolation: isolate;
+}
+
+.gacha-draw-btn__fill {
+  position: absolute;
+  inset: 0;
+  width: 0%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 214, 93, 0.55), rgba(255, 245, 220, 0.85));
+  opacity: 0.9;
+  z-index: 0;
+}
+
+.gacha-draw-btn::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from 180deg,
+    rgba(255, 214, 93, 0.0),
+    rgba(255, 214, 93, 0.75),
+    rgba(255, 245, 220, 0.85),
+    rgba(255, 214, 93, 0.0)
+  );
+  filter: blur(10px);
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 180ms ease;
+}
+
+.gacha-draw-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 22%; /* 샤인 너비(더 좁게) */
+  left: -30%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.78), transparent);
+  transform: skewX(-18deg);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.gacha-draw-btn__label {
+  letter-spacing: -0.02em;
+  font-size: 18px;
+  color: var(--color-farm-olive);
+}
+
+.gacha-draw-btn__cost {
+  font-weight: 1000;
+  font-size: 14px;
+  color: var(--color-farm-olive);
+  padding: 4px 10px;
+  border-radius: 9999px;
+}
+
+.gacha-draw-btn:hover:not(:disabled) {
+  transform: translate(1px, 1px);
+  box-shadow: 4px 4px 0 var(--color-farm-yellow);
+  filter: saturate(1.04) brightness(1.05);
+}
+
+/* 반짝(샤인) */
+.gacha-draw-btn:hover:not(:disabled)::before {
+  opacity: 0.7;
+}
+
+.gacha-draw-btn:hover:not(:disabled)::after {
+  opacity: 0.9;
+  animation: gacha-btn-shine 1.15s ease-out forwards;
+}
+
+.gacha-draw-btn:active:not(:disabled) {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--color-farm-yellow);
+  filter: brightness(0.98);
+}
+
+.gacha-draw-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  filter: grayscale(0.25) brightness(0.98);
+  box-shadow: 5px 6px 0 var(--color-farm-yellow);
+}
+
+@keyframes gacha-btn-shine {
+  0% { left: -30%; opacity: 0; }
+  15% { opacity: 0.9; }
+  100% { left: 115%; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gacha-draw-btn {
+    animation: none !important;
+  }
+  .gacha-draw-btn::after {
+    animation: none !important;
   }
 }
 </style>

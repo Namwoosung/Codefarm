@@ -1,9 +1,23 @@
 /* PrimeIcons - CDN 사용 */
 @import url('https://cdn.jsdelivr.net/npm/primeicons@6.0.1/primeicons.css');
 
-/* Fonts */
-@import url('https://static.toss.im/toss-fonts/font.css');
-@import url('https://fastly.jsdelivr.net/gh/projectnoonnu/noonfonts_three@1.0/D2Coding.css');
+/* Fonts - D2Coding 폰트 직접 정의 */
+@font-face {
+  font-family: 'D2Coding';
+  src: url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/d2coding/D2Coding.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/d2coding/D2Coding.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'D2Coding';
+  src: url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/d2coding/D2CodingBold.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/Joungkyun/font-d2coding@1.3.2/d2coding/D2CodingBold.woff') format('woff');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
 
 /* DNF 비트비트 v2 */
 @font-face {
@@ -19,7 +33,7 @@
   src: url('https://cdn.jsdelivr.net/gh/fontbee/font@main/Toss/Moneygraphy-Pixel.woff2') format('woff2');
 }
 /* Tailwind v4에서 config(플러그인 포함) 적용 */
-@config "../../tailwind.config.js";
+@config "../../../tailwind.config.js";
 @import "tailwindcss";
 
 @theme {

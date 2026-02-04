@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import api from '@/api'
+import { getCardList, drawCard, getCardRankings, normalizeCard } from '@/api/card'
 
 export const useCardStore = defineStore('card', () => {
   // 내 카드 목록
@@ -12,20 +12,9 @@ export const useCardStore = defineStore('card', () => {
   //랭킹리스트
   const rankingList = ref([])
 
-  const normalizeCard = (item) => {
-    const c = item?.card && typeof item.card === 'object' ? item.card : item
-    if (!c) return null
-    const rawImg = c.image ?? c.cardImage ?? c.img ?? ''
-    const img =
-      typeof rawImg === 'string' && rawImg ? rawImg.replace(/\.svg$/i, '.png') : rawImg
-    const rawCount = item?.count ?? c?.count ?? 1
-    const count = Number.isFinite(Number(rawCount)) ? Number(rawCount) : 1
-    return { ...c, image: img, cardImage: img, img, count }
-  }
-
   const cardList = async () => {
     try {
-      const res = await api.get('/cards/me')
+      const res = await getCardList()
       const raw = res.data.data?.cards ?? []
       cards.value = (Array.isArray(raw) ? raw : Object.values(raw)).map(normalizeCard).filter(Boolean)
     } catch (err) {
@@ -35,7 +24,7 @@ export const useCardStore = defineStore('card', () => {
 
   const cardDraw = async () => {
     try {
-        const res = await api.post('/cards/draw')
+        const res = await drawCard()
         const payload = res.data?.data
         newcard.value = payload
     
@@ -75,7 +64,7 @@ export const useCardStore = defineStore('card', () => {
 
   const ranking = async () => {
     try {
-      const res = await api.get('/cards/rankings')
+      const res = await getCardRankings()
       rankingList.value = res.data.data?.topCollectors
     } catch (err) {
       console.warn('[card.ranking] failed:', err?.response?.status, err?.response?.data ?? err)

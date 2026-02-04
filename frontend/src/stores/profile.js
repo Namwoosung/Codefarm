@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import api from '@/api'
+import { getUserProfile, updateUserProfile, getMyReports, getReportDetail } from '@/api/profile'
 import { useAuthStore } from '@/stores/auth'
 
 export const useProfileStore = defineStore('profile', () => {
@@ -13,7 +13,7 @@ export const useProfileStore = defineStore('profile', () => {
 
     const userinfo = async () => {
         try {   
-            const res = await api.get('/users/profiles')
+            const res = await getUserProfile()
             user.value = res.data.data
 
             // auth/localStorage와 사용자 정보 일관성 유지
@@ -42,7 +42,7 @@ export const useProfileStore = defineStore('profile', () => {
                 nickname: payload.nickname,
             }
 
-            const res = await api.patch('/users/profiles', requestBody)
+            const res = await updateUserProfile(requestBody)
             user.value = res.data?.data ?? null
 
             // auth/localStorage와 사용자 정보 일관성 유지
@@ -63,7 +63,7 @@ export const useProfileStore = defineStore('profile', () => {
     }
     const reportList = async (params) => {
         try {
-            const res = await api.get('/reports/me', { params })
+            const res = await getMyReports(params)
             reports.value = res.data.data
             console.log(res.data.message)
             console.log(res.data.data)
@@ -74,7 +74,7 @@ export const useProfileStore = defineStore('profile', () => {
 
     const resportDetail = async (reportId) => {
         try {
-            const res = await api.get(`reports/${reportId}`)
+            const res = await getReportDetail(reportId)
             report.value = res.data.data
             console.log(res.data.data)
         } catch (err) {

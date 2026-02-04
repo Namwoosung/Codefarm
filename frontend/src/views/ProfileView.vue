@@ -3,10 +3,8 @@
     <div class="max-w-7xl mx-auto w-full flex flex-col flex-1 min-h-0">
 
       <div class="flex flex-col gap-6 md:flex-row flex-1 min-h-0">
-        <!-- 좌측 사이드바 (1) -->
         <aside class="w-full md:w-auto md:flex-[1] md:min-w-0 self-start">
           <div class="relative">
-            <!-- nails -->
             <div
               class="pointer-events-none absolute left-3 top-3 z-10 h-3 w-3 rounded-full border border-farm-brown/25 bg-gradient-to-b from-farm-cream to-farm-brown/30 shadow-[0_1px_2px_rgba(0,0,0,0.25)] before:content-[''] before:absolute before:left-1/2 before:top-1/2 before:h-[1.5px] before:w-2 before:-translate-x-1/2 before:-translate-y-1/2 before:rotate-45 before:rounded-full before:bg-farm-brown/60 after:content-[''] after:absolute after:left-1/2 after:top-1/2 after:h-[1.5px] after:w-2 after:-translate-x-1/2 after:-translate-y-1/2 after:-rotate-45 after:rounded-full after:bg-farm-brown/60"
             ></div>
@@ -20,7 +18,6 @@
               class="pointer-events-none absolute bottom-3 right-3 z-10 h-3 w-3 rounded-full border border-farm-brown/25 bg-gradient-to-b from-farm-cream to-farm-brown/30 shadow-[0_1px_2px_rgba(0,0,0,0.25)] before:content-[''] before:absolute before:left-1/2 before:top-1/2 before:h-[1.5px] before:w-2 before:-translate-x-1/2 before:-translate-y-1/2 before:rotate-45 before:rounded-full before:bg-farm-brown/60 after:content-[''] after:absolute after:left-1/2 after:top-1/2 after:h-[1.5px] after:w-2 after:-translate-x-1/2 after:-translate-y-1/2 after:-rotate-45 after:rounded-full after:bg-farm-brown/60"
             ></div>
 
-            <!-- post-it -->
             <div
               class="card rounded-2xl border border-farm-cream bg-farm-paper p-7 shadow-lg rotate-[-1.5deg] origin-top"
             >
@@ -42,15 +39,7 @@
               </div>
             <button
               type="button"
-              class="btn btn-sm w-full mt-4 rounded-xl bg-farm-olive text-farm-paper font-bold tracking-tight shadow-sm hover:brightness-110 active:brightness-95"
-              @click="handleOpenReport"
-            >
-              내 리포트
-            </button>
-
-            <button
-              type="button"
-              class="btn btn-sm w-full mt-2 rounded-xl bg-farm-olive text-farm-paper font-bold tracking-tight shadow-sm hover:brightness-110 active:brightness-95"
+              class="btn btn-sm w-full my-6 rounded-xl bg-farm-olive text-farm-paper font-bold tracking-tight shadow-sm hover:brightness-110 active:brightness-95"
               @click="openEditModal"
             >
               프로필 수정
@@ -59,7 +48,6 @@
           </div>
         </aside>
 
-        <!-- 우측 메인 (3) -->
         <main class="w-full md:w-auto md:flex-[3] md:min-w-0 h-full min-h-0">
           <NotebookFlip class="h-[calc(100vh-200px)] w-full" />
         </main>
@@ -80,7 +68,6 @@
 import { useProfileStore } from '@/stores/profile'
 import { storeToRefs } from 'pinia'
 import { onMounted, ref } from 'vue'
-import PageTitle from '@/components/atoms/PageTitle.vue'
 import NotebookFlip from '@/components/organisms/NotebookFlip.vue'
 import ProfileEditModal from '@/components/organisms/ProfileEditModal.vue'
 
@@ -112,11 +99,6 @@ const handleSubmitEdit = async (payload) => {
   } finally {
     isSaving.value = false
   }
-}
-
-const handleOpenReport = () => {
-  // TODO: 리포트 목록/페이지로 이동 로직이 생기면 여기 연결
-  console.log('내 리포트: 준비 중')
 }
 
 </script>

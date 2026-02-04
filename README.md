@@ -135,7 +135,7 @@ feature/backend/receiptParser-SSR-208
 * 태그는 아래 **6개 중 하나만 사용**
 
   ```
-  feature | fix | refactor | docs | chore | ci
+  feat | fix | refactor | docs | chore | ci
   ```
 * 태그는 **소문자**
 * 커밋 메시지는 **영어**, **동사로 시작**
@@ -147,6 +147,6 @@ feature/backend/receiptParser-SSR-208
 
 예시
 
-* `feature(backend): add controller advice`
+* `feat(backend): add controller advice`
 * `docs(infra): update branch naming convention`
 * `fix(frontend): resolve login validation issue`
