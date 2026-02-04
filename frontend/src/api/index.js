@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 const api = axios.create({
   // Vite Proxy(/api)를 사용하므로 기본 경로를 /api로 설정
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  timeout: 5000,
+  timeout: 30000,
   headers: {
     // '타입/서브타입 (MIME type)'
     'Content-Type': 'application/json'
