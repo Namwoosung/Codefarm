@@ -72,7 +72,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // 토큰이 있을 때만 서버에 로그아웃 요청 (없으면 401 난 요청이 또 인터셉터에서 logout 호출 → 무한 반복 방지)
       if (hadToken) {
-        await api.post('/users/logout')
+        await apiLogout()
       }
     } catch (_) {
       // 로그아웃 API 실패(401 등)여도 클라이언트 상태는 항상 비움

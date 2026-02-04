@@ -23,15 +23,16 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 )
 
-// 401 시 토큰 제거 → 로그아웃 상태로 맞춤 (로그인/로그아웃 요청 실패 시에는 스토어 건드리지 않음)
+/** 401 시 로그아웃 처리 생략 옵션 (인증 불필요 요청: login, logout 등) */
+export const SKIP_AUTH_ON_401 = 'skipAuthOn401'
+
+// 401 시 토큰 제거 → 로그아웃 상태로 맞춤 (skipAuthOn401 요청은 제외)
 api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      const requestUrl = err.config?.url ?? ''
-      const isLoginRequest = requestUrl.includes('/users/login')
-      const isLogoutRequest = requestUrl.includes('/users/logout')
-      if (!isLoginRequest && !isLogoutRequest) {
+      const skipAuth = err.config?.[SKIP_AUTH_ON_401] === true
+      if (!skipAuth) {
         try {
           useAuthStore().logout()
         } catch (_) {}

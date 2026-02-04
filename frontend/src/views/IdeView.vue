@@ -749,6 +749,16 @@ async function closeSessionOnLeave() {
   ideStore.clearSession()
 }
 
+/** 라우트 이탈 시 공통 정리(세션 종료 + 스냅샷 인터벌 해제) 후 next 호출 */
+async function cleanupOnLeaveAndProceed(next) {
+  if (snapshotIntervalId) {
+    clearInterval(snapshotIntervalId)
+    snapshotIntervalId = null
+  }
+  await closeSessionOnLeave()
+  next()
+}
+
 /** FR-CODE-010: 브라우저 닫기/새로고침 시 작성 중인 코드 있으면 확인 (beforeunload) */
 function onBeforeUnload(e) {
   const code = ideStore.getCode(route.params.id)
@@ -946,22 +956,12 @@ watch(
 onBeforeRouteLeave(async (to, from, next) => {
   if (skipLeaveConfirm.value) {
     skipLeaveConfirm.value = false
-    await closeSessionOnLeave()
-    if (snapshotIntervalId) {
-      clearInterval(snapshotIntervalId)
-      snapshotIntervalId = null
-    }
-    next()
+    await cleanupOnLeaveAndProceed(next)
     return
   }
   // 로그인 필요 모달에서 로그인/회원가입 버튼으로 갈 때는 확인 생략
   if (!authStore.isLoggedIn && (to.path === '/login' || to.path === '/signup')) {
-    await closeSessionOnLeave()
-    if (snapshotIntervalId) {
-      clearInterval(snapshotIntervalId)
-      snapshotIntervalId = null
-    }
-    next()
+    await cleanupOnLeaveAndProceed(next)
     return
   }
   const code = ideStore.getCode(route.params.id)
@@ -980,12 +980,7 @@ onBeforeRouteLeave(async (to, from, next) => {
     next(false)
     return
   }
-  await closeSessionOnLeave()
-  if (snapshotIntervalId) {
-    clearInterval(snapshotIntervalId)
-    snapshotIntervalId = null
-  }
-  next()
+  await cleanupOnLeaveAndProceed(next)
 })
 
 onUnmounted(() => {
