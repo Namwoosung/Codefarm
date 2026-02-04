@@ -107,5 +107,7 @@ export const useIdeStore = defineStore('ide', () => {
     updateHintState
   }
 }, {
-  persist: true // localStorage에 codeByProblemId 자동 저장
+  persist: {
+    pick: ['codeByProblemId'] // hints는 메모리만, 새로고침 시 API로 재로드
+  }
 })

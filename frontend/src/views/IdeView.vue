@@ -734,16 +734,18 @@ function startSnapshotInterval() {
   }, SNAPSHOT_INTERVAL_MS)
 }
 
-/** 페이지 이탈 시 세션 종료 */
+/** 페이지 이탈 시 세션 종료 (SSE 해제 + hints 비우기) */
 async function closeSessionOnLeave() {
   const sid = ideStore.sessionId
   justCreatedSessionId.value = null
-  if (!sid) return
-  try {
-    await sessionApi.closeSession(sid)
-  } catch (_) {
-    // 이탈 중이므로 무시
+  if (sid) {
+    try {
+      await sessionApi.closeSession(sid)
+    } catch (_) {
+      // 이탈 중이므로 무시
+    }
   }
+  // clearSession: sessionId=null, hints=[] → useSSE watch가 cleanup()으로 SSE 연결 해제
   ideStore.clearSession()
 }
 

@@ -9,6 +9,11 @@ const MAX_RECONNECT_ATTEMPTS = 10
 /** 치명적 오류: 재연결 중단 (401, 403, 404) */
 const FATAL_STATUS_CODES = [401, 403, 404]
 
+/** AbortError 여부 확인 (reader.read() 도중 ac.abort() 호출 시 발생) */
+function isAbortError(e) {
+  return e?.name === 'AbortError' || (e instanceof DOMException && e.name === 'AbortError')
+}
+
 /**
  * HTTP 상태 코드별 에러 메시지
  */
@@ -121,14 +126,14 @@ export function useSSE(sessionIdRef, options = {}) {
               read()
             })
             .catch((e) => {
-              if (aborted || ac?.signal?.aborted) return
+              if (aborted || isAbortError(e) || ac?.signal?.aborted) return
               scheduleReconnect(sessionId)
             })
         }
         read()
       })
       .catch((e) => {
-        if (aborted || ac?.signal?.aborted) return
+        if (aborted || isAbortError(e) || ac?.signal?.aborted) return
         isConnecting.value = false
         scheduleReconnect(sessionId)
       })
