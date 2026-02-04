@@ -17,8 +17,11 @@ public class UpdateUserProfileRequestDto {
     )
     private String nickname;
 
+    @Pattern(regexp = "^[가-힣a-zA-Z]{2,20}$", message = "INVALID_PARAMETER")
     private String name;
 
+    @Min(value = 0, message = "INVALID_PARAMETER")
+    @Max(value = 150, message = "INVALID_PARAMETER")
     private Integer age;
 
     @Min(value = 1, message = "codingLevel must be between 1 and 5")
