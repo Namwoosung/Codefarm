@@ -267,17 +267,6 @@
       </Transition>
     </Teleport>
 
-    <!-- 힌트 차감 토스트 -->
-    <Transition name="toast">
-      <div v-if="toastMessage" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[1100] w-[min(520px,calc(100vw-2rem))]">
-        <div role="alert" class="alert alert-info alert-soft shadow-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="h-6 w-6 shrink-0 stroke-current">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <span class="text-sm font-semibold">{{ toastMessage }}</span>
-        </div>
-      </div>
-    </Transition>
   </div>
 </template>
 
@@ -296,6 +285,7 @@ import BellIcon from '@/components/atoms/BellIcon.vue'
 import EscapeIcon from '@/components/atoms/EscapeIcon.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
+import { useToastStore } from '@/stores/toast'
 import * as sessionApi from '@/api/session'
 import { getReportDetail, buildReportFromSubmitResponse } from '@/api/reports'
 import { subscribeHintSSE } from '@/api/hint'
@@ -308,6 +298,7 @@ const hintPanelRef = ref(null)
 let sseUnsubscribe = null
 const authStore = useAuthStore()
 const ideStore = useIdeStore()
+const toastStore = useToastStore()
 // 스토어 로그인 상태를 computed로 참조해 로그아웃 시에도 블러/오버레이 즉시 반영
 const isLoggedIn = computed(() => !!authStore.token)
 
@@ -358,9 +349,6 @@ const idleConfirmShownAt = ref(null)
 // const IDLE_MS = 30 * 60 * 1000 // 30분(운영)
 const IDLE_MS = 1 * 60 * 1000 // 1분(테스트: 1분 무입력 → 모달, 그로부터 1분 → 메인 취소 안내)
 let idleCheckIntervalId = null
-/** 힌트 차감 토스트 (FR-CODE-010-1) */
-const toastMessage = ref('')
-let toastTimer = null
 /** confirm 대체 모달 (탈주/이탈) */
 const confirmState = reactive({
   show: false,
@@ -1329,12 +1317,7 @@ watch(notificationPanelOpen, (open) => {
 })
 
 function showToast(msg) {
-  toastMessage.value = msg
-  if (toastTimer) clearTimeout(toastTimer)
-  toastTimer = setTimeout(() => {
-    toastMessage.value = ''
-    toastTimer = null
-  }, 3000)
+  toastStore.showToast(msg, { durationMs: 3000 })
 }
 </script>
 
@@ -1540,15 +1523,6 @@ function showToast(msg) {
   font-size: 1rem;
   font-weight: 600;
   color: var(--color-farm-brown-dark);
-}
-.toast-enter-active,
-.toast-leave-active {
-  transition: opacity 0.25s, transform 0.25s;
-}
-.toast-enter-from,
-.toast-leave-to {
-  opacity: 0;
-  transform: translateX(-50%) translateY(0.5rem);
 }
 @media (max-width: 767px) {
   .ide-resizer-hit {

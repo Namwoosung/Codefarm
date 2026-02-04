@@ -48,6 +48,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     errCode.value = null
     errorMessage.value = null
+    console.log('login 호출')
 
     try {
       const res = await apiLogin(payload)
@@ -57,13 +58,16 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = data.token?.accessToken ?? data.accessToken ?? null
       if (token.value) localStorage.setItem('token', token.value)
       if (user.value) localStorage.setItem('user', JSON.stringify(user.value))
-      return res.data
+      console.log('토큰 저장 완료')
+        return res.data
     } catch (err) {
       errCode.value = err?.response?.data?.errorCode ?? null
       errorMessage.value = err?.response?.data?.message ?? null
+      console.log('login 실패', err)
       throw err
     } finally {
       loading.value = false
+      console.log('login 완료')
     }
   }
 

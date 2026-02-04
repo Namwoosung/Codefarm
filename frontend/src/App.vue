@@ -3,6 +3,7 @@ import { RouterView, useRoute } from 'vue-router'
 import { computed, onMounted } from 'vue'
 import CommonHeader from '@/components/organisms/CommonHeader.vue'
 import CommonFooter from '@/components/organisms/CommonFooter.vue'
+import AppToast from '@/components/atoms/AppToast.vue'
 import { useAuthStore } from '@/stores/auth'
 import { useIdeStore } from '@/stores/ide'
 
@@ -23,6 +24,7 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-farm-cream flex flex-col">
+    <AppToast />
     <!-- 메인/커리큘럼 → IDE 진입 시 로딩 오버레이 -->
     <Teleport to="body">
       <Transition name="fade">
