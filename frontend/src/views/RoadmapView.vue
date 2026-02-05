@@ -10,54 +10,72 @@
         leave-from-class="opacity-100"
         leave-to-class="opacity-0"
       >
-        <div v-if="showRoadmapLoading" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-farm-cream/95 backdrop-blur-sm">
-          <span class="loading loading-spinner loading-lg text-farm-point"></span>
-          <p class="text-sm font-medium text-farm-brown-dark">로드맵 불러오는 중...</p>
+        <div v-if="showRoadmapLoading" class="fixed inset-0 z-[9999] flex items-center justify-center bg-[rgba(245,242,232,0.92)]">
+          <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
       </Transition>
     </Teleport>
 
-    <main :class="[!selectedLevel ? 'mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12' : 'w-full h-screen overflow-hidden']">
+    <main :class="[!selectedLevel ? 'mx-auto max-w-7xl px-6 py-12' : 'w-full h-screen overflow-hidden']">
       <!-- 메인 로드맵 이미지 영역 (레벨 미선택 시) -->
-      <section v-if="!selectedLevel" class="roadmap-main-section relative w-full flex flex-col items-center">
-        <div class="roadmap-header mb-8 sm:mb-10 text-center">
-          <h2 class="text-3xl sm:text-4xl font-dnf text-farm-brown-dark mb-2 tracking-tight">Welcome to Code Farm!</h2>
-          <p class="text-base sm:text-lg text-farm-brown/70">길을 따라 모험을 시작할 레벨을 선택하세요.</p>
+      <section v-if="!selectedLevel" class="relative w-full flex flex-col items-center">
+        <div class="mb-12 text-center">
+          <h2 class="text-4xl font-dnf text-farm-brown-dark mb-4 tracking-tight">Welcome to Code Farm!</h2>
+          <p class="text-lg text-farm-brown opacity-75 font-medium">길을 따라 모험을 시작할 레벨을 선택하세요.</p>
         </div>
-
-        <div class="roadmap-map-wrapper relative w-full sm:w-[70%] md:w-[55%] lg:w-[50%] max-w-[600px] min-w-[280px]">
-          <!-- 상단 그라데이션 페이드 -->
-          <div class="absolute top-0 left-0 right-0 h-24 bg-gradient-to-b from-farm-cream via-farm-cream/80 to-transparent z-20 pointer-events-none" />
-
-          <RoadmapMap
-            :background-image="roadmapMainImage"
-            @bg-loaded="mainMapLoaded = true"
-            @select-level="(id) => selectedLevel = id"
-            class="relative z-10"
-          />
-
-          <!-- 하단 그라데이션 페이드 -->
-          <div class="absolute bottom-0 left-0 right-0 h-24 bg-gradient-to-t from-farm-cream via-farm-cream/80 to-transparent z-20 pointer-events-none" />
-
-          <!-- 좌측 캐릭터 (닭) -->
-          <div class="absolute left-[-200px] top-[28%] -translate-y-1/2 w-64 h-64 z-30 hidden lg:block pointer-events-none">
-            <div class="tooltip tooltip-open tooltip-top roadmap-tooltip roadmap-tooltip-left" data-tip="다양한 문제를 풀고 포인트를 모아보세요!">
-              <img class="w-full h-full object-contain" :src="heroCharacter" alt="" />
+        
+        <div class="relative w-full flex flex-col items-center">
+        <div class="relative w-[50%] max-w-[600px]">
+          <!-- 상단 블러 마스크: z-20으로 높여 지도 위를 덮음 -->
+          <div class="absolute top-0 left-0 w-full h-24 bg-gradient-to-b from-farm-cream via-farm-cream/80 to-transparent z-20 pointer-events-none"></div>
+          
+          <!-- 캐릭터와 툴팁: z-30으로 높여 가장 앞으로 배치 (클릭 통과 유지) -->
+          <div class="absolute left-[-220px] top-[28%] -translate-y-1/2 w-72 h-72 z-30 hidden lg:block pointer-events-none">
+            <div class="tooltip tooltip-open tooltip-top [--tooltip-tail:0px] [--tooltip-color:rgba(255,255,50,1)] [--tooltip-text-color:#4e3b2a] [--tooltip-offset:-20px]" data-tip="다양한 문제를 풀고 포인트를 모아보세요!">
+              <img
+                class="w-full h-full object-contain"
+                :src="heroCharacter"
+                alt="character"
+              />
             </div>
           </div>
 
-          <!-- 우측 캐릭터 (오리) -->
-          <div class="absolute right-[-120px] top-[58%] -translate-y-1/2 w-48 h-48 z-30 hidden lg:block pointer-events-none">
-            <div class="tooltip tooltip-open tooltip-top roadmap-tooltip roadmap-tooltip-right" data-tip="100포인트로 카드뽑기를 할 수 있어요!">
-              <img class="w-full h-full object-contain" :src="duckCharacter" alt="" />
-            </div>
-          </div>
+            <!-- RoadmapMap: z-10으로 설정하여 캐릭터와 마스크 뒤로 보냄 -->
+            <RoadmapMap
+              :background-image="roadmapMainImage"
+              @bg-loaded="mainMapLoaded = true"
+              @select-level="(id) => selectedLevel = id"
+              class="w-full relative z-10"
+            />
 
-          <!-- 좌측 하단 메가크루 -->
-          <div class="absolute left-[-240px] bottom-[-220px] w-[580px] h-[590px] z-30 hidden lg:block pointer-events-none">
-            <div class="absolute left-[200px] top-[150px] tooltip tooltip-open tooltip-top roadmap-tooltip roadmap-tooltip-mega" data-tip="문제가 잘 안풀리나요? 추천 문제로 보충해보아요" />
-            <img class="w-full h-full object-contain opacity-90" :src="megacrewImage" alt="" />
+            <!-- 오리 캐릭터와 툴팁: z-30으로 상향 -->
+            <div class="absolute right-[-140px] top-[58%] -translate-y-1/2 w-52 h-52 z-30 hidden lg:block pointer-events-none">
+              <div class="tooltip tooltip-open tooltip-top [--tooltip-tail:0px] [--tooltip-color:rgba(74,74,41,0.9)] [--tooltip-text-color:#ffffff] [--tooltip-offset:-20px]" data-tip="100포인트로 카드뽑기를 할 수 있어요!">
+                <img
+                  class="w-full h-full object-contain"
+                  :src="duckCharacter"
+                  alt="duck"
+                />
+              </div>
+            </div>
+
+          <!-- 하단 블러 마스크: z-20으로 상향 -->
+          <div class="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-farm-cream via-farm-cream/80 to-transparent z-20 pointer-events-none"></div>
+
+          <!-- 좌측 하단 메가크루 이미지: 위치 고정 및 좌측 정렬된 툴팁 추가 -->
+          <div class="absolute left-[-260px] bottom-[-240px] w-[620px] h-[630px] z-30 hidden lg:block pointer-events-none">
+            <!-- 가장 좌측 캐릭터 위쪽에 위치하도록 조정 (위치 하향) -->
+            <div 
+              class="absolute left-[220px] top-[160px] tooltip tooltip-open tooltip-top [--tooltip-tail:0px] [--tooltip-color:rgba(255,235,59,0.9)] [--tooltip-text-color:#4e3b2a]" 
+              data-tip="문제가 잘 안풀리나요? 추천 문제로 보충해보아요"
+            ></div>
+            <img
+              class="w-full h-full object-contain opacity-90"
+              :src="megacrewImage"
+              alt="megacrew"
+            />
           </div>
+        </div>
         </div>
       </section>
 
@@ -65,33 +83,38 @@
       <section v-else class="relative w-full h-full">
         <div class="cf-panel-inner !p-0 h-full">
           <div class="cf-roadmap !h-full !max-h-none !mb-0 !rounded-none">
-            <!-- 돌아가기 버튼 -->
+            <!-- 돌아가기 버튼: 좌측 전체 높이 사이드바 형태 -->
             <div class="absolute left-0 top-0 h-full z-30 flex items-center">
               <button 
                 @click="selectedLevel = null"
-                class="group relative flex items-center w-10 sm:w-12 hover:w-28 h-full bg-farm-brown-dark/5 hover:bg-farm-paper/95 backdrop-blur-md text-farm-olive transition-all duration-300 ease-out overflow-hidden border-r border-farm-brown/10 pointer-events-auto"
+                class="group relative flex items-center w-8 hover:w-24 h-full bg-white/5 hover:bg-white/90 backdrop-blur-md text-farm-olive transition-all duration-500 ease-in-out overflow-hidden border-r border-white/10 pointer-events-auto"
               >
-                <div class="absolute left-0 w-10 sm:w-12 flex justify-center items-center h-full z-10">
+                <!-- 평상시 및 호버 시 공통 아이콘 영역 -->
+                <div class="absolute left-0 w-8 flex justify-center items-center h-full z-10">
                   <iconify-icon 
                     icon="mdi:chevron-left" 
-                    class="text-xl font-black transition-transform duration-300 group-hover:-translate-x-0.5"
+                    class="text-xl font-black transition-transform duration-500 group-hover:-translate-x-1"
                   ></iconify-icon>
                 </div>
-                <div class="pl-12 pr-3 whitespace-nowrap transform translate-x-2 group-hover:translate-x-0 opacity-0 group-hover:opacity-100 transition-all duration-300 ease-out">
-                  <span class="font-bold text-sm tracking-tight text-farm-brown-dark">돌아가기</span>
+
+                <!-- 호버 시 나타나는 텍스트 영역 -->
+                <div class="pl-8 pr-3 whitespace-nowrap transform translate-x-2 group-hover:translate-x-0 opacity-0 group-hover:opacity-100 transition-all duration-500 ease-out">
+                  <span class="font-bold text-sm tracking-tight">Back</span>
                 </div>
-                <div class="absolute inset-y-0 right-0 w-px bg-farm-brown/20 group-hover:opacity-0 transition-opacity"></div>
+                
+                <!-- 평상시 보여줄 우측 가이드 라인 -->
+                <div class="absolute inset-y-0 right-0 w-[1px] bg-white/30 group-hover:opacity-0 transition-opacity"></div>
               </button>
             </div>
 
-            <!-- 타이틀 영역 -->
-            <div class="absolute top-20 sm:top-24 left-0 w-full z-20 pointer-events-none">
-              <div class="text-center">
-                <p class="text-xs font-bold text-farm-olive/70 tracking-[0.2em] uppercase mb-1">Curriculum</p>
-                <h1 class="text-4xl sm:text-5xl md:text-6xl font-dnf text-farm-olive mb-1 drop-shadow-sm">
+            <!-- 타이틀 영역: 이미지 위에 절대 위치로 배치 -->
+            <div class="absolute top-24 left-0 w-full z-20 pointer-events-none">
+              <div class="text-center relative">
+                <h2 class="text-sm font-bold text-farm-olive/80 tracking-[0.3em] uppercase mb-1">Curriculum</h2>
+                <h1 class="text-6xl font-dnf text-farm-olive mb-2 relative inline-block">
                   LEVEL {{ selectedLevel }}
                 </h1>
-                <p class="text-lg sm:text-xl md:text-2xl text-farm-olive/95 font-bold tracking-tight">
+                <p class="text-2xl text-farm-olive font-bold tracking-tight">
                   {{ levelTopics[selectedLevel - 1] }}
                 </p>
               </div>
@@ -111,7 +134,6 @@
                 v-for="n in 5"
                 :key="n"
                 class="cf-level group/level"
-                :class="{ 'cf-level--locked': !isStepUnlocked(selectedLevel - 1, n) }"
               >
                 <div class="cf-level-visual">
                   <span class="cf-level-num">STEP {{ n }}</span>
@@ -125,9 +147,8 @@
                 <button
                   type="button"
                   class="cf-level-btn"
-                  :aria-label="isStepUnlocked(selectedLevel - 1, n) ? `레벨 ${selectedLevel} - STEP ${n}` : `STEP ${n - 1}을 먼저 완료해주세요`"
-                  :disabled="!isStepUnlocked(selectedLevel - 1, n)"
-                  @click="isStepUnlocked(selectedLevel - 1, n) && onClickLevel(selectedLevel, n)"
+                  :aria-label="`레벨 ${selectedLevel} - ${n}`"
+                  @click="onClickLevel(selectedLevel, n)"
                   @mouseenter="onHoverLevel(selectedLevel, n)"
                   @mouseleave="onLeaveLevel"
                 />
@@ -137,40 +158,46 @@
                   <div
                     v-if="hoveredRoadmap === selectedLevel && hoveredLevel === n"
                     class="cf-level-summary-vertical"
-                    :class="{ 'cf-level-summary-vertical--locked': !isStepUnlocked(selectedLevel - 1, n) }"
                   >
-                    <p class="cf-level-summary-vertical-label">STEP {{ n }}</p>
-                    <p v-if="!isStepUnlocked(selectedLevel - 1, n)" class="cf-level-summary-vertical-title text-farm-brown/70">
-                      이전 STEP을 먼저 풀어주세요
-                    </p>
-                    <p v-else class="cf-level-summary-vertical-title">
-                      {{ getStepProblem(selectedLevel - 1, n)?.problem?.title || `STEP ${n}` }}
-                    </p>
-                    <template v-if="isStepUnlocked(selectedLevel - 1, n)">
-                      <div class="cf-level-summary-vertical-divider"></div>
-                      <div class="cf-level-summary-vertical-meta">
-                        <span v-if="getStepProblem(selectedLevel - 1, n)?.problem?.difficulty" class="cf-level-meta-item">
-                          <span class="text-[10px] text-farm-brown/50">난이도</span>
-                          <span class="text-[11px] font-bold text-farm-brown">{{ getStepProblem(selectedLevel - 1, n).problem.difficulty }}</span>
-                        </span>
-                        <span v-if="getStepProblem(selectedLevel - 1, n)?.problem?.difficulty && getStepProblem(selectedLevel - 1, n)?.statistics?.successCount != null" class="cf-level-meta-sep">·</span>
-                        <span v-if="getStepProblem(selectedLevel - 1, n)?.statistics?.successCount != null" class="cf-level-meta-item">
-                          <span class="text-[10px] text-farm-brown/50">정답률</span>
-                          <span class="text-[11px] font-bold text-farm-brown">{{ formatSuccessRate(getStepProblem(selectedLevel - 1, n).statistics.successCount, getStepProblem(selectedLevel - 1, n).statistics.submissionCount) }}</span>
-                        </span>
+                    <div class="flex flex-col gap-2">
+                      <div class="flex items-center justify-center gap-1.5">
+                        <span class="px-2 py-0.5 rounded-md bg-farm-olive/10 text-[10px] font-bold text-farm-olive uppercase tracking-wider">Step {{ n }}</span>
+                        <div class="h-1 w-1 rounded-full bg-farm-brown/30"></div>
+                        <span class="text-[10px] font-bold text-farm-brown/60 uppercase tracking-wider">Problem</span>
                       </div>
-                      <div class="cf-level-summary-vertical-status">
+                      
+                      <p class="cf-level-summary-title">
+                        {{
+                          getStepProblem(selectedLevel - 1, n)?.problem?.title ||
+                            `STEP ${n}`
+                        }}
+                      </p>
+                      
+                      <div class="h-[1px] w-full bg-gradient-to-r from-transparent via-farm-brown/20 to-transparent my-1"></div>
+                      
+                      <div class="flex flex-wrap justify-center gap-x-3 gap-y-1">
+                        <div v-if="getStepProblem(selectedLevel - 1, n)?.problem?.difficulty" class="flex items-center gap-1">
+                          <span class="text-[10px] text-farm-brown/50 font-bold">난이도</span>
+                          <span class="text-[11px] text-farm-brown font-bold">{{ getStepProblem(selectedLevel - 1, n).problem.difficulty }}</span>
+                        </div>
+                        <div v-if="getStepProblem(selectedLevel - 1, n)?.statistics?.successCount != null" class="flex items-center gap-1">
+                          <span class="text-[10px] text-farm-brown/50 font-bold">정답률</span>
+                          <span class="text-[11px] text-farm-brown font-bold">{{ formatSuccessRate(getStepProblem(selectedLevel - 1, n).statistics.successCount, getStepProblem(selectedLevel - 1, n).statistics.submissionCount) }}</span>
+                        </div>
+                      </div>
+
+                      <div class="mt-1">
                         <span 
                           :class="[
                             'px-3 py-1 rounded-full text-[10px] font-black shadow-sm border',
                             getStepProblem(selectedLevel - 1, n)?.userStatus?.isSolved 
-                              ? 'bg-farm-green-light/80 text-farm-green-dark border-farm-green/50' 
+                              ? 'bg-green-100 text-green-700 border-green-200' 
                               : getStepProblem(selectedLevel - 1, n)?.userStatus?.isTried 
-                                ? 'bg-farm-yellow/70 text-farm-brown-dark border-farm-brown/30' 
-                                : 'bg-farm-cream/90 text-farm-brown/70 border-farm-brown/20'
+                                ? 'bg-orange-100 text-orange-700 border-orange-200' 
+                                : 'bg-gray-100 text-gray-600 border-gray-200'
                           ]"
                         >
-                          {{
+                          {{ 
                             getStepProblem(selectedLevel - 1, n)?.userStatus?.isSolved 
                               ? 'COMPLETED' 
                               : getStepProblem(selectedLevel - 1, n)?.userStatus?.isTried 
@@ -179,7 +206,7 @@
                           }}
                         </span>
                       </div>
-                    </template>
+                    </div>
                   </div>
                 </Transition>
               </div>
@@ -288,22 +315,22 @@
     <!-- 풀고 있는 문제가 있을 때 다른 문제 클릭 시 확인 모달 -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showActiveSessionModal && activeSessionPayload" class="fixed inset-0 flex items-center justify-center bg-farm-brown-dark/30 backdrop-blur-sm z-[9999]">
-          <div class="bg-farm-paper shadow-2xl rounded-2xl p-6 min-w-[320px] max-w-[90vw] border border-farm-brown/20">
-            <p class="text-base font-medium text-farm-brown-dark mb-5">
+        <div v-if="showActiveSessionModal && activeSessionPayload" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]">
+          <div class="card bg-base-100 shadow-2xl rounded-xl p-6 min-w-[320px] max-w-[90vw] border border-base-300">
+            <p class="text-lg font-semibold text-[var(--color-farm-brown-dark)] mb-4">
               풀고 있는 문제가 있습니다. (현재 {{ activeSessionPayload.otherProblemId }}번 문제)
             </p>
-            <div class="flex justify-end gap-2">
+            <div class="flex justify-end gap-3">
               <button
                 type="button"
-                class="px-4 py-2 rounded-xl text-sm font-medium text-farm-brown-dark border border-farm-brown/30 hover:bg-farm-cream transition-colors"
+                class="btn btn-sm btn-ghost border border-base-300"
                 @click="goToExistingProblem"
               >
                 기존 문제로
               </button>
               <button
                 type="button"
-                class="px-4 py-2 rounded-xl text-sm font-medium text-farm-paper bg-farm-green hover:bg-farm-green-dark disabled:opacity-50 transition-colors"
+                class="btn btn-sm bg-[var(--color-farm-green)] text-white border-none hover:bg-[var(--color-farm-green-dark)]"
                 :disabled="activeSessionLoading"
                 @click="goToNewProblem"
               >
@@ -610,13 +637,6 @@ function getStepProblem(curriculumIdx, level) {
   )
 }
 
-/** STEP 순차 잠금: STEP 1은 항상 열림, STEP n(n>=2)은 이전 STEP 해결 시에만 열림 */
-function isStepUnlocked(curriculumIdx, stepNum) {
-  if (stepNum <= 1) return true
-  const prev = getStepProblem(curriculumIdx, stepNum - 1)
-  return prev?.userStatus?.isSolved === true
-}
-
 function getStepSummary(curriculumIdx, level) {
   const step = getStepProblem(curriculumIdx, level)
   if (!step) return ''
@@ -768,37 +788,21 @@ async function goToNewProblem() {
 </script>
 
 <style scoped>
+/* 툴팁 커스텀 스타일 */
 :deep(.tooltip) {
   --tooltip-tail: 8px;
 }
 :deep(.tooltip:before) {
-  background: linear-gradient(180deg, rgba(255, 253, 245, 0.99), rgba(250, 245, 230, 0.98)) !important;
+  background-color: #faea92 !important; /* farm 테마 노란색 */
   color: #4e3b2a !important;
-  font-family: var(--font-dnf);
-  font-size: 0.9rem;
-  letter-spacing: 0.02em;
-  padding: 10px 18px !important;
-  border-radius: 16px !important;
-  border: 2px solid rgba(124, 187, 103, 0.4) !important;
-  box-shadow:
-    0 4px 0 rgba(94, 141, 72, 0.2),
-    0 6px 20px rgba(78, 59, 42, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  max-width: none !important;
-  width: max-content !important;
-  line-height: 1.4;
-}
-:deep(.roadmap-tooltip-left:before) {
-  border-left-width: 4px;
-  border-left-color: rgba(255, 224, 130, 0.9);
-}
-:deep(.roadmap-tooltip-right:before) {
-  border-left-width: 4px;
-  border-left-color: rgba(74, 74, 41, 0.5);
-}
-:deep(.roadmap-tooltip-mega:before) {
-  border-left-width: 4px;
-  border-left-color: rgba(255, 224, 130, 0.9);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 10px 32px; /* 너비와 높이를 키우기 위해 패딩 증가 */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border: 2px dashed #4E3B2A !important; /* 가장 어두운 브라운색 점선 테두리 */
+  max-width: none !important; /* 가로 길이 제한 해제 */
+  width: max-content !important; /* 텍스트 길이에 맞춤 */
 }
 :deep(.tooltip:after) {
   display: none !important;
@@ -899,8 +903,9 @@ async function goToNewProblem() {
 
 .cf-roadmap-recommend {
   position: absolute;
-  right: 4rem;
-  top: 3rem;
+  right: 5.25rem;
+  top: 3.25rem;
+  bottom: auto;
   z-index: 5;
 }
 
@@ -919,6 +924,8 @@ async function goToNewProblem() {
     0 2px 8px rgba(0, 0, 0, 0.12);
   transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease;
 }
+
+/* 빛살(레이) */
 .cf-sun-btn::before {
   content: '';
   position: absolute;
@@ -930,10 +937,13 @@ async function goToNewProblem() {
     rgba(255, 224, 130, 0) 10deg 20deg
   );
   opacity: 0.9;
+  /* 가운데는 비우고 바깥만 보이게 */
   -webkit-mask: radial-gradient(circle, transparent 0 58%, #000 59% 100%);
   mask: radial-gradient(circle, transparent 0 58%, #000 59% 100%);
   pointer-events: none;
 }
+
+/* 은은한 글로우 */
 .cf-sun-btn::after {
   content: '';
   position: absolute;
@@ -963,7 +973,7 @@ async function goToNewProblem() {
   font-size: 13px;
   font-weight: 900;
   letter-spacing: -0.02em;
-  color: rgba(78, 59, 42, 0.92);
+  color: rgba(78, 59, 42, 0.92); /* farm-brown-dark 계열 */
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
   line-height: 1;
   user-select: none;
@@ -987,8 +997,11 @@ async function goToNewProblem() {
 .cf-roadmap::after {
   content: '';
   position: absolute;
-  inset: -2px;
-  box-shadow: inset 0 0 70px 40px rgba(255, 249, 233, 0.85);
+  inset: -2px; /* 이미지 경계선을 완전히 덮기 위해 살짝 바깥으로 확장 */
+  /* 더 강력하고 넓은 그림자로 경계선을 완전히 지움 */
+  box-shadow: 
+    inset 0 0 80px 45px #FFF9E9,
+    inset 0 0 120px 20px #FFF9E9;
   pointer-events: none;
   z-index: 1;
 }
@@ -1076,8 +1089,8 @@ async function goToNewProblem() {
   display: flex;
   justify-content: center;
   align-items: flex-end;
-  padding: 0 8% 6%;
-  gap: -1.5rem;
+  padding: 0 10% 8%;
+  gap: -2rem; /* 음수 간격을 주어 표지판들이 서로 겹치도록 설정 */
   z-index: 2;
   pointer-events: none;
 }
@@ -1088,7 +1101,6 @@ async function goToNewProblem() {
   flex: 1;
   flex-basis: 0;
   max-width: 22%;
-  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1108,9 +1120,9 @@ async function goToNewProblem() {
 .cf-level-num {
   position: absolute;
   top: 50%;
-  left: calc(50% + 12px);
+  left: calc(50% + 10px);
   transform: translate(-50%, -50%);
-  font-size: 1.4rem;
+  font-size: 1.25rem;
   font-weight: 800;
   color: var(--color-farm-yellow);
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
@@ -1122,11 +1134,11 @@ async function goToNewProblem() {
 }
 .cf-level:hover .cf-level-num {
   transform: translate(-50%, -50%);
-  color: #ffeb3b;
+  color: #ffeb3b; /* 원래의 노란색으로 복구 */
   text-shadow: 0 0 12px rgba(255, 235, 59, 0.7), 0 2px 4px rgba(0, 0, 0, 0.4);
 }
 .cf-level-cloud {
-  width: 10.5rem;
+  width: 9rem;
   height: auto;
   object-fit: contain;
   display: block;
@@ -1140,7 +1152,7 @@ async function goToNewProblem() {
   top: 0;
   left: 0;
   width: 100%;
-  height: 10.5rem;
+  height: 9rem; /* 표지판 이미지 높이에 맞춤 */
   padding: 0;
   margin: 0;
   border: 0;
@@ -1154,31 +1166,8 @@ async function goToNewProblem() {
   outline: 2px solid rgba(255, 235, 59, 0.9);
   outline-offset: 2px;
 }
-.cf-level-btn:disabled {
-  cursor: not-allowed;
-}
-/* STEP 순차 잠금: 이전 STEP 미해결 시 비활성화 스타일 (활성과 같은 톤, 조금 어둡게) */
-.cf-level--locked .cf-level-num {
-  color: #b5a035;
-  text-shadow: 0 1px 2px rgba(78, 59, 42, 0.25);
-}
-.cf-level--locked .cf-level-cloud {
-  filter: sepia(0.2) brightness(0.88) saturate(0.75);
-}
-.cf-level--locked:hover .cf-level-visual {
-  transform: none;
-}
-.cf-level--locked:hover .cf-level-num {
-  color: #b5a035;
-  text-shadow: 0 1px 2px rgba(78, 59, 42, 0.25);
-}
-.cf-level--locked:hover .cf-level-cloud {
-  filter: sepia(0.2) brightness(0.88) saturate(0.75);
-}
-.cf-level-summary-vertical--locked {
-  border-color: rgba(122, 92, 62, 0.18);
-  background: rgba(250, 246, 238, 0.97);
-}
+
+/* 세로형 문제 요약 정보 */
 .cf-summary-vertical-enter-active,
 .cf-summary-vertical-leave-active {
   transition: all 0.3s ease;
@@ -1195,57 +1184,14 @@ async function goToNewProblem() {
   left: 50%;
   transform: translateX(-50%);
   margin-top: 0.75rem;
-  padding: 1rem 1.25rem;
-  border-radius: 14px;
-  background: rgba(255, 253, 245, 0.97);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(122, 92, 62, 0.12);
-  box-shadow: 0 6px 20px rgba(78, 59, 42, 0.1);
+  padding: 1rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
   width: 220px;
   text-align: center;
   z-index: 10;
   pointer-events: none;
-}
-.cf-level-summary-vertical-label {
-  font-size: 0.65rem;
-  font-weight: 800;
-  color: var(--color-farm-olive);
-  letter-spacing: 0.12em;
-  margin: 0 0 0.35rem;
-  text-transform: uppercase;
-}
-.cf-level-summary-vertical-title {
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: #4e3b2a;
-  margin: 0;
-  line-height: 1.35;
-  word-break: keep-all;
-}
-.cf-level-summary-vertical-divider {
-  height: 1px;
-  margin: 0.5rem 0;
-  background: linear-gradient(to right, transparent, rgba(122, 92, 62, 0.2), transparent);
-}
-.cf-level-summary-vertical-meta {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 0.25rem 0.5rem;
-}
-.cf-level-meta-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-.cf-level-meta-sep {
-  color: rgba(122, 92, 62, 0.4);
-  font-size: 0.7rem;
-  font-weight: 700;
-}
-.cf-level-summary-vertical-status {
-  margin-top: 0.5rem;
 }
 .cf-level-summary-title {
   font-size: 1rem;
@@ -1261,25 +1207,18 @@ async function goToNewProblem() {
 }
 
 @media (min-width: 768px) {
-  .cf-level-num { font-size: 1.9rem; }
-  .cf-level-cloud { width: 12rem; }
-  .cf-level-btn { height: 12rem; }
-  .cf-roadmap-levels { padding: 0 6% 5%; transform: translateY(-210px); }
-  .cf-level-summary-vertical { width: 240px; padding: 1.1rem 1.35rem; }
-  .cf-level-summary-vertical-title { font-size: 1rem; }
+  .cf-level-num { font-size: 1.75rem; }
+  .cf-level-cloud { width: 11rem; }
+  .cf-level-btn { height: 11rem; }
+  .cf-level-summary-vertical { width: 220px; }
 }
 
-@media (max-width: 639px) {
-  .cf-roadmap-levels { padding: 0 4% 4%; transform: translateY(-150px); gap: -1rem; }
-  .cf-level-cloud { width: 8rem; }
-  .cf-level-num { font-size: 1.2rem; }
-  .cf-level-btn { height: 8rem; }
-  .cf-level-summary-vertical { width: 200px; padding: 0.9rem 1rem; }
-  .cf-level-summary-vertical-title { font-size: 0.9rem; }
-  .cf-roadmap-recommend { right: 1.5rem; top: 2rem; }
-  .cf-sun-btn { width: 54px; height: 54px; }
-  .cf-sun-text { font-size: 11px; }
+@media (min-width: 768px) {
+  .cf-level-num { font-size: 1.5rem; }
+  .cf-level-cloud { width: 9rem; }
 }
+
+/* 문제 상세 모달 */
 .cf-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1288,27 +1227,29 @@ async function goToNewProblem() {
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  background: rgba(78, 59, 42, 0.25);
-  backdrop-filter: blur(4px);
+  background: rgba(0, 0, 0, 0.4);
   cursor: pointer;
 }
 .cf-modal {
   width: 100%;
   max-width: 26rem;
-  background: rgba(255, 253, 245,   0.97);
+  /* 더 밝은 페이퍼 톤 */
+  background: rgba(255, 253, 245, 0.97);
+  /* 테두리 두께 줄임 */
   border: 2px solid rgba(74, 74, 41, 0.35);
   border-radius: 24px;
+  /* 배경이 투명하므로 블러로 유리 느낌 */
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 10px 0 rgba(74, 74, 41, 0.08);
+  box-shadow: 0 10px 0 rgba(74, 74, 41, 0.08); /* 올리브색 계열 그림자 */
   cursor: default;
   overflow: hidden;
   position: relative;
 }
 .cf-modal-header {
-  padding: 1.35rem 1.5rem 1.1rem;
-  background: rgba(255, 253, 245, 0.9);
-  border-bottom: 1px solid rgba(122, 92, 62, 0.12);
+  padding: 1.5rem 1.5rem 1rem;
+  background: rgba(255, 253, 245, 0.85);
+  border-bottom: 1px solid rgba(122, 92, 62, 0.18);
 }
 .cf-modal-label {
   display: inline-block;
@@ -1330,21 +1271,22 @@ async function goToNewProblem() {
   line-height: 1.2;
 }
 .cf-modal-body {
-  padding: 1.1rem 1.5rem;
+  padding: 1.25rem 1.5rem;
 }
 .cf-modal-info-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.6rem;
+  gap: 0.75rem;
 }
 .cf-modal-info-card {
-  background: rgba(255, 255, 255, 0.9);
-  padding: 0.65rem 0.9rem;
-  border-radius: 12px;
-  border: 1px solid rgba(122, 92, 62, 0.1);
+  background: #ffffff;
+  padding: 0.75rem 1rem;
+  border-radius: 16px;
+  border: 2px solid rgba(245, 242, 232, 0.95);
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.2rem;
+  box-shadow: inset 0 -3px 0 #f0f0f0;
 }
 .cf-modal-info-card dt {
   font-size: 0.65rem;
@@ -1379,16 +1321,16 @@ async function goToNewProblem() {
   padding: 0.35rem 0.75rem;
   border-radius: 10px;
 }
-.cf-modal-status-solved { background: var(--color-farm-green); color: white; border-bottom: 2px solid var(--color-farm-green-dark); }
-.cf-modal-status-tried { background: var(--color-farm-point); color: white; border-bottom: 2px solid #c96a52; }
-.cf-modal-status-none { background: var(--color-farm-brown); color: white; border-bottom: 2px solid var(--color-farm-brown-dark); }
+.cf-modal-status-solved { background: #4ade80; color: white; border-bottom: 2px solid #16a34a; }
+.cf-modal-status-tried { background: #fb923c; color: white; border-bottom: 2px solid #ea580c; }
+.cf-modal-status-none { background: #94a3b8; color: white; border-bottom: 2px solid #475569; }
 
 .cf-modal-actions {
-  padding: 1rem 1.5rem 1.35rem;
+  padding: 1rem 1.5rem 1.5rem;
   display: flex;
-  gap: 0.65rem;
-  background: rgba(255, 253, 245, 0.9);
-  border-top: 1px solid rgba(122, 92, 62, 0.12);
+  gap: 0.75rem;
+  background: rgba(255, 253, 245, 0.85);
+  border-top: 1px solid rgba(122, 92, 62, 0.18);
 }
 .cf-modal-btn {
   flex: 1;
@@ -1432,6 +1374,8 @@ async function goToNewProblem() {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* 애니메이션 효과 */
 @keyframes bounce-slow {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-15px); }

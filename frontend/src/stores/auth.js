@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { login as apiLogin, logout as apiLogout, signup as apiSignup, checkEmailDuplicate as apiCheckEmailDuplicate, checkNicknameDuplicate as apiCheckNicknameDuplicate, getUserProfile as apiGetUserProfile, normalizeCodingLevel } from '@/api/auth'
+import { useProfileStore } from '@/stores/profile'
 
 /** localStorage의 토큰을 읽어, 만료되었으면 제거하고 null 반환 */
 function getValidTokenFromStorage() {
@@ -50,6 +51,12 @@ export const useAuthStore = defineStore('auth', () => {
     errorMessage.value = null
     console.log('login 호출')
 
+    // 로그인 전 이전 유저 데이터 초기화 (회원 전환 시 이전 정보 남는 문제 방지)
+    try {
+      const profileStore = useProfileStore()
+      profileStore.reset()
+    } catch (_) {}
+
     try {
       const res = await apiLogin(payload)
       const data = res.data?.data ?? {}
@@ -85,6 +92,12 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = null
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      
+      // profile store 초기화 (회원 전환 시 이전 유저 정보 남는 문제 방지)
+      try {
+        const profileStore = useProfileStore()
+        profileStore.reset()
+      } catch (_) {}
     }
   }
 
