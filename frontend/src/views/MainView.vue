@@ -374,7 +374,7 @@ const buildQueryParams = (page = 0) => ({
 
 // 클라이언트 측 필터링 (NORMAL 타입 + statusFilter)
 const filteredProblems = computed(() => {
-  const list = problems.value ?? []
+  const list = allProblems.value ?? []
   // 1. NORMAL 타입만 필터링
   const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
   // 2. statusFilter 적용
@@ -390,10 +390,10 @@ const filteredProblems = computed(() => {
 const totalPages = computed(() => {
   if (!statusFilter.value && totalFromServer.value > 0) {
     // 전체 필터: 서버에서 받은 total 기준으로 페이지 수 계산 (아직 로드 안 된 데이터도 포함)
-    return Math.max(1, Math.ceil(totalFromServer.value / postsPerPage))
+    return Math.max(1, Math.ceil(totalFromServer.value / postsPerPage.value))
   }
   // statusFilter 적용 시: 실제 필터링된 데이터 기준
-  return Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage))
+  return Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage.value))
 })
 
 // 현재 페이지에 표시할 문제 목록 (21개씩)
