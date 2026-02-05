@@ -187,10 +187,10 @@
       </div>
 
       <!-- 문제 카드 리스트 -->
-      <div class="relative" :aria-busy="loading ? 'true' : 'false'">
+      <div class="relative" :aria-busy="isCurrentPageLoading ? 'true' : 'false'">
         <div
           class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 transition-opacity"
-          :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
+          :class="isCurrentPageLoading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard
             v-for="problem in pagedProblems"
@@ -200,15 +200,20 @@
           />
         </div>
 
-        <div v-if="loading" class="absolute inset-0 flex items-center justify-center">
+        <div v-if="isCurrentPageLoading" class="absolute inset-0 flex items-center justify-center">
           <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
 
-        <div v-if="!loading && !error && pagedProblems.length === 0" class="py-20 text-center">
+        <div v-if="!isCurrentPageLoading && !error && pagedProblems.length === 0" class="py-20 text-center">
           <p class="text-farm-brown/70 text-sm">조건에 맞는 문제가 없어요.</p>
           <button type="button" class="mt-3 text-sm font-medium text-farm-point hover:underline" @click="resetFilters">
             필터 초기화
           </button>
+        </div>
+
+        <!-- 추가 데이터 로딩 중 표시 -->
+        <div v-if="loadingMore" class="mt-4 text-center">
+          <span class="text-xs text-farm-brown/60">추가 데이터 로딩 중...</span>
         </div>
       </div>
       <!-- 페이지네이션 -->
@@ -222,7 +227,7 @@
           <button
             type="button"
             class="h-10 rounded-xl bg-transparent px-3 text-sm font-semibold text-farm-brown-dark transition-colors hover:bg-transparent hover:text-farm-brown-dark/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30 disabled:cursor-not-allowed disabled:text-farm-brown/30"
-            :disabled="loading || currentPage <= 1"
+            :disabled="isCurrentPageLoading || currentPage <= 1"
             @click="back"
           >
             이전
@@ -239,7 +244,7 @@
                     ? 'text-farm-brown-dark'
                     : 'text-farm-brown/60 hover:text-farm-brown-dark'
                 "
-                :disabled="loading"
+                :disabled="isCurrentPageLoading"
                 @click="goToPage(item.page)"
               >
                 <span
@@ -256,7 +261,7 @@
           <button
             type="button"
             class="h-10 rounded-xl bg-transparent px-3 text-sm font-semibold text-farm-brown-dark transition-colors hover:bg-transparent hover:text-farm-brown-dark/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30 disabled:cursor-not-allowed disabled:text-farm-brown/30"
-            :disabled="loading || currentPage >= totalPages"
+            :disabled="isCurrentPageLoading || currentPage >= totalPages"
             @click="next"
           >
             다음
@@ -290,7 +295,7 @@ const router = useRouter()
 const MAIN_PAGE_STORAGE_KEY = 'main_page'
 const MAIN_SCROLL_STORAGE_KEY = 'main_scroll'
 
-const problems = ref([]) // 전체 문제 목록 (API에서 가져온 원본)
+const allProblems = ref([]) // 전체 문제 목록 (API에서 가져온 원본)
 const loading = ref(true) // 초기 로딩 (첫 페이지)
 const loadingMore = ref(false) // 추가 데이터 로딩 중
 const error = ref(null)
@@ -369,7 +374,7 @@ const buildQueryParams = (page = 0) => ({
 
 // 클라이언트 측 필터링 (NORMAL 타입 + statusFilter)
 const filteredProblems = computed(() => {
-  const list = problems.value ?? []
+  const list = allProblems.value ?? []
   // 1. NORMAL 타입만 필터링
   const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
   // 2. statusFilter 적용
@@ -385,10 +390,10 @@ const filteredProblems = computed(() => {
 const totalPages = computed(() => {
   if (!statusFilter.value && totalFromServer.value > 0) {
     // 전체 필터: 서버에서 받은 total 기준으로 페이지 수 계산 (아직 로드 안 된 데이터도 포함)
-    return Math.max(1, Math.ceil(totalFromServer.value / postsPerPage.value))
+    return Math.max(1, Math.ceil(totalFromServer.value / postsPerPage))
   }
   // statusFilter 적용 시: 실제 필터링된 데이터 기준
-  return Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage.value))
+  return Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage))
 })
 
 // 현재 페이지에 표시할 문제 목록 (21개씩)
@@ -396,6 +401,14 @@ const pagedProblems = computed(() => {
   const perPage = postsPerPage.value
   const start = (currentPage.value - 1) * perPage
   return filteredProblems.value.slice(start, start + perPage)
+})
+
+// 현재 페이지 데이터가 아직 로드 중인지 확인
+const isCurrentPageLoading = computed(() => {
+  if (loading.value) return true
+  if (!loadingMore.value) return false
+  // 백그라운드 로딩 중이고, 현재 페이지 데이터가 없으면 로딩 중
+  return pagedProblems.value.length === 0
 })
 
 // 드롭다운 상태
@@ -468,11 +481,13 @@ async function goToNewProblem() {
   router.push(`/ide/${payload.targetProblemId}`)
 }
 
+// 점진적 로딩: 첫 페이지 빠르게 표시 → 나머지 백그라운드 로드
 const fetchProblems = async () => {
   try {
     loading.value = true
+    loadingMore.value = false
     error.value = null
-    problems.value = []
+    allProblems.value = []
     
     // 1. 첫 페이지 호출 → 빠르게 화면 표시
     const firstResult = await getProblemList(buildQueryParams(0))
@@ -480,7 +495,7 @@ const fetchProblems = async () => {
     const total = firstResult.total ?? firstData.length
     
     totalFromServer.value = total
-    problems.value = firstData
+    allProblems.value = firstData
     loading.value = false // 첫 페이지 로딩 완료 → 화면 표시
     
     // 2. 추가 페이지가 필요하면 백그라운드에서 로드
@@ -501,7 +516,7 @@ const fetchProblems = async () => {
       for (const result of results) {
         allData.push(...(result.data ?? []))
       }
-      problems.value = allData
+      allProblems.value = allData
       loadingMore.value = false
     }
     
@@ -514,7 +529,6 @@ const fetchProblems = async () => {
     })
   } catch (e) {
     error.value = e.response?.data?.message || e.message || '문제 목록을 불러오지 못했습니다.'
-  } finally {
     loading.value = false
     // IDE에서 복귀 시 저장해 둔 스크롤 위치 복원 (한 번만)
     try {
@@ -579,7 +593,7 @@ const next = () => {
 }
 
 const goToPage = (page) => {
-  if (loading.value) return
+  if (isCurrentPageLoading.value) return
   const p = Number(page)
   if (!Number.isFinite(p)) return
   const clamped = Math.min(Math.max(1, p), totalPages.value)
