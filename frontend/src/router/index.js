@@ -80,9 +80,21 @@ const router = createRouter({
   ],
 })
 
+// 메인 페이지 복원용 storage 키 (MainView와 동일한 문자열)
+const MAIN_PAGE_STORAGE_KEY = 'main_page'
+const MAIN_SCROLL_STORAGE_KEY = 'main_scroll'
+
 router.beforeEach((to, from, next) => {
   const ideStore = useIdeStore()
   const uiStore = useUiStore()
+
+  // 메인(/)에서 IDE가 아닌 다른 페이지로 나갈 때: 복원용 저장값 초기화 → 다른 곳에서 메인 올 때 1페이지·맨 위로
+  if (from.path === '/' && !to.path.startsWith('/ide/')) {
+    try {
+      sessionStorage.removeItem(MAIN_PAGE_STORAGE_KEY)
+      sessionStorage.removeItem(MAIN_SCROLL_STORAGE_KEY)
+    } catch (_) {}
+  }
 
   // 모든 화면 이동: 새 화면이 "완성본"으로 준비될 때까지 오버레이 유지
   if (to.fullPath !== from.fullPath) uiStore.startRouteChange()
