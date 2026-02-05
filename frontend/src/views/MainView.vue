@@ -187,10 +187,10 @@
       </div>
 
       <!-- 문제 카드 리스트 -->
-      <div class="relative" :aria-busy="isCurrentPageLoading ? 'true' : 'false'">
+      <div class="relative" :aria-busy="loading ? 'true' : 'false'">
         <div
           class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 transition-opacity"
-          :class="isCurrentPageLoading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
+          :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard
             v-for="problem in pagedProblems"
@@ -200,20 +200,15 @@
           />
         </div>
 
-        <div v-if="isCurrentPageLoading" class="absolute inset-0 flex items-center justify-center">
+        <div v-if="loading" class="absolute inset-0 flex items-center justify-center">
           <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
 
-        <div v-if="!isCurrentPageLoading && !error && pagedProblems.length === 0" class="py-20 text-center">
+        <div v-if="!loading && !error && pagedProblems.length === 0" class="py-20 text-center">
           <p class="text-farm-brown/70 text-sm">조건에 맞는 문제가 없어요.</p>
           <button type="button" class="mt-3 text-sm font-medium text-farm-point hover:underline" @click="resetFilters">
             필터 초기화
           </button>
-        </div>
-
-        <!-- 추가 데이터 로딩 중 표시 -->
-        <div v-if="loadingMore" class="mt-4 text-center">
-          <span class="text-xs text-farm-brown/60">추가 데이터 로딩 중...</span>
         </div>
       </div>
       <!-- 페이지네이션 -->
@@ -227,7 +222,7 @@
           <button
             type="button"
             class="h-10 rounded-xl bg-transparent px-3 text-sm font-semibold text-farm-brown-dark transition-colors hover:bg-transparent hover:text-farm-brown-dark/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30 disabled:cursor-not-allowed disabled:text-farm-brown/30"
-            :disabled="isCurrentPageLoading || currentPage <= 1"
+            :disabled="loading || currentPage <= 1"
             @click="back"
           >
             이전
@@ -244,7 +239,7 @@
                     ? 'text-farm-brown-dark'
                     : 'text-farm-brown/60 hover:text-farm-brown-dark'
                 "
-                :disabled="isCurrentPageLoading"
+                :disabled="loading"
                 @click="goToPage(item.page)"
               >
                 <span
@@ -261,7 +256,7 @@
           <button
             type="button"
             class="h-10 rounded-xl bg-transparent px-3 text-sm font-semibold text-farm-brown-dark transition-colors hover:bg-transparent hover:text-farm-brown-dark/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30 disabled:cursor-not-allowed disabled:text-farm-brown/30"
-            :disabled="isCurrentPageLoading || currentPage >= totalPages"
+            :disabled="loading || currentPage >= totalPages"
             @click="next"
           >
             다음
@@ -403,14 +398,6 @@ const pagedProblems = computed(() => {
   return filteredProblems.value.slice(start, start + perPage)
 })
 
-// 현재 페이지 데이터가 아직 로드 중인지 확인
-const isCurrentPageLoading = computed(() => {
-  if (loading.value) return true
-  if (!loadingMore.value) return false
-  // 백그라운드 로딩 중이고, 현재 페이지 데이터가 없으면 로딩 중
-  return pagedProblems.value.length === 0
-})
-
 // 드롭다운 상태
 const openDropdown = ref(null) // 'algorithm' | 'difficulty' | null
 const toggleDropdown = (key) => {
@@ -481,11 +468,9 @@ async function goToNewProblem() {
   router.push(`/ide/${payload.targetProblemId}`)
 }
 
-// 점진적 로딩: 첫 페이지 빠르게 표시 → 나머지 백그라운드 로드
 const fetchProblems = async () => {
   try {
     loading.value = true
-    loadingMore.value = false
     error.value = null
     problems.value = []
     
@@ -529,9 +514,9 @@ const fetchProblems = async () => {
     })
   } catch (e) {
     error.value = e.response?.data?.message || e.message || '문제 목록을 불러오지 못했습니다.'
-    loading.value = false
-    loadingMore.value = false
   } finally {
+    loading.value = false
+    // IDE에서 복귀 시 저장해 둔 스크롤 위치 복원 (한 번만)
     try {
       const saved = sessionStorage.getItem(MAIN_SCROLL_STORAGE_KEY)
       if (saved != null) {
@@ -594,7 +579,7 @@ const next = () => {
 }
 
 const goToPage = (page) => {
-  if (isCurrentPageLoading.value) return
+  if (loading.value) return
   const p = Number(page)
   if (!Number.isFinite(p)) return
   const clamped = Math.min(Math.max(1, p), totalPages.value)
