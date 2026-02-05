@@ -274,7 +274,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProblemList } from '@/api/problem'
 import { useCardStore } from '@/stores/card'
@@ -345,7 +345,7 @@ const buildQueryParams = (page = 0) => ({
 
 // 클라이언트 측 필터링 (NORMAL 타입 + statusFilter)
 const filteredProblems = computed(() => {
-  const list = allProblems.value ?? []
+  const list = problems.value ?? []
   // 1. NORMAL 타입만 필터링
   const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
   // 2. statusFilter 적용
@@ -369,9 +369,9 @@ const totalPages = computed(() => {
 
 // 현재 페이지에 표시할 문제 목록 (21개씩)
 const pagedProblems = computed(() => {
-  const start = (currentPage.value - 1) * postsPerPage
-  const end = start + postsPerPage
-  return filteredProblems.value.slice(start, end)
+  const perPage = postsPerPage.value
+  const start = (currentPage.value - 1) * perPage
+  return filteredProblems.value.slice(start, start + perPage)
 })
 
 // 현재 페이지 데이터가 아직 로드 중인지 확인
@@ -419,6 +419,9 @@ async function onClickProblem(problem) {
   } catch (_) {
     // 404 등 = 활성 세션 없음 → 그대로 이동
   }
+  try {
+    sessionStorage.setItem(MAIN_SCROLL_STORAGE_KEY, String(window.scrollY))
+  } catch (_) {}
   router.push(`/ide/${problemId}`)
 }
 
@@ -427,6 +430,9 @@ function goToExistingProblem() {
   if (!payload) return
   showActiveSessionModal.value = false
   activeSessionPayload.value = null
+  try {
+    sessionStorage.setItem(MAIN_SCROLL_STORAGE_KEY, String(window.scrollY))
+  } catch (_) {}
   router.push(`/ide/${payload.otherProblemId}`)
 }
 
@@ -440,6 +446,9 @@ async function goToNewProblem() {
   showActiveSessionModal.value = false
   activeSessionPayload.value = null
   activeSessionLoading.value = false
+  try {
+    sessionStorage.setItem(MAIN_SCROLL_STORAGE_KEY, String(window.scrollY))
+  } catch (_) {}
   router.push(`/ide/${payload.targetProblemId}`)
 }
 
@@ -494,6 +503,7 @@ const resetFilters = () => {
   algorithmSelected.value = []
   statusFilter.value = ''
   currentPage.value = 1
+  syncPageToRoute(1)
 }
 
 // 단일 Watcher: 페이지/필터/정렬을 한 곳에서만 감시해서 중복 호출 방지
@@ -518,6 +528,7 @@ const scrollToTop = () => {
 const back = () => {
   if (currentPage.value > 1) {
     currentPage.value--
+    syncPageToRoute(currentPage.value)
     scrollToTop()
   }
 }
@@ -525,6 +536,7 @@ const back = () => {
 const next = () => {
   if (currentPage.value < totalPages.value) {
     currentPage.value++
+    syncPageToRoute(currentPage.value)
     scrollToTop()
   }
 }
@@ -536,6 +548,7 @@ const goToPage = (page) => {
   const clamped = Math.min(Math.max(1, p), totalPages.value)
   if (clamped === currentPage.value) return
   currentPage.value = clamped
+  syncPageToRoute(clamped)
   scrollToTop()
 }
 
@@ -557,7 +570,34 @@ const paginationItems = computed(() => {
   return items
 })
 
-// API 호출이 필요한 필터 변경 감시 (algorithm, difficulty, sortBy)
+// 메인(/)으로 복귀 시(뒤로가기·메인으로 버튼 등) URL 또는 sessionStorage로 페이지 복원
+watch(
+  () => (route.path === '/' ? route.query.page : undefined),
+  (pageQuery) => {
+    if (route.path !== '/') return
+    const fromQuery = pageQuery != null ? parseInt(pageQuery, 10) : null
+    const p =
+      fromQuery != null && Number.isFinite(fromQuery)
+        ? Math.max(1, fromQuery)
+        : (() => {
+            try {
+              const v = parseInt(sessionStorage.getItem(MAIN_PAGE_STORAGE_KEY), 10)
+              return Number.isFinite(v) && v >= 1 ? v : 1
+            } catch (_) {
+              return 1
+            }
+          })()
+    if (p !== currentPage.value) {
+      currentPage.value = p
+      try {
+        sessionStorage.setItem(MAIN_PAGE_STORAGE_KEY, String(p))
+      } catch (_) {}
+      if (pageQuery == null && p > 1) syncPageToRoute(p)
+    }
+  },
+  { immediate: true }
+)
+
 watch(
   () => ({
     sortBy: sortBy.value,
@@ -565,16 +605,23 @@ watch(
     algorithmKey: normalizeArrayKey(algorithmSelected.value),
   }),
   (next, prev) => {
+    // prev 없음 = 최초 1회 실행. 이때는 페이지 리셋하면 안 됨(URL/sessionStorage 복원값이 덮어씌워짐)
     const criteriaChanged =
-      !prev ||
-      next.sortBy !== prev.sortBy ||
-      next.difficultyKey !== prev.difficultyKey ||
-      next.algorithmKey !== prev.algorithmKey
+      prev != null &&
+      (next.size !== prev.size ||
+        next.sortBy !== prev.sortBy ||
+        next.difficultyKey !== prev.difficultyKey ||
+        next.algorithmKey !== prev.algorithmKey)
 
-    if (criteriaChanged) {
+    // 필터/정렬(또는 size)만 바뀐 경우에만 페이지를 1로
+    if (criteriaChanged && next.page !== 1) {
       currentPage.value = 1
-      scheduleFetch(200)
+      syncPageToRoute(1)
+      return
     }
+
+    // 필터/정렬 변경은 디바운스, 페이징은 즉시
+    scheduleFetch(prev != null && criteriaChanged ? 200 : 0)
   },
   { immediate: true }
 )

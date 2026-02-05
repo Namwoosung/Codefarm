@@ -135,6 +135,24 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
   - hint_content는 반드시 null이 아니어야 함(즉, 실제 힌트를 써야 함)
   - dedup_reason는 "" 로 비워
 
+[질문 유효성 규칙]
+- 학생 질문(user_question)이 아래에 해당하면 "무관 질문"으로 본다:
+  - 욕설, 비속어, 공격적인 표현
+  - 욕설 예시: 바보, 멍청, 욕, 비하 표현
+  - 문제/코드/입력/출력과 관계없는 내용
+  - 감정 표현만 있고 질문이 아닌 경우
+
+- 무관 질문일 때 처리 방식:
+  - should_send = true
+  - feedback_type = CHECK_IN
+  - hint_style = SOCRATIC
+  - hint_content에는 문제와 관련된 질문을 하도록 유도하는 말만 쓴다
+  - 정답이나 코드 힌트는 절대 주지 않는다
+  
+[무관 질문 응답 규칙]
+- 욕설이나 무관 질문에는 약간의 훈육이 필요하고, 학생이 다시 집중하도록 유도해야 한다
+- hint_content 예시: "문제와 관련 없는 질문이에요. 지금은 문제 해결에 집중해 볼까요?"
+
 [결정 규칙 - 중복 방지(단, 학생 질문이 없을 때만)]
 - should_send=false 조건:
   - 이번에 만들 힌트의 "핵심 행동"이 "이전 힌트 목록" 중 하나와 거의 같으면 false.

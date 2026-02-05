@@ -26,9 +26,18 @@
         </div>
 
         <div class="px-6 pb-6">
-          <!-- Loading / Empty -->
-          <div v-if="reportLoading" class="flex items-center justify-center py-12">
-            <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
+          <!-- Loading: 스켈레톤 + 리포트 생성중 문구 -->
+          <div v-if="reportLoading" class="py-6">
+            <p class="text-center text-[var(--color-farm-brown)] font-semibold mb-6">리포트 생성중...</p>
+            <div class="report-modal-skeleton space-y-5">
+              <div class="h-20 rounded-xl bg-[var(--color-farm-cream)]/50 animate-pulse" />
+              <div class="h-4 w-3/4 rounded bg-[var(--color-farm-cream)]/50 animate-pulse" />
+              <div class="h-4 w-1/2 rounded bg-[var(--color-farm-cream)]/50 animate-pulse" />
+              <div class="h-24 rounded-lg bg-[var(--color-farm-cream)]/50 animate-pulse" />
+              <div class="h-4 w-full rounded bg-[var(--color-farm-cream)]/50 animate-pulse" />
+              <div class="h-4 w-5/6 rounded bg-[var(--color-farm-cream)]/50 animate-pulse" />
+              <div class="h-16 rounded-lg bg-[var(--color-farm-cream)]/50 animate-pulse" />
+            </div>
           </div>
           <div v-else-if="!report?.result" class="flex items-center justify-center py-12">
             <p class="text-[var(--color-farm-brown)]">불러오지 못했습니다.</p>
