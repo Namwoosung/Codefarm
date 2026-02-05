@@ -295,8 +295,37 @@ const loading = ref(true) // 초기 로딩 (첫 페이지)
 const loadingMore = ref(false) // 추가 데이터 로딩 중
 const error = ref(null)
 const totalFromServer = ref(0) // 서버에서 알려준 전체 개수
-const currentPage = ref(1)
+
+// 페이지/스크롤 저장용 키
+const MAIN_PAGE_STORAGE_KEY = 'main_page'
+const MAIN_SCROLL_STORAGE_KEY = 'main_scroll'
+
+// URL 쿼리와 동기화: 뒤로가기/메인으로 복귀 시 페이지 유지
+function getInitialPage() {
+  const fromQuery = route.query.page != null ? parseInt(route.query.page, 10) : null
+  if (fromQuery != null && Number.isFinite(fromQuery)) return Math.max(1, fromQuery)
+  try {
+    const fromStorage = parseInt(sessionStorage.getItem(MAIN_PAGE_STORAGE_KEY), 10)
+    if (Number.isFinite(fromStorage) && fromStorage >= 1) return fromStorage
+  } catch (_) {}
+  return 1
+}
+
+const currentPage = ref(getInitialPage())
 const postsPerPage = ref(21)
+
+/** 현재 페이지를 URL 쿼리에 반영 (뒤로가기 시 복원용) */
+function syncPageToRoute(pageNum) {
+  const p = Number(pageNum)
+  if (!Number.isFinite(p) || p < 1) return
+  try {
+    sessionStorage.setItem(MAIN_PAGE_STORAGE_KEY, String(p))
+  } catch (_) {}
+  const q = { ...route.query }
+  if (p === 1) delete q.page
+  else q.page = String(p)
+  router.replace({ path: '/', query: q })
+}
 
 // idle cancel 모달 (30분 무입력 강제 종료 안내)
 const showIdleCancelModal = computed(() => route.query.idle_cancel === '1')
@@ -371,7 +400,6 @@ const pagedProblems = computed(() => {
   const start = (currentPage.value - 1) * perPage
   return filteredProblems.value.slice(start, start + perPage)
 })
-
 // 현재 페이지 데이터가 아직 로드 중인지 확인
 const isCurrentPageLoading = computed(() => {
   if (loading.value) return true
@@ -604,6 +632,8 @@ watch(
 
 watch(
   () => ({
+    page: currentPage.value,
+    size: postsPerPage.value,
     sortBy: sortBy.value,
     difficultyKey: normalizeArrayKey(difficultySelected.value),
     algorithmKey: normalizeArrayKey(algorithmSelected.value),
@@ -611,15 +641,18 @@ watch(
   (next, prev) => {
     // prev 없음 = 최초 1회 실행. 이때는 페이지 리셋하면 안 됨(URL/sessionStorage 복원값이 덮어씌워짐)
     const criteriaChanged =
-      !prev ||
-      next.sortBy !== prev.sortBy ||
-      next.difficultyKey !== prev.difficultyKey ||
-      next.algorithmKey !== prev.algorithmKey
+      prev != null &&
+      (next.sortBy !== prev.sortBy ||
+        next.difficultyKey !== prev.difficultyKey ||
+        next.algorithmKey !== prev.algorithmKey)
 
-    if (criteriaChanged) {
+    // 필터/정렬만 바뀐 경우에만 페이지를 1로
+    if (criteriaChanged && currentPage.value !== 1) {
       currentPage.value = 1
-      scheduleFetch(200)
     }
+
+    // 필터/정렬 변경은 디바운스, 최초/페이징은 즉시
+    scheduleFetch(criteriaChanged ? 200 : 0)
   },
   { immediate: true }
 )
