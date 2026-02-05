@@ -4,11 +4,7 @@
       <div class="flex flex-col items-center space-y-4 text-farm-cream">
         <!-- 링크 영역 -->
         <div class="flex flex-wrap justify-center gap-4 text-sm">
-          <a href="#" class="text-farm-cream hover:text-farm-yellow transition-colors">개인 정보 처리 방침</a>
-          <span class="text-farm-cream/50">|</span>
-          <a href="#" class="text-farm-cream hover:text-farm-yellow transition-colors">사이트 이용 약관</a>
-          <span class="text-farm-cream/50">|</span>
-          <a href="#" class="text-farm-cream hover:text-farm-yellow transition-colors">쿠키 기본 설정</a>
+          <span class="text-farm-cream/50">여기에 뭐적지 . . .</span>
         </div>
         
         <!-- 저작권 문구 -->

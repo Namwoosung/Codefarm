@@ -117,12 +117,6 @@
             <span class="flex w-full items-center justify-between gap-3">
               <span class="flex items-center gap-2 truncate">
                 <span class="truncate">난이도</span>
-                <span
-                  v-if="difficultySelected.length"
-                  class="badge badge-sm border-farm-brown/20 bg-farm-paper text-farm-brown-dark"
-                >
-                  {{ difficultySelected.length }}
-                </span>
               </span>
               <span
                 class="text-farm-brown-dark/60 transition-transform"
@@ -199,7 +193,7 @@
           :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard
-            v-for="problem in filteredProblems"
+            v-for="problem in pagedProblems"
             :key="problem.problemId ?? problem.id"
             :problem="problem"
             @click="onClickProblem"
@@ -210,7 +204,7 @@
           <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
 
-        <div v-if="!loading && !error && filteredProblems.length === 0" class="py-20 text-center">
+        <div v-if="!loading && !error && pagedProblems.length === 0" class="py-20 text-center">
           <p class="text-farm-brown/70 text-sm">조건에 맞는 문제가 없어요.</p>
           <button type="button" class="mt-3 text-sm font-medium text-farm-point hover:underline" @click="resetFilters">
             필터 초기화
@@ -291,12 +285,11 @@ import * as sessionApi from '@/api/session'
 
 const route = useRoute()
 const router = useRouter()
-const problems = ref([])
+const allProblems = ref([]) // 전체 문제 목록 (API에서 가져온 원본)
 const loading = ref(true)
 const error = ref(null)
 const currentPage = ref(1)
-const postsPerPage = ref(21)
-const totalPages = ref(10)
+const postsPerPage = 21
 
 // idle cancel 모달 (30분 무입력 강제 종료 안내)
 const showIdleCancelModal = computed(() => route.query.idle_cancel === '1')
@@ -312,7 +305,7 @@ function closeIdleCancelModal() {
 }
 
 // 필터/정렬 상태
-const sortBy = ref('createdAt')
+const sortBy = ref('difficulty')
 const difficultySelected = ref([])
 const algorithmSelected = ref([])
 const statusFilter = ref('') // '' | 'solved' | 'unsolved' | 'tried'
@@ -332,24 +325,39 @@ const algorithmOptions = [
   "STACK",
 ]
 
-const buildQueryParams = () => ({
-  size: postsPerPage.value,
-  page: Math.max(0, currentPage.value - 1),
+const API_PAGE_SIZE = 100 // 백엔드 최대 size 제한
+
+const buildQueryParams = (page = 0) => ({
+  size: API_PAGE_SIZE,
+  page,
   sortBy: sortBy.value || undefined,
   algorithm: algorithmSelected.value.length ? algorithmSelected.value.join(',') : undefined,
   difficulty: difficultySelected.value.length ? difficultySelected.value.join(',') : undefined,
   problemType: 'NORMAL',
 })
 
+// 클라이언트 측 필터링 (NORMAL 타입 + statusFilter)
 const filteredProblems = computed(() => {
-  const list = problems.value ?? []
+  const list = allProblems.value ?? []
+  // 1. NORMAL 타입만 필터링
   const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
+  // 2. statusFilter 적용
   const status = statusFilter.value
   if (!status) return normalOnly
   if (status === 'solved') return normalOnly.filter((p) => p?.userStatus?.isSolved)
   if (status === 'unsolved') return normalOnly.filter((p) => !p?.userStatus?.isSolved && !p?.userStatus?.isTried)
   if (status === 'tried') return normalOnly.filter((p) => p?.userStatus?.isTried && !p?.userStatus?.isSolved)
   return normalOnly
+})
+
+// 전체 페이지 수 계산
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage)))
+
+// 현재 페이지에 표시할 문제 목록 (21개씩)
+const pagedProblems = computed(() => {
+  const start = (currentPage.value - 1) * postsPerPage
+  const end = start + postsPerPage
+  return filteredProblems.value.slice(start, end)
 })
 
 // 드롭다운 상태
@@ -417,10 +425,32 @@ const fetchProblems = async () => {
   try {
     loading.value = true
     error.value = null
-    const { data, total } = await getProblemList(buildQueryParams())
-    problems.value = data ?? []
-    const safeTotal = Number.isFinite(Number(total)) ? Number(total) : (data?.length ?? 0)
-    totalPages.value = Math.max(1, Math.ceil(safeTotal / postsPerPage.value))
+    
+    // 1. 첫 페이지 호출해서 전체 개수 확인
+    const firstResult = await getProblemList(buildQueryParams(0))
+    const firstData = firstResult.data ?? []
+    const total = firstResult.total ?? firstData.length
+    
+    // 2. 추가 페이지가 필요한지 확인
+    const totalPages = Math.ceil(total / API_PAGE_SIZE)
+    
+    if (totalPages <= 1) {
+      allProblems.value = firstData
+    } else {
+      // 3. 나머지 페이지 병렬 호출
+      const promises = []
+      for (let page = 1; page < totalPages; page++) {
+        promises.push(getProblemList(buildQueryParams(page)))
+      }
+      const results = await Promise.all(promises)
+      
+      // 4. 모든 결과 합치기
+      const allData = [...firstData]
+      for (const result of results) {
+        allData.push(...(result.data ?? []))
+      }
+      allProblems.value = allData
+    }
   } catch (e) {
     error.value = e.response?.data?.message || e.message || '문제 목록을 불러오지 못했습니다.'
   } finally {
@@ -497,10 +527,9 @@ const paginationItems = computed(() => {
   return items
 })
 
+// API 호출이 필요한 필터 변경 감시 (algorithm, difficulty, sortBy)
 watch(
   () => ({
-    page: currentPage.value,
-    size: postsPerPage.value,
     sortBy: sortBy.value,
     difficultyKey: normalizeArrayKey(difficultySelected.value),
     algorithmKey: normalizeArrayKey(algorithmSelected.value),
@@ -508,22 +537,22 @@ watch(
   (next, prev) => {
     const criteriaChanged =
       !prev ||
-      next.size !== prev.size ||
       next.sortBy !== prev.sortBy ||
       next.difficultyKey !== prev.difficultyKey ||
       next.algorithmKey !== prev.algorithmKey
 
-    // 필터/정렬(또는 size)이 바뀌면 페이지를 1로 돌리되, fetch는 한 번만
-    if (criteriaChanged && next.page !== 1) {
+    if (criteriaChanged) {
       currentPage.value = 1
-      return
+      scheduleFetch(200)
     }
-
-    // 필터/정렬 변경은 디바운스, 페이징은 즉시
-    scheduleFetch(criteriaChanged ? 200 : 0)
   },
   { immediate: true }
 )
+
+// statusFilter 변경 시 페이지만 리셋 (API 호출 불필요)
+watch(statusFilter, () => {
+  currentPage.value = 1
+})
 
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick)
