@@ -12,7 +12,8 @@ export const requestManualHint = async (sessionId, { userQuestion, code }) => {
     return getMockManualHintResponse(userQuestion)
   }
   try {
-    const { data } = await api.post(`/sessions/${sessionId}/hints/manual`, { userQuestion })
+    // AI 사용으로 전역 60초보다 길게 설정
+    const { data } = await api.post(`/sessions/${sessionId}/hints/manual`, { userQuestion }, { timeout: 90 * 1000 })
     return data
   } catch (err) {
     if (err.response?.status === 404 || err.response?.status === 400 || err.response?.status === 403 || err.response?.status === 500) {
@@ -81,6 +82,8 @@ import { createParser } from 'eventsource-parser'
 /** SSE 재연결 설정 */
 const RECONNECT_INTERVAL_MS = 3000
 const MAX_RECONNECT_ATTEMPTS = 10
+/** AI 사용 구독 연결 타임아웃 (ms) */
+const HINT_SSE_TIMEOUT_MS = 30000
 
 /** 400, 403, 404 등 재연결 중단 대상 */
 const FATAL_STATUS_CODES = [400, 403, 404]
@@ -123,6 +126,9 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
   const connect = () => {
     if (aborted) return
     ac = new AbortController()
+    const timeoutId = setTimeout(() => {
+      if (!ac.signal.aborted) ac.abort()
+    }, HINT_SSE_TIMEOUT_MS)
 
     if (reconnectAttempts > 0) {
       console.log(`[SSE] 재연결 시도 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) sessionId=${sessionId}`)
@@ -132,6 +138,7 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
 
     fetch(url, { signal: ac.signal, headers })
       .then((res) => {
+        clearTimeout(timeoutId)
         if (aborted) return
         if (!res.ok) {
           const status = res.status
@@ -189,6 +196,7 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
         read()
       })
       .catch((e) => {
+        clearTimeout(timeoutId)
         if (aborted || ac?.signal?.aborted) return
         console.warn('[SSE] fetch 오류', e?.message ?? e)
         scheduleReconnect()

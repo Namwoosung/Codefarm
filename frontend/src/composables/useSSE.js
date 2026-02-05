@@ -6,6 +6,12 @@ import { useIdeStore } from '@/stores/ide'
 const RECONNECT_INTERVAL_MS = 3000
 const MAX_RECONNECT_ATTEMPTS = 10
 
+/** 연결 성공 후 첫 이벤트(CONNECTED) 대기 시간. 초과 시 서버 무응답으로 간주 후 재연결 */
+const FIRST_EVENT_WATCHDOG_MS = 10 * 1000
+
+/** 타임아웃/SSE 최종 실패 시 사용자 안내 메시지 */
+export const SSE_DELAY_TOAST_MESSAGE = '서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요.'
+
 /** 치명적 오류: 재연결 중단 (401, 403, 404) */
 const FATAL_STATUS_CODES = [401, 403, 404]
 
@@ -97,11 +103,30 @@ export function useSSE(sessionIdRef, options = {}) {
 
         reconnectCount.value = 0
 
+        // 연결은 됐지만 첫 이벤트(CONNECTED)가 오지 않으면 서버 무응답으로 간주
+        let firstEventWatchdogId = setTimeout(() => {
+          firstEventWatchdogId = null
+          if (aborted || !ac?.signal) return
+          onFatalError?.(SSE_DELAY_TOAST_MESSAGE)
+          ac.abort()
+          scheduleReconnect(sessionId)
+        }, FIRST_EVENT_WATCHDOG_MS)
+
+        const clearFirstEventWatchdog = () => {
+          if (firstEventWatchdogId != null) {
+            clearTimeout(firstEventWatchdogId)
+            firstEventWatchdogId = null
+          }
+        }
+
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         const parser = createParser({
           onEvent(ev) {
             if (aborted) return
+            if (ev.event === 'CONNECTED') {
+              clearFirstEventWatchdog()
+            }
             try {
               const data = ev.data ? JSON.parse(ev.data) : null
               if (ev.event === 'AUTO_HINT' && data) {
@@ -118,6 +143,7 @@ export function useSSE(sessionIdRef, options = {}) {
               if (aborted) return
               if (done) {
                 parser.reset?.({ consume: true })
+                clearFirstEventWatchdog()
                 scheduleReconnect(sessionId)
                 return
               }
@@ -127,6 +153,7 @@ export function useSSE(sessionIdRef, options = {}) {
             })
             .catch((e) => {
               if (aborted || isAbortError(e) || ac?.signal?.aborted) return
+              clearFirstEventWatchdog()
               scheduleReconnect(sessionId)
             })
         }
@@ -142,7 +169,7 @@ export function useSSE(sessionIdRef, options = {}) {
   const scheduleReconnect = (sessionId) => {
     if (aborted || sessionId == null) return
     if (reconnectCount.value >= MAX_RECONNECT_ATTEMPTS) {
-      onFatalError?.('서버와 연결이 불안정합니다. 자동으로 재연결을 시도합니다.')
+      onFatalError?.(SSE_DELAY_TOAST_MESSAGE)
       return
     }
     reconnectCount.value += 1
