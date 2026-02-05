@@ -263,7 +263,7 @@
       @cancel="onConfirmModalCancel"
     />
 
-    <!-- 30분 무입력 시: 현재 문제를 풀고 있나요? -->
+    <!-- 무입력 시: 현재 문제를 풀고 있나요? -->
     <Teleport to="body">
       <Transition name="modal">
         <div v-if="showIdleConfirmModal" class="fixed inset-0 flex items-center justify-center bg-black/40 z-[9999]">
@@ -358,14 +358,14 @@ const problemPanelActiveTab = ref('problem')
 const problemTitle = ref('문제')
 /** 이번 진입에서 방금 생성한 세션 ID (getLatestCode 호출 생략용) */
 const justCreatedSessionId = ref(null)
-/** 30분 무입력 시 확인 모달: 마지막 활동 시각 (코드 입력 또는 "예(계속하기)" 클릭) */
+/** 무입력 확인 모달: 마지막 활동 시각 (코드 입력 또는 "예(계속하기)" 클릭) */
 const lastActivityAt = ref(null)
 /** 무입력 확인 모달 표시 여부 */
 const showIdleConfirmModal = ref(false)
 /** 확인 모달을 띄운 시각 (모달 표시 후 IDLE_MS 경과 시 강제 종료용) */
 const idleConfirmShownAt = ref(null)
-// const IDLE_MS = 30 * 60 * 1000 // 30분(운영)
-const IDLE_MS = 1 * 60 * 1000 // 1분(테스트: 1분 무입력 → 모달, 그로부터 1분 → 메인 취소 안내)
+/** 무입력 기준: 테스트(개발) 1분, 운영 5분 */
+const IDLE_MS = import.meta.env.DEV ? 1 * 60 * 1000 : 5 * 60 * 1000
 let idleCheckIntervalId = null
 /** confirm 대체 모달 (탈주/이탈) */
 const confirmState = reactive({
@@ -405,17 +405,17 @@ function onConfirmModalCancel() {
   closeConfirm(false)
 }
 
-/** 30분 무입력 확인 모달 "예(계속하기)" 클릭: 활동 시각 갱신 후 모달 닫기 */
+/** 무입력 확인 모달 "예(계속하기)" 클릭: 활동 시각 갱신 후 모달 닫기 */
 function onIdleConfirmContinue() {
   showIdleConfirmModal.value = false
   idleConfirmShownAt.value = null
   lastActivityAt.value = Date.now()
 }
 
-/** 무입력 체크 interval (테스트 시 15초마다 확인해 1분 타이밍에 가깝게 동작) */
+/** 무입력 체크 interval (테스트 1분이면 15초마다, 운영 5분이면 1분마다 확인) */
 function startIdleCheck() {
   if (idleCheckIntervalId) return
-  const checkIntervalMs = IDLE_MS === 60 * 1000 ? 15 * 1000 : 60 * 1000 // 테스트(1분)면 15초, 운영(30분)이면 1분
+  const checkIntervalMs = IDLE_MS <= 60 * 1000 ? 15 * 1000 : 60 * 1000
   idleCheckIntervalId = setInterval(async () => {
     const sid = ideStore.sessionId
     if (sid == null) return
@@ -890,7 +890,7 @@ watch(() => ideStore.lastCodeInputAt, () => {
   if (ideStore.lastCodeInputAt && !snapshotIntervalId) startSnapshotInterval()
 }, { deep: true })
 
-// 30분 무입력 체크: 코드 입력 시 마지막 활동 시각 갱신
+// 무입력 체크: 코드 입력 시 마지막 활동 시각 갱신
 watch(
   () => ideStore.lastCodeInputAt,
   (v) => {
