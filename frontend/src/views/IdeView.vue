@@ -1049,8 +1049,9 @@ const handleSubmit = async () => {
       const reportId = res?.data?.submissionContext?.resultId ?? res?.data?.resultId ?? res?.data?.reportId
       try {
         const fetched = reportId != null ? await getReportDetail(reportId) : null
-        if (fetched?.result) {
-          reportData.value.result = { ...reportData.value.result, ...fetched.result }
+        // getReportDetail은 API의 data 필드(ReportDetailResponseDto)를 그대로 반환함. result 래핑 없음.
+        if (fetched && typeof fetched === 'object') {
+          reportData.value.result = { ...reportData.value.result, ...fetched }
         }
       } catch (_) {}
       reportModalFromHistory.value = false
