@@ -174,9 +174,15 @@
             </div>
 
             <div class="flex gap-3 px-4 py-2 flex-shrink-0 bg-[var(--color-farm-paper)] border-t border-b border-[var(--color-farm-cream)]">
-              <button type="button" class="btn btn-sm h-9 min-w-[119px] bg-gradient-to-r from-[#7A5C3E] to-[#CDFF86] text-white border-none rounded-2xl shadow hover:shadow-md transition-all" @click="handleSubmit">
-                <span class="font-bold">▷</span>
-                <span>제출하기</span>
+              <button
+                type="button"
+                class="btn btn-sm h-9 min-w-[119px] bg-gradient-to-r from-[#7A5C3E] to-[#CDFF86] text-white border-none rounded-2xl shadow hover:shadow-md transition-all"
+                :disabled="isSubmitLoading"
+                @click="handleSubmit"
+              >
+                <span v-if="isSubmitLoading" class="font-bold">⏱️</span>
+                <span v-else class="font-bold">▷</span>
+                <span>{{ isSubmitLoading ? '제출 중...' : '제출하기' }}</span>
               </button>
               <button
                 type="button"
@@ -321,6 +327,7 @@ const isResizing = ref(false)
 const terminalHeight = ref(210) // 터미널 영역 높이 (px)
 const isResizingVertical = ref(false)
 const isRunLoading = ref(false) // FR-CODE-004-1: 실행 중 버튼 비활성화
+const isSubmitLoading = ref(false) // 제출 중 중복 클릭 방지 (응답 시까지 버튼 비활성화)
 const isInitializing = ref(true) // 메인→IDE 진입 시 세션/문제 로드 중
 const showReportModal = ref(false)
 const reportData = ref(null)
@@ -1002,6 +1009,8 @@ const handleSubmit = async () => {
     if (terminalPanel.value) terminalPanel.value.write('세션이 없습니다. 페이지를 새로고침해 주세요.\r\n')
     return
   }
+  if (isSubmitLoading.value) return
+  isSubmitLoading.value = true
   const code = ideStore.getCode(route.params.id)
   if (terminalPanel.value) {
     terminalPanel.value.clear()
@@ -1073,6 +1082,8 @@ const handleSubmit = async () => {
       }
       terminalPanel.value.write('❌ 제출 실패\r\n')
     }
+  } finally {
+    isSubmitLoading.value = false
   }
 }
 
