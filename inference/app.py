@@ -77,7 +77,7 @@ if not GMS_API_KEY:
     raise RuntimeError("GMS_API_KEY (or GMS_KEY) is missing in .env")
 
 GMS_CHAT_URL = os.getenv("GMS_CHAT_URL", "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions")
-GMS_MODEL = os.getenv("GMS_MODEL", "gpt-5.2")
+GMS_MODEL = os.getenv("GMS_MODEL", "gpt-4o-mini")
 GMS_TIMEOUT = float(os.getenv("GMS_TIMEOUT", "30.0"))
 
 # 동시요청 보호(Queue)
