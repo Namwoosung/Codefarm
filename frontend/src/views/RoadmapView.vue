@@ -111,6 +111,7 @@
                 v-for="n in 5"
                 :key="n"
                 class="cf-level group/level"
+                :class="{ 'cf-level--locked': !isStepUnlocked(selectedLevel - 1, n) }"
               >
                 <div class="cf-level-visual">
                   <span class="cf-level-num">STEP {{ n }}</span>
@@ -124,8 +125,9 @@
                 <button
                   type="button"
                   class="cf-level-btn"
-                  :aria-label="`레벨 ${selectedLevel} - ${n}`"
-                  @click="onClickLevel(selectedLevel, n)"
+                  :aria-label="isStepUnlocked(selectedLevel - 1, n) ? `레벨 ${selectedLevel} - STEP ${n}` : `STEP ${n - 1}을 먼저 완료해주세요`"
+                  :disabled="!isStepUnlocked(selectedLevel - 1, n)"
+                  @click="isStepUnlocked(selectedLevel - 1, n) && onClickLevel(selectedLevel, n)"
                   @mouseenter="onHoverLevel(selectedLevel, n)"
                   @mouseleave="onLeaveLevel"
                 />
@@ -135,43 +137,49 @@
                   <div
                     v-if="hoveredRoadmap === selectedLevel && hoveredLevel === n"
                     class="cf-level-summary-vertical"
+                    :class="{ 'cf-level-summary-vertical--locked': !isStepUnlocked(selectedLevel - 1, n) }"
                   >
                     <p class="cf-level-summary-vertical-label">STEP {{ n }}</p>
-                    <p class="cf-level-summary-vertical-title">
+                    <p v-if="!isStepUnlocked(selectedLevel - 1, n)" class="cf-level-summary-vertical-title text-farm-brown/70">
+                      이전 STEP을 먼저 풀어주세요
+                    </p>
+                    <p v-else class="cf-level-summary-vertical-title">
                       {{ getStepProblem(selectedLevel - 1, n)?.problem?.title || `STEP ${n}` }}
                     </p>
-                    <div class="cf-level-summary-vertical-divider"></div>
-                    <div class="cf-level-summary-vertical-meta">
-                      <span v-if="getStepProblem(selectedLevel - 1, n)?.problem?.difficulty" class="cf-level-meta-item">
-                        <span class="text-[10px] text-farm-brown/50">난이도</span>
-                        <span class="text-[11px] font-bold text-farm-brown">{{ getStepProblem(selectedLevel - 1, n).problem.difficulty }}</span>
-                      </span>
-                      <span v-if="getStepProblem(selectedLevel - 1, n)?.problem?.difficulty && getStepProblem(selectedLevel - 1, n)?.statistics?.successCount != null" class="cf-level-meta-sep">·</span>
-                      <span v-if="getStepProblem(selectedLevel - 1, n)?.statistics?.successCount != null" class="cf-level-meta-item">
-                        <span class="text-[10px] text-farm-brown/50">정답률</span>
-                        <span class="text-[11px] font-bold text-farm-brown">{{ formatSuccessRate(getStepProblem(selectedLevel - 1, n).statistics.successCount, getStepProblem(selectedLevel - 1, n).statistics.submissionCount) }}</span>
-                      </span>
-                    </div>
-                    <div class="cf-level-summary-vertical-status">
-                      <span 
-                        :class="[
-                          'px-3 py-1 rounded-full text-[10px] font-black shadow-sm border',
-                          getStepProblem(selectedLevel - 1, n)?.userStatus?.isSolved 
-                            ? 'bg-farm-green-light/80 text-farm-green-dark border-farm-green/50' 
-                            : getStepProblem(selectedLevel - 1, n)?.userStatus?.isTried 
-                              ? 'bg-farm-yellow/70 text-farm-brown-dark border-farm-brown/30' 
-                              : 'bg-farm-cream/90 text-farm-brown/70 border-farm-brown/20'
-                        ]"
-                      >
-                        {{ 
-                          getStepProblem(selectedLevel - 1, n)?.userStatus?.isSolved 
-                            ? 'COMPLETED' 
-                            : getStepProblem(selectedLevel - 1, n)?.userStatus?.isTried 
-                              ? 'IN PROGRESS' 
-                              : 'NOT STARTED' 
-                        }}
-                      </span>
-                    </div>
+                    <template v-if="isStepUnlocked(selectedLevel - 1, n)">
+                      <div class="cf-level-summary-vertical-divider"></div>
+                      <div class="cf-level-summary-vertical-meta">
+                        <span v-if="getStepProblem(selectedLevel - 1, n)?.problem?.difficulty" class="cf-level-meta-item">
+                          <span class="text-[10px] text-farm-brown/50">난이도</span>
+                          <span class="text-[11px] font-bold text-farm-brown">{{ getStepProblem(selectedLevel - 1, n).problem.difficulty }}</span>
+                        </span>
+                        <span v-if="getStepProblem(selectedLevel - 1, n)?.problem?.difficulty && getStepProblem(selectedLevel - 1, n)?.statistics?.successCount != null" class="cf-level-meta-sep">·</span>
+                        <span v-if="getStepProblem(selectedLevel - 1, n)?.statistics?.successCount != null" class="cf-level-meta-item">
+                          <span class="text-[10px] text-farm-brown/50">정답률</span>
+                          <span class="text-[11px] font-bold text-farm-brown">{{ formatSuccessRate(getStepProblem(selectedLevel - 1, n).statistics.successCount, getStepProblem(selectedLevel - 1, n).statistics.submissionCount) }}</span>
+                        </span>
+                      </div>
+                      <div class="cf-level-summary-vertical-status">
+                        <span 
+                          :class="[
+                            'px-3 py-1 rounded-full text-[10px] font-black shadow-sm border',
+                            getStepProblem(selectedLevel - 1, n)?.userStatus?.isSolved 
+                              ? 'bg-farm-green-light/80 text-farm-green-dark border-farm-green/50' 
+                              : getStepProblem(selectedLevel - 1, n)?.userStatus?.isTried 
+                                ? 'bg-farm-yellow/70 text-farm-brown-dark border-farm-brown/30' 
+                                : 'bg-farm-cream/90 text-farm-brown/70 border-farm-brown/20'
+                          ]"
+                        >
+                          {{
+                            getStepProblem(selectedLevel - 1, n)?.userStatus?.isSolved 
+                              ? 'COMPLETED' 
+                              : getStepProblem(selectedLevel - 1, n)?.userStatus?.isTried 
+                                ? 'IN PROGRESS' 
+                                : 'NOT STARTED' 
+                          }}
+                        </span>
+                      </div>
+                    </template>
                   </div>
                 </Transition>
               </div>
@@ -600,6 +608,13 @@ function getStepProblem(curriculumIdx, level) {
     curriculum.problems[level - 1] ||
     null
   )
+}
+
+/** STEP 순차 잠금: STEP 1은 항상 열림, STEP n(n>=2)은 이전 STEP 해결 시에만 열림 */
+function isStepUnlocked(curriculumIdx, stepNum) {
+  if (stepNum <= 1) return true
+  const prev = getStepProblem(curriculumIdx, stepNum - 1)
+  return prev?.userStatus?.isSolved === true
 }
 
 function getStepSummary(curriculumIdx, level) {
@@ -1138,6 +1153,31 @@ async function goToNewProblem() {
 .cf-level-btn:focus-visible {
   outline: 2px solid rgba(255, 235, 59, 0.9);
   outline-offset: 2px;
+}
+.cf-level-btn:disabled {
+  cursor: not-allowed;
+}
+/* STEP 순차 잠금: 이전 STEP 미해결 시 비활성화 스타일 (활성과 같은 톤, 조금 어둡게) */
+.cf-level--locked .cf-level-num {
+  color: #b5a035;
+  text-shadow: 0 1px 2px rgba(78, 59, 42, 0.25);
+}
+.cf-level--locked .cf-level-cloud {
+  filter: sepia(0.2) brightness(0.88) saturate(0.75);
+}
+.cf-level--locked:hover .cf-level-visual {
+  transform: none;
+}
+.cf-level--locked:hover .cf-level-num {
+  color: #b5a035;
+  text-shadow: 0 1px 2px rgba(78, 59, 42, 0.25);
+}
+.cf-level--locked:hover .cf-level-cloud {
+  filter: sepia(0.2) brightness(0.88) saturate(0.75);
+}
+.cf-level-summary-vertical--locked {
+  border-color: rgba(122, 92, 62, 0.18);
+  background: rgba(250, 246, 238, 0.97);
 }
 .cf-summary-vertical-enter-active,
 .cf-summary-vertical-leave-active {

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="modal modal-open" @click.self="$emit('close', false)">
+    <div v-if="show" class="modal modal-open" @click.self="requireGoToMain ? undefined : $emit('close', false)">
       <div class="modal-box max-w-2xl max-h-[90vh] overflow-y-auto p-0 bg-[var(--color-farm-paper)] border border-[var(--color-farm-cream)] shadow-xl">
         <!-- Header -->
         <div class="flex items-center justify-between sticky top-0 z-10 px-6 py-4 bg-[var(--color-farm-paper)] border-b border-[var(--color-farm-cream)]">
@@ -15,6 +15,7 @@
             </span>
           </div>
           <button
+            v-if="!requireGoToMain"
             type="button"
             class="btn btn-ghost btn-sm btn-square text-[var(--color-farm-brown)] hover:bg-[var(--color-farm-cream)] hover:text-[var(--color-farm-brown-dark)]"
             aria-label="모달 닫기"
@@ -134,7 +135,7 @@
           </button>
         </div>
       </div>
-      <div class="modal-backdrop bg-black/50" @click="$emit('close', false)"></div>
+      <div class="modal-backdrop bg-black/50" @click="requireGoToMain ? undefined : $emit('close', false)"></div>
     </div>
   </Teleport>
 </template>
@@ -147,7 +148,9 @@ const props = defineProps({
   report: { type: Object, default: null },
   reportLoading: { type: Boolean, default: false },
   reportLoadFailed: { type: Boolean, default: false },
-  backButtonText: { type: String, default: '' }
+  backButtonText: { type: String, default: '' },
+  /** true면 X 버튼 숨김, 백드롭 클릭 무시 → 반드시 '메인 화면으로'로만 닫기 */
+  requireGoToMain: { type: Boolean, default: false }
 })
 defineEmits(['close'])
 
