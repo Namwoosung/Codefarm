@@ -4,7 +4,7 @@ import { useAuthStore } from '@/stores/auth'
 const api = axios.create({
   // Vite Proxy(/api)를 사용하므로 기본 경로를 /api로 설정
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
-  // timeout 미설정 → axios 기본(무제한). AI 사용 요청(힌트 등)만 해당 호출에서 timeout 지정
+  timeout: 60 * 1000, // 전역 기본 60초. AI 등 장시간 요청은 개별로 더 길게 설정
   headers: {
     // '타입/서브타입 (MIME type)'
     'Content-Type': 'application/json'

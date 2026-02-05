@@ -12,7 +12,8 @@ export const requestManualHint = async (sessionId, { userQuestion, code }) => {
     return getMockManualHintResponse(userQuestion)
   }
   try {
-    const { data } = await api.post(`/sessions/${sessionId}/hints/manual`, { userQuestion }, { timeout: 30000 })
+    // AI 사용으로 전역 60초보다 길게 설정
+    const { data } = await api.post(`/sessions/${sessionId}/hints/manual`, { userQuestion }, { timeout: 90 * 1000 })
     return data
   } catch (err) {
     if (err.response?.status === 404 || err.response?.status === 400 || err.response?.status === 403 || err.response?.status === 500) {
