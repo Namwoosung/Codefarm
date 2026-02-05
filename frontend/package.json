@@ -20,6 +20,7 @@
     "axios": "^1.13.3",
     "eventsource-parser": "^3.0.6",
     "iconify-icon": "^3.0.2",
+    "marked": "^17.0.1",
     "monaco-editor": "^0.55.1",
     "monaco-editor-vue3": "^1.0.5",
     "monaco-themes": "^0.4.8",
