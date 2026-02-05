@@ -17,6 +17,10 @@ app = FastAPI(
 
 SUPPORTED_LANGUAGES = {"PYTHON"}
 
+# 동시 실행 제한 (최대 4개)
+MAX_CONCURRENT_EXECUTIONS = 4
+execution_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EXECUTIONS)
+
 
 @app.post("/execute", response_model=ExecuteResult)
 async def execute(req: ExecuteRequest):
@@ -32,24 +36,35 @@ async def execute(req: ExecuteRequest):
         f"stdin_len={len(req.stdin or '')}"
     )
 
-    try:
-        # 동시 실행 제한 없이 바로 실행
-        stdout, stderr, exec_time, memory_usage, is_timeout, is_oom = \
-            await asyncio.to_thread(
-                run_python_in_docker,
-                req.code,
-                req.stdin or "",
-                req.timeLimitMs,
-                req.memoryLimitMb,
-                req.cpuLimit,
-            )
+    # 세마포어 획득 (대기 가능)
+    logger.info(
+        f"[SEMAPHORE] waiting... "
+        f"current_available={execution_semaphore._value}"
+    )
 
-    except Exception:
-        logger.exception("[EXECUTION ERROR]")
-        raise HTTPException(
-            status_code=500,
-            detail="Execution Server Internal Error",
+    async with execution_semaphore:
+        logger.info(
+            f"[SEMAPHORE] acquired "
+            f"remaining={execution_semaphore._value}"
         )
+
+        try:
+            stdout, stderr, exec_time, memory_usage, is_timeout, is_oom = \
+                await asyncio.to_thread(
+                    run_python_in_docker,
+                    req.code,
+                    req.stdin or "",
+                    req.timeLimitMs,
+                    req.memoryLimitMb,
+                    req.cpuLimit,
+                )
+
+        except Exception:
+            logger.exception("[EXECUTION ERROR]")
+            raise HTTPException(
+                status_code=500,
+                detail="Execution Server Internal Error",
+            )
 
     logger.info(
         f"[RESULT] "
