@@ -532,7 +532,6 @@ const fetchProblems = async () => {
     loading.value = false
     loadingMore.value = false
   } finally {
-    // IDE에서 복귀 시 저장해 둔 스크롤 위치 복원 (한 번만)
     try {
       const saved = sessionStorage.getItem(MAIN_SCROLL_STORAGE_KEY)
       if (saved != null) {
