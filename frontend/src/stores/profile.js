@@ -87,15 +87,6 @@ export const useProfileStore = defineStore('profile', () => {
         lastReportListKey.value = ''
     }
 
-    // 로그아웃/로그인 시 모든 상태 초기화 (회원 전환 시 이전 유저 정보 남는 문제 방지)
-    const reset = () => {
-        user.value = null
-        report.value = null
-        reports.value = []
-        reportsFetched.value = false
-        lastReportListKey.value = ''
-    }
-
     const resportDetail = async (reportId) => {
         try {
             const res = await getReportDetail(reportId)
@@ -114,6 +105,5 @@ export const useProfileStore = defineStore('profile', () => {
         invalidateReportList,
         resportDetail,
         updateUser,
-        reset,
     }
 })
