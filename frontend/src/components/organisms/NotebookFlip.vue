@@ -180,6 +180,8 @@
             :report="reportModalData"
             :report-loading="reportModalLoading"
             :report-load-failed="reportModalLoadFailed"
+            back-button-text="닫기"
+            :require-go-to-main="true"
             @close="onReportModalClose"
           />
 

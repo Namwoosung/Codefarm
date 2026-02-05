@@ -117,12 +117,6 @@
             <span class="flex w-full items-center justify-between gap-3">
               <span class="flex items-center gap-2 truncate">
                 <span class="truncate">난이도</span>
-                <span
-                  v-if="difficultySelected.length"
-                  class="badge badge-sm border-farm-brown/20 bg-farm-paper text-farm-brown-dark"
-                >
-                  {{ difficultySelected.length }}
-                </span>
               </span>
               <span
                 class="text-farm-brown-dark/60 transition-transform"
@@ -199,7 +193,7 @@
           :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard
-            v-for="problem in filteredProblems"
+            v-for="problem in pagedProblems"
             :key="problem.problemId ?? problem.id"
             :problem="problem"
             @click="onClickProblem"
@@ -210,7 +204,7 @@
           <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
 
-        <div v-if="!loading && !error && filteredProblems.length === 0" class="py-20 text-center">
+        <div v-if="!loading && !error && pagedProblems.length === 0" class="py-20 text-center">
           <p class="text-farm-brown/70 text-sm">조건에 맞는 문제가 없어요.</p>
           <button type="button" class="mt-3 text-sm font-medium text-farm-point hover:underline" @click="resetFilters">
             필터 초기화
@@ -337,7 +331,7 @@ function closeIdleCancelModal() {
 }
 
 // 필터/정렬 상태
-const sortBy = ref('createdAt')
+const sortBy = ref('difficulty')
 const difficultySelected = ref([])
 const algorithmSelected = ref([])
 const statusFilter = ref('') // '' | 'solved' | 'unsolved' | 'tried'
@@ -357,24 +351,39 @@ const algorithmOptions = [
   "STACK",
 ]
 
-const buildQueryParams = () => ({
-  size: postsPerPage.value,
-  page: Math.max(0, currentPage.value - 1),
+const API_PAGE_SIZE = 100 // 백엔드 최대 size 제한
+
+const buildQueryParams = (page = 0) => ({
+  size: API_PAGE_SIZE,
+  page,
   sortBy: sortBy.value || undefined,
   algorithm: algorithmSelected.value.length ? algorithmSelected.value.join(',') : undefined,
   difficulty: difficultySelected.value.length ? difficultySelected.value.join(',') : undefined,
   problemType: 'NORMAL',
 })
 
+// 클라이언트 측 필터링 (NORMAL 타입 + statusFilter)
 const filteredProblems = computed(() => {
-  const list = problems.value ?? []
+  const list = allProblems.value ?? []
+  // 1. NORMAL 타입만 필터링
   const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
+  // 2. statusFilter 적용
   const status = statusFilter.value
   if (!status) return normalOnly
   if (status === 'solved') return normalOnly.filter((p) => p?.userStatus?.isSolved)
   if (status === 'unsolved') return normalOnly.filter((p) => !p?.userStatus?.isSolved && !p?.userStatus?.isTried)
   if (status === 'tried') return normalOnly.filter((p) => p?.userStatus?.isTried && !p?.userStatus?.isSolved)
   return normalOnly
+})
+
+// 전체 페이지 수 계산
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage)))
+
+// 현재 페이지에 표시할 문제 목록 (21개씩)
+const pagedProblems = computed(() => {
+  const start = (currentPage.value - 1) * postsPerPage
+  const end = start + postsPerPage
+  return filteredProblems.value.slice(start, end)
 })
 
 // 드롭다운 상태
@@ -585,8 +594,6 @@ watch(
 
 watch(
   () => ({
-    page: currentPage.value,
-    size: postsPerPage.value,
     sortBy: sortBy.value,
     difficultyKey: normalizeArrayKey(difficultySelected.value),
     algorithmKey: normalizeArrayKey(algorithmSelected.value),
@@ -612,6 +619,11 @@ watch(
   },
   { immediate: true }
 )
+
+// statusFilter 변경 시 페이지만 리셋 (API 호출 불필요)
+watch(statusFilter, () => {
+  currentPage.value = 1
+})
 
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick)
