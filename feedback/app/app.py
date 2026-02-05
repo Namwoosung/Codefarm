@@ -16,7 +16,7 @@ load_dotenv()
 # Config
 # =========================
 GMS_URL = os.getenv("GMS_URL", "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions")
-MODEL = os.getenv("GMS_MODEL", "gpt-5.2")
+MODEL = os.getenv("GMS_MODEL", "gpt-4o-mini")
 
 REQUIRE_SERVER_TOKEN = os.getenv("REQUIRE_SERVER_TOKEN", "0") == "1"
 REPORT_SERVER_TOKEN = os.getenv("REPORT_SERVER_TOKEN", "")
