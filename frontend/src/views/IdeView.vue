@@ -225,6 +225,7 @@
       :report="reportData"
       :report-loading="reportDetailLoading"
       :back-button-text="route.query.from === 'roadmap' ? '이전화면으로' : ''"
+      :require-go-to-main="!reportModalFromHistory"
       @close="onReportModalClose"
     />
 
