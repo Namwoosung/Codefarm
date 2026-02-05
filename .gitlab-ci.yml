@@ -20,6 +20,9 @@ default:
   before_script:
     - echo "source=$CI_PIPELINE_SOURCE branch=$CI_COMMIT_BRANCH sha=$CI_COMMIT_SHA"
 
+# =====================
+# BUILD (Docker build & push)
+# =====================
 .build-template:
   stage: build
   before_script:
@@ -37,6 +40,9 @@ build-backend:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+      changes:
+        - backend/**/*
+        - .gitlab-ci.yml
 
 build-web:
   extends: .build-template
@@ -47,6 +53,9 @@ build-web:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+      changes:
+        - infra/nginx/**/*
+        - .gitlab-ci.yml
 
 build-execution:
   extends: .build-template
@@ -57,6 +66,11 @@ build-execution:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+      changes:
+        - execution/**/*
+        - docker-compose.exec.yml
+        - scripts/deploy_foundation.sh
+        - .gitlab-ci.yml
 
 build-feedback:
   extends: .build-template
@@ -67,7 +81,15 @@ build-feedback:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
+      changes:
+        - feedback/**/*
+        - docker-compose.feedback.yml
+        - scripts/deploy_foundation.sh
+        - .gitlab-ci.yml
 
+# =====================
+# TEST
+# =====================
 test:
   stage: test
   tags: [ec2-mono]
@@ -77,6 +99,9 @@ test:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\//'
 
+# =====================
+# SECURITY (Trivy FS)
+# =====================
 cache:
   key: trivy-cache
   paths:
@@ -91,12 +116,63 @@ trivy_fs:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
 
+# =====================
+# DEPLOY (SSH → server scripts)
+# =====================
 .deploy-template:
   stage: deploy
   before_script:
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
+deploy-foundation-dev:
+  extends: .deploy-template
+  script:
+    - chmod 600 "$SSH_KEY"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" \
+        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      changes:
+        - docker-compose.db.yml
+        - docker-compose.exec.yml
+        - docker-compose.feedback.yml
+        - scripts/deploy_foundation.sh
+        - scripts/healthcheck.sh
+        - execution/**/*
+        - feedback/**/*
+        - .gitlab-ci.yml
+  needs:
+    - job: build-execution
+    - job: build-feedback
+
+deploy-foundation-prod:
+  extends: .deploy-template
+  script:
+    - chmod 600 "$SSH_KEY"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" \
+        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+      when: never
+    - if: '$CI_COMMIT_BRANCH == "main"'
+      when: manual
+      changes:
+        - docker-compose.db.yml
+        - docker-compose.exec.yml
+        - docker-compose.feedback.yml
+        - scripts/deploy_foundation.sh
+        - scripts/healthcheck.sh
+        - execution/**/*
+        - feedback/**/*
+        - .gitlab-ci.yml
+  needs:
+    - job: build-execution
+    - job: build-feedback
+
+# 기존 server deploy
 deploy-dev:
   extends: .deploy-template
   script:
@@ -118,6 +194,9 @@ deploy-prod:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
 
+# =====================
+# INFERENCE (Elice sparse checkout)
+# =====================
 inference-deploy:
   stage: inference
   tags: [elice-container]
