@@ -87,17 +87,19 @@ public class SessionService {
 
         sessionCodeRedisService.initialize(session.getId());
 
+        Duration interval = resolveInterval(user);
+
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(
                     new TransactionSynchronization() {
                         @Override
                         public void afterCommit() {
-                            autoHintSchedulerService.start(session.getId());
+                            autoHintSchedulerService.start(session.getId(), interval);
                         }
                     }
             );
         } else {
-            autoHintSchedulerService.start(session.getId());
+            autoHintSchedulerService.start(session.getId(), interval);
         }
 
         return SessionResponseDto.from(session);
@@ -548,5 +550,20 @@ public class SessionService {
                         .toList();
 
         return SessionResultsResponseDto.from(items);
+    }
+
+    private Duration resolveInterval(User user) {
+
+        String nickname = user.getNickname();
+
+        if (nickname != null &&
+                (nickname.equals("admin1") ||
+                        nickname.equals("admin2") ||
+                        nickname.equals("admin3"))) {
+
+            return Duration.ofSeconds(30);
+        }
+
+        return Duration.ofMinutes(5);
     }
 }
