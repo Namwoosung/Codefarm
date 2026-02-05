@@ -243,6 +243,7 @@ import CardDetail from '@/components/organisms/CardDetail.vue'
 import cardListBg from '@/assets/card/cardlist.png'
 import gachaImg from '@/assets/card/Gacha.png'
 import farmerImg from '@/assets/roadmap/farmer.png'
+import confetti from 'canvas-confetti'
 
 const profile = useProfileStore()
 const cardStore = useCardStore()
@@ -295,7 +296,14 @@ watch(
   (msg) => {
     if (!msg) return
     const text = String(msg)
-    const durationMs = text.includes('이미 보유') ? 900 : 2600
+    const isNewCard = !text.includes('이미 보유')
+    const durationMs = isNewCard ? 2600 : 900
+    
+    // 새 카드 획득 시 confetti 효과
+    if (isNewCard) {
+      triggerConfetti()
+    }
+    
     setTimeout(() => {
       toastStore.showToast(text, { durationMs })
     }, 350)
@@ -318,6 +326,72 @@ const closeCardModal = () => {
 }
 const selectedCard = ref(null)
 const isGachaModal = ref(false)
+
+// 새 카드 획득 시 카드 중심에서 "팡!" 터지는 confetti 효과
+const triggerConfetti = () => {
+  const grade = selectedCard.value?.grade
+  let colors = ['#FFD700', '#FFA500', '#FF6B6B', '#4ECDC4', '#A78BFA', '#F472B6']
+  let particleCount = 80
+  
+  if (grade === 'SPECIAL') {
+    colors = ['#A78BFA', '#8B5CF6', '#C084FC', '#E879F9', '#F0ABFC', '#FFD700']
+    particleCount = 150
+  } else if (grade === 'GOLD') {
+    colors = ['#FFD700', '#FFA500', '#FBBF24', '#F59E0B', '#EAB308', '#FEF08A']
+    particleCount = 120
+  } else if (grade === 'SILVER') {
+    colors = ['#94A3B8', '#CBD5E1', '#E2E8F0', '#F1F5F9', '#64748B', '#FFFFFF']
+    particleCount = 100
+  }
+
+  // 카드 윗부분에서 "팡!" 방사형으로 터지는 효과
+  confetti({
+    particleCount: particleCount * 2,
+    spread: 360,
+    origin: { x: 0.5, y: 0.35 },
+    colors,
+    shapes: ['circle', 'square'],
+    scalar: 2,
+    gravity: 0.8,
+    startVelocity: 35,
+    ticks: 120,
+    decay: 0.88,
+  })
+
+  // 살짝 딜레이 후 한번 더 터뜨림 (풍성함 추가)
+  setTimeout(() => {
+    confetti({
+      particleCount: particleCount,
+      spread: 360,
+      origin: { x: 0.5, y: 0.35 },
+      colors,
+      shapes: ['circle'],
+      scalar: 1.5,
+      gravity: 0.7,
+      startVelocity: 25,
+      ticks: 100,
+      decay: 0.88,
+    })
+  }, 120)
+
+  // SPECIAL/GOLD는 별 모양 반짝이 추가
+  if (grade === 'SPECIAL' || grade === 'GOLD') {
+    setTimeout(() => {
+      confetti({
+        particleCount: 60,
+        spread: 360,
+        origin: { x: 0.5, y: 0.35 },
+        colors: ['#FFD700', '#FFFFFF', '#FEF08A'],
+        shapes: ['star'],
+        scalar: 3,
+        gravity: 0.6,
+        startVelocity: 28,
+        ticks: 140,
+        decay: 0.88,
+      })
+    }, 80)
+  }
+}
 
 // 백엔드가 카드 이미지를 .svg로 주는 경우 .png로 변환
 const modalCardImage = computed(() => {
