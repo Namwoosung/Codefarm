@@ -65,14 +65,7 @@ build-execution:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
-      changes:
-        - execution/**/*
-        - docker-compose.exec.yml
-        - docker-compose.db.yml
-        - docker-compose.feedback.yml
-        - scripts/deploy_foundation.sh
-        - scripts/healthcheck.sh
-        - .gitlab-ci.yml
+      when: on_success
 
 build-feedback:
   extends: .build-template
@@ -83,14 +76,8 @@ build-feedback:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
-      changes:
-        - feedback/**/*
-        - docker-compose.feedback.yml
-        - docker-compose.db.yml
-        - docker-compose.exec.yml
-        - scripts/deploy_foundation.sh
-        - scripts/healthcheck.sh
-        - .gitlab-ci.yml
+      when: on_success
+
 
 # =====================
 # TEST
@@ -135,52 +122,30 @@ deploy-foundation-dev:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" \
-        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
-      changes:
-        - execution/**/*
-        - feedback/**/*
-        - docker-compose.db.yml
-        - docker-compose.exec.yml
-        - docker-compose.feedback.yml
-        - scripts/deploy_foundation.sh
-        - scripts/healthcheck.sh
-        - .gitlab-ci.yml
   needs:
     - job: build-execution
-      optional: true
     - job: build-feedback
-      optional: true
+
 
 deploy-foundation-prod:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" \
-        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_foundation.sh"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
-      changes:
-        - execution/**/*
-        - feedback/**/*
-        - docker-compose.db.yml
-        - docker-compose.exec.yml
-        - docker-compose.feedback.yml
-        - scripts/deploy_foundation.sh
-        - scripts/healthcheck.sh
-        - .gitlab-ci.yml
   needs:
     - job: build-execution
-      optional: true
     - job: build-feedback
-      optional: true
+
 
 # ✅ Server deploy (backend + web)
 deploy-dev:
