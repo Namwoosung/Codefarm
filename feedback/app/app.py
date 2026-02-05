@@ -28,7 +28,8 @@ HTTP_TIMEOUT = httpx.Timeout(
 
 # ✅ A안: 비용 폭주 방지 — 재시도/재생성 전부 OFF
 MAX_FEEDBACK_CHARS = int(os.getenv("MAX_FEEDBACK_CHARS", "260"))
-MAX_COMPLETION_TOKENS = int(os.getenv("MAX_COMPLETION_TOKENS", "220"))
+# 260자 제한이면 220 토큰은 과한 편이라 줄여서 장문 폭주를 낮춥니다.
+MAX_COMPLETION_TOKENS = int(os.getenv("MAX_COMPLETION_TOKENS", "140"))
 DEBUG_LOG = os.getenv("DEBUG_LOG", "1") == "1"
 
 CACHE_SIZE = int(os.getenv("CACHE_SIZE", "512"))
@@ -39,12 +40,11 @@ TRUNC_CODE = int(os.getenv("TRUNC_CODE", "1400"))
 TRUNC_PREV_ANALYSIS = int(os.getenv("TRUNC_PREV_ANALYSIS", "150"))
 PREV_LIMIT = int(os.getenv("PREV_LIMIT", "2"))
 
-app = FastAPI(title="Report Feedback Server", version="2.1.1")
+app = FastAPI(title="Report Feedback Server", version="2.1.2")
 
 _http_client: Optional[httpx.AsyncClient] = None
 _cache: Dict[str, str] = {}
 _cache_order: List[str] = []
-
 
 # =========================
 # Schemas
@@ -84,7 +84,6 @@ class Result(BaseModel):
     memory: Optional[int] = Field(None, ge=0)
 
 
-
 class FeedbackRequest(BaseModel):
     request_id: Optional[str] = None
     problem: Problem
@@ -102,7 +101,6 @@ class FeedbackResponse(BaseModel):
 # =========================
 # Label mapping (학생 친화 번역)
 # =========================
-# 1) 기본 내부 필드명/상수
 INTERNAL_TOKENS_BASE = ["SUCCESS", "GIVE_UP", "resultType", "mistake_type"]
 
 LABEL_MAP: Dict[str, str] = {
@@ -213,50 +211,38 @@ def summarize_mistakes_student_friendly(prev: List["PreviousJudgement"]) -> List
 
 
 # =========================
-# Prompt
+# Prompt (형식 강제)
 # =========================
 DEVELOPER_PROMPT = """
-Answer in Korean.
-You are a kind and patient teacher speaking directly to a student.
+Answer in Korean. You are a kind and patient teacher speaking directly to a student.
 
-CRITICAL RULES (must follow):
-- NEVER mention internal field names or labels (e.g., SUCCESS, GIVE_UP, resultType, mistake_type, or any label codes).
-- NEVER expose programmatic or system terms.
-- ALWAYS translate evidence into student-friendly language.
-
-OUTPUT MUST BE VALID MARKDOWN and follow EXACTLY this structure:
+You MUST output ONLY the following markdown template.
+You MUST start the output with exactly: "### ✅ 결과"
+Do NOT write any text before that. Do NOT write any text after the template.
 
 ### ✅ 결과
-- **굵은 표현 1개 이상을 포함한 격려 문장 1줄**로 결과 요약(성공/오류)
+- <한 줄: 결과 요약 + **굵은 격려 1개 이상**>
 
 ### 🔍 근거(왜 이렇게 됐을까?)
-- **굵은 표현으로 핵심 원인 1개를 강조**
-- 학생 말로 작성된 설명 1~2줄 (가장 유력한 원인 하나만)
+- <한 줄: **핵심 원인 1개** 강조 + 학생 말>
 
 ### 🛠 다음에 해볼 것
-- 바로 실천 가능한 행동 **2개**
-- 각 행동은 1줄씩, 최소 1개는 **굵은 표현으로 강조**
+- <한 줄: **바로 할 행동 1**>
+- <한 줄: 행동 2>
 
 Hard rules:
-- Max 260 characters total (including markdown).
-- Use ONLY markdown syntax (** for bold).
-- No HTML tags, no code blocks, no backticks.
-- No links.
-- Do not add or remove any sections or headings.
-
-Content rules:
-- If solved: praise + one small improvement tip + optionally ONE short concept keyword (can be bold).
-- If failed: explain ONE likely cause + ONE fix strategy in student-friendly language.
+- Total <= 260 characters INCLUDING markdown and newlines.
+- Exactly 3 headings (above) and exactly 4 bullet lines (1 / 1 / 2).
+- Use ONLY '**' for bold. No other markdown.
+- No HTML tags, no code blocks, no backticks, no links.
+- NEVER mention internal field names, labels, codes, or system/programming terms.
 """.strip()
-
-
 
 
 # =========================
 # Text utils
 # =========================
 CODE_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
-
 
 def _trunc(s: Optional[str], n: int) -> str:
     s = (s or "").strip()
@@ -279,24 +265,40 @@ def _strip_forbidden_terms(text: str) -> str:
     for tok in FORBIDDEN_TOKENS:
         if tok in ("SUCCESS", "GIVE_UP"):
             continue
-        text = text.replace(tok, "")
+        if tok:
+            text = text.replace(tok, "")
 
     # 3) 라벨처럼 보이는 패턴도 제거(유출 방지)
     text = LABEL_LIKE_PATTERN.sub("", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
+def _keep_from_first_heading(text: str) -> str:
+    """
+    모델이 '줄글 + 템플릿' 형태로 출력하는 경우가 잦아,
+    템플릿 시작(### ✅ 결과) 이전의 모든 텍스트를 잘라냅니다.
+    """
+    if not text:
+        return text
+    idx = text.find("### ✅ 결과")
+    if idx == -1:
+        return text
+    return text[idx:].lstrip()
+
+
 def postprocess(text: str) -> str:
     text = sanitize_llm_text(text)
 
-    # ✅ 내부 용어/라벨 유출 방지
+    # ✅ 0) 템플릿 시작 이전의 줄글 제거
+    text = _keep_from_first_heading(text)
+
+    # ✅ 1) 내부 용어/라벨 유출 방지
     text = _strip_forbidden_terms(text)
 
-    # ✅ 줄바꿈 보존하면서 정리
+    # ✅ 2) 줄바꿈 보존하면서 정리
     lines = [ln.strip() for ln in (text or "").splitlines()]
     lines = [ln for ln in lines if ln]  # 빈 줄 제거
 
-    # 헤더/불릿 형태만 약하게 정규화(선택)
     norm = []
     for ln in lines:
         # "-내용" -> "- 내용"
@@ -306,12 +308,11 @@ def postprocess(text: str) -> str:
 
     text = "\n".join(norm).strip()
 
-    # ✅ 260자 제한: 그냥 하드컷(마크다운은 문장단위 컷이 오히려 깨질 수 있음)
+    # ✅ 3) 260자 제한(하드컷)
     if len(text) > MAX_FEEDBACK_CHARS:
         text = text[:MAX_FEEDBACK_CHARS].rstrip()
 
     return text
-
 
 
 def policy_violation_reason(text: str) -> Optional[str]:
@@ -321,6 +322,10 @@ def policy_violation_reason(text: str) -> Optional[str]:
         return "TOO_LONG"
     if "```" in text or "`" in text:
         return "CODE_FORMAT"
+
+    # ✅ 템플릿 시작 강제(전처리에서 잘라냈더라도 최종 확인)
+    if not text.lstrip().startswith("### ✅ 결과"):
+        return "PREFIX_TEXT_NOT_ALLOWED"
 
     # 토큰 유출 최후 검사
     for tok in FORBIDDEN_TOKENS:
@@ -335,13 +340,20 @@ def policy_violation_reason(text: str) -> Optional[str]:
         if h not in text:
             return "MD_STRUCTURE_MISSING"
 
-    # 섹션 외 추가 헤더 금지(선택)
-    extra_headers = [ln for ln in text.splitlines() if ln.startswith("### ")]
-    if len(extra_headers) != 3:
+    headers = [ln for ln in text.splitlines() if ln.startswith("### ")]
+    if len(headers) != 3:
         return "MD_TOO_MANY_HEADERS"
 
-    return None
+    bullets = [ln for ln in text.splitlines() if ln.startswith("- ")]
+    if len(bullets) != 4:
+        return "BULLET_COUNT_WRONG"
 
+    # 굵은 표현 최소 3군데(결과/근거/다음행동 중 최소 1개 강조가 자연스럽게 나오도록)
+    # '**' 토큰이 6개면(쌍 3개) OK
+    if text.count("**") < 6:
+        return "BOLD_MISSING"
+
+    return None
 
 
 # =========================
@@ -360,16 +372,39 @@ def _result_type_korean(rt: str) -> str:
 
 
 def fallback_feedback(req: FeedbackRequest) -> str:
+    """
+    fallback도 동일한 '3개 헤더 + 4개 불릿' 형식을 지켜야 policy 통과가 쉬움.
+    """
+    rt = req.result.resultType
     gap = req.problem.difficulty - req.user.coding_level
-    if req.result.resultType == "GIVE_UP":
-        base = "괜찮아, 이런 실수는 누구나 해! "
+
+    if rt == "SUCCESS":
+        line1 = "- **정답으로 통과했어!** 끝까지 해결한 게 정말 좋아."
+        line2 = "- **입력/출력 형식**을 한 번 더 점검하면 더 깔끔해져."
+        line3 = "- **작은 예시 1개**로 손으로 따라가며 중간값을 확인해봐."
+        line4 = "- 다음엔 같은 유형을 1문제 더 풀어서 패턴을 익혀보자."
+    else:
+        line1 = "- **괜찮아, 여기서 배우면 돼!** 이번엔 오류가 났어."
         if gap >= 2:
-            return base + "문제가 너의 현재 수준보다 조금 어려울 수 있으니, 입력/변수/조건을 차근차근 점검하고 작은 예제로 한 줄씩 확인해보자."
-        return base + "오류 원인과 코드에서 가장 의심되는 부분(입력 처리, 변수 초기화, 인덱스/조건)을 한 군데만 골라 작은 테스트로 바로 재현해 고쳐보자."
-    base = "정답으로 통과한 건 정말 좋아! "
-    if gap <= -1:
-        return base + "이제는 변수 이름과 입출력 처리, 예외 케이스를 더 깔끔하게 정리하는 연습을 해보자."
-    return base + "다음엔 같은 유형의 문제를 한두 개 더 풀면서 입력 처리와 출력 형식을 더 자연스럽게 익혀보자."
+            cause = "**입력 처리/조건**에서 헷갈렸을 가능성이 커."
+        else:
+            cause = "**변수 초기화/조건** 중 한 군데가 어긋났을 가능성이 있어."
+        line2 = f"- {cause} 한 곳만 찍어서 확인해보자."
+        line3 = "- **가장 작은 입력**으로 직접 값을 써가며 흐름을 확인해봐."
+        line4 = "- 출력이 맞는지(YES/NO, 줄바꿈)도 마지막에 한 번 점검해봐."
+
+    fb = "\n".join([
+        "### ✅ 결과",
+        line1,
+        "",
+        "### 🔍 근거(왜 이렇게 됐을까?)",
+        line2,
+        "",
+        "### 🛠 다음에 해볼 것",
+        line3,
+        line4
+    ])
+    return fb
 
 
 # =========================
@@ -537,8 +572,8 @@ async def feedback(
         "previous_judgement_notes": prev_payload,
 
         "constraints": {
-            "sentences": "3~5",
             "max_chars": MAX_FEEDBACK_CHARS,
+            "template": "3 headings + 4 bullets (1/1/2)",
             "forbidden": ["정답코드", "완전한 풀이", "코드블록", "백틱", "내부 필드명/라벨"],
         },
     }
@@ -550,10 +585,9 @@ async def feedback(
             {
                 "role": "user",
                 "content": (
-                    "아래 JSON만 보고 학생에게 피드백을 작성해줘. "
-                    "3~5문장, 격려+근거진단+다음행동 필수.\n"
-                    "중요: 내부 필드명/라벨 코드는 절대 쓰지 말고, 학생이 이해할 말로만 말해줘.\n"
-                    "정답/완전풀이/코드블록/백틱은 금지.\n\n"
+                    "다음 JSON만 근거로, 템플릿 그대로 피드백을 작성해.\n"
+                    "- 금지: 내부용어/라벨/코드/백틱/코드블록/링크/추가설명\n"
+                    "- 반드시: 3개 섹션 + 불릿 4줄(1/1/2) + 260자 이내\n\n"
                     + json.dumps(llm_payload, ensure_ascii=False)
                 ),
             },
