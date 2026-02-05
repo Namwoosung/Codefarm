@@ -285,11 +285,17 @@ import * as sessionApi from '@/api/session'
 
 const route = useRoute()
 const router = useRouter()
+
+// 페이지/스크롤 저장용 키
 const MAIN_PAGE_STORAGE_KEY = 'main_page'
 const MAIN_SCROLL_STORAGE_KEY = 'main_scroll'
-const problems = ref([])
-const loading = ref(true)
+
+const problems = ref([]) // 전체 문제 목록 (API에서 가져온 원본)
+const loading = ref(true) // 초기 로딩 (첫 페이지)
+const loadingMore = ref(false) // 추가 데이터 로딩 중
 const error = ref(null)
+const totalFromServer = ref(0) // 서버에서 알려준 전체 개수
+
 // URL 쿼리와 동기화: 뒤로가기/메인으로 복귀 시 페이지 유지 (쿼리 없으면 sessionStorage에서 복원)
 function getInitialPage() {
   const fromQuery = route.query.page != null ? parseInt(route.query.page, 10) : null
@@ -375,8 +381,15 @@ const filteredProblems = computed(() => {
   return normalOnly
 })
 
-// 전체 페이지 수 계산 (computed로 필터된 목록 기준)
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage.value)))
+// 전체 페이지 수 계산 (statusFilter가 없으면 서버 total 기준, 있으면 필터링된 개수 기준)
+const totalPages = computed(() => {
+  if (!statusFilter.value && totalFromServer.value > 0) {
+    // 전체 필터: 서버에서 받은 total 기준으로 페이지 수 계산 (아직 로드 안 된 데이터도 포함)
+    return Math.max(1, Math.ceil(totalFromServer.value / postsPerPage.value))
+  }
+  // statusFilter 적용 시: 실제 필터링된 데이터 기준
+  return Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage.value))
+})
 
 // 현재 페이지에 표시할 문제 목록 (21개씩)
 const pagedProblems = computed(() => {
@@ -459,8 +472,39 @@ const fetchProblems = async () => {
   try {
     loading.value = true
     error.value = null
-    const { data } = await getProblemList(buildQueryParams())
-    problems.value = data ?? []
+    problems.value = []
+    
+    // 1. 첫 페이지 호출 → 빠르게 화면 표시
+    const firstResult = await getProblemList(buildQueryParams(0))
+    const firstData = firstResult.data ?? []
+    const total = firstResult.total ?? firstData.length
+    
+    totalFromServer.value = total
+    problems.value = firstData
+    loading.value = false // 첫 페이지 로딩 완료 → 화면 표시
+    
+    // 2. 추가 페이지가 필요하면 백그라운드에서 로드
+    const totalApiPages = Math.ceil(total / API_PAGE_SIZE)
+    
+    if (totalApiPages > 1) {
+      loadingMore.value = true
+      
+      // 나머지 페이지 병렬 호출 (백그라운드)
+      const promises = []
+      for (let page = 1; page < totalApiPages; page++) {
+        promises.push(getProblemList(buildQueryParams(page)))
+      }
+      const results = await Promise.all(promises)
+      
+      // 결과 합치기
+      const allData = [...firstData]
+      for (const result of results) {
+        allData.push(...(result.data ?? []))
+      }
+      problems.value = allData
+      loadingMore.value = false
+    }
+    
     // totalPages는 computed이므로 다음 tick에 갱신됨. 현재 페이지가 새 total 초과면 보정
     nextTick(() => {
       if (currentPage.value > totalPages.value) {
