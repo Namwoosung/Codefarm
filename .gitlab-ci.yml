@@ -31,6 +31,7 @@ default:
     - test -n "$DOCKERHUB_TOKEN" || { echo "DOCKERHUB_TOKEN missing"; exit 1; }
     - echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
 
+# 배포 브랜치(develop/main)에서는 backend/web는 항상 빌드해서 SHA 태그가 반드시 존재하게 함
 build-backend:
   extends: .build-template
   script:
@@ -40,9 +41,7 @@ build-backend:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
-      changes:
-        - backend/**/*
-        - .gitlab-ci.yml
+      when: on_success
 
 build-web:
   extends: .build-template
@@ -53,10 +52,10 @@ build-web:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
-      changes:
-        - infra/nginx/**/*
-        - .gitlab-ci.yml
+      when: on_success
 
+# foundation 쪽(execution/feedback)은 변경 있을 때만 빌드해도 되는데,
+# foundation 배포가 돌 때는 반드시 존재해야 하므로, 아래 deploy-foundation-*의 rules와 changes를 "같게" 맞춤.
 build-execution:
   extends: .build-template
   script:
@@ -69,7 +68,10 @@ build-execution:
       changes:
         - execution/**/*
         - docker-compose.exec.yml
+        - docker-compose.db.yml
+        - docker-compose.feedback.yml
         - scripts/deploy_foundation.sh
+        - scripts/healthcheck.sh
         - .gitlab-ci.yml
 
 build-feedback:
@@ -84,7 +86,10 @@ build-feedback:
       changes:
         - feedback/**/*
         - docker-compose.feedback.yml
+        - docker-compose.db.yml
+        - docker-compose.exec.yml
         - scripts/deploy_foundation.sh
+        - scripts/healthcheck.sh
         - .gitlab-ci.yml
 
 # =====================
@@ -125,6 +130,7 @@ trivy_fs:
     - mkdir -p ~/.ssh
     - ssh-keyscan "$HOST" >> ~/.ssh/known_hosts
 
+# ✅ Foundation deploy (db + execution + feedback)
 deploy-foundation-dev:
   extends: .deploy-template
   script:
@@ -136,17 +142,19 @@ deploy-foundation-dev:
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
       changes:
+        - execution/**/*
+        - feedback/**/*
         - docker-compose.db.yml
         - docker-compose.exec.yml
         - docker-compose.feedback.yml
         - scripts/deploy_foundation.sh
         - scripts/healthcheck.sh
-        - execution/**/*
-        - feedback/**/*
         - .gitlab-ci.yml
   needs:
     - job: build-execution
+      optional: true
     - job: build-feedback
+      optional: true
 
 deploy-foundation-prod:
   extends: .deploy-template
@@ -160,39 +168,49 @@ deploy-foundation-prod:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
       changes:
+        - execution/**/*
+        - feedback/**/*
         - docker-compose.db.yml
         - docker-compose.exec.yml
         - docker-compose.feedback.yml
         - scripts/deploy_foundation.sh
         - scripts/healthcheck.sh
-        - execution/**/*
-        - feedback/**/*
         - .gitlab-ci.yml
   needs:
     - job: build-execution
+      optional: true
     - job: build-feedback
+      optional: true
 
-# 기존 server deploy
+# ✅ Server deploy (backend + web)
 deploy-dev:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" \
+        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh dev"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "develop"'
+  needs:
+    - job: build-backend
+    - job: build-web
 
 deploy-prod:
   extends: .deploy-template
   script:
     - chmod 600 "$SSH_KEY"
-    - ssh -i "$SSH_KEY" "$USER@$HOST" "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh prod"
+    - ssh -i "$SSH_KEY" "$USER@$HOST" \
+        "DOCKERHUB_USERNAME='$DOCKERHUB_USERNAME' DOCKERHUB_TOKEN='$DOCKERHUB_TOKEN' IMAGE_TAG='$CI_COMMIT_SHA' bash /srv/app/scripts/deploy_server.sh prod"
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
       when: never
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
+  needs:
+    - job: build-backend
+    - job: build-web
 
 # =====================
 # INFERENCE (Elice sparse checkout)
