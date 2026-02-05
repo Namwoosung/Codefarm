@@ -991,6 +991,13 @@ onUnmounted(() => {
   closeIdeBroadcastChannel()
   clearIdleCheck()
 
+  // 이탈 시 close가 호출되지 않은 경우(가드 스킵 등) 대비: 아직 세션이 남아 있으면 종료 요청
+  const sid = ideStore.sessionId
+  if (sid != null) {
+    sessionApi.closeSession(sid).catch(() => {})
+    ideStore.clearSession()
+  }
+
   // confirm 대기 중이면 안전하게 취소 처리
   if (confirmResolver) closeConfirm(false)
 })
@@ -1025,26 +1032,26 @@ const handleSubmit = async () => {
       const ec = res?.data?.evaluationContext
       if (success) {
         // 성공 시: evaluationContext 없음
-        terminalPanel.value.write('📊 모든 테스트 통과 (100%)\r\n')
-        terminalPanel.value.write('✅ 모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
-        if (res?.data?.execTime) terminalPanel.value.write(`⏱️ 실행 시간: ${res.data.execTime}ms\r\n`)
-        if (res?.data?.memory) terminalPanel.value.write(`💾 메모리: ${(res.data.memory / 1024).toFixed(2)}KB\r\n`)
+        terminalPanel.value.write('📊\u3000모든 테스트 통과 (100%)\r\n')
+        terminalPanel.value.write('✅\u3000모든 테스트를 통과했습니다. 세션을 종료합니다.\r\n')
+        if (res?.data?.execTime) terminalPanel.value.write(`⏱️\u3000실행 시간: ${res.data.execTime}ms\r\n`)
+        if (res?.data?.memory) terminalPanel.value.write(`💾\u3000메모리: ${(res.data.memory / 1024).toFixed(2)}KB\r\n`)
       } else if (ec) {
         // 실패 시: evaluationContext 있음
         const passed = ec.passedCount ?? 0
         const total = ec.totalCount
         const pct = total > 0 ? Math.round((passed / total) * 100) : 0
-        terminalPanel.value.write('\r\n│ 📊 채점 결과: ' + `${passed} / ${total}개 테스트 통과 (${pct}%)` + '\r\n')
-        if (ec.failReason) terminalPanel.value.write('│ ❌ 사유: ' + ec.failReason + '\r\n')
-        if (ec.isTimeout) terminalPanel.value.write('│ ⏱️ 시간 초과\r\n')
-        if (ec.isOom) terminalPanel.value.write('│ 💾 메모리 초과\r\n')
-        terminalPanel.value.write('\r\n❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
+        terminalPanel.value.write('\r\n│\u3000📊\u3000채점 결과: ' + `${passed} / ${total}개 테스트 통과 (${pct}%)` + '\r\n')
+        if (ec.failReason) terminalPanel.value.write('│\u3000❌\u3000사유: ' + ec.failReason + '\r\n')
+        if (ec.isTimeout) terminalPanel.value.write('│\u3000⏱️\u3000시간 초과\r\n')
+        if (ec.isOom) terminalPanel.value.write('│\u3000💾\u3000메모리 초과\r\n')
+        terminalPanel.value.write('\r\n❌\u3000일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
       } else {
         terminalPanel.value.write(res?.message || '제출 완료\r\n')
-        terminalPanel.value.write('❌ 일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
+        terminalPanel.value.write('❌\u3000일부 테스트를 통과하지 못했습니다. 세션은 유지됩니다.\r\n')
       }
     }
-    // 1) 제출 성공 시: 백엔드가 세션을 자동 종료하므로 close API 호출 없이 로컬 상태만 정리 후 리포트 모달 표시
+    // 1) 제출 성공 시에만: 백엔드가 세션 자동 종료 → 로컬 정리 후 리포트 모달 표시. 실패 시에는 모달 안 띄움
     if (success) {
       timerStoppedAt.value = lastStatusTick.value - problemStartTime.value
       problemStartTime.value = 0
@@ -1054,18 +1061,18 @@ const handleSubmit = async () => {
         clearInterval(snapshotIntervalId)
         snapshotIntervalId = null
       }
-      const problemTitle = `문제 #${route.params.id}`
-      reportData.value = buildReportFromSubmitResponse(res, problemTitle)
+      reportModalFromHistory.value = false
+      reportData.value = buildReportFromSubmitResponse(res, `문제 #${route.params.id}`)
+      reportDetailLoading.value = true
+      showReportModal.value = true
       const reportId = res?.data?.submissionContext?.resultId ?? res?.data?.resultId ?? res?.data?.reportId
       try {
         const fetched = reportId != null ? await getReportDetail(reportId) : null
-        // getReportDetail은 API의 data 필드(ReportDetailResponseDto)를 그대로 반환함. result 래핑 없음.
         if (fetched && typeof fetched === 'object') {
           reportData.value.result = { ...reportData.value.result, ...fetched }
         }
       } catch (_) {}
-      reportModalFromHistory.value = false
-      showReportModal.value = true
+      reportDetailLoading.value = false
     }
   } catch (err) {
     if (terminalPanel.value) {
@@ -1082,7 +1089,7 @@ const handleSubmit = async () => {
           } catch (_) {}
         }
       }
-      terminalPanel.value.write('❌ 제출 실패\r\n')
+      terminalPanel.value.write('❌\u3000제출 실패\r\n')
     }
   } finally {
     isSubmitLoading.value = false
@@ -1156,11 +1163,11 @@ const doRunWithInput = async (input) => {
       if (d?.isOom) terminalPanel.value.writeStderr('Memory Limit Exceeded\r\n')
       // FR-CODE-005-2, 005-3: 실행 결과 요약
       if (d?.isTimeout) {
-        terminalPanel.value.write(`\r\n⏱️ 실행 시간 초과 (제한: 10초)\r\n`)
+        terminalPanel.value.write(`\r\n⏱️\u3000실행 시간 초과 (제한: 10초)\r\n`)
       } else if (res?.message === '실행 완료') {
-        terminalPanel.value.write(`\r\n✅ 실행 성공 (${execTimeSec}초)\r\n`)
+        terminalPanel.value.write(`\r\n✅\u3000실행 성공 (${execTimeSec}초)\r\n`)
       } else {
-        terminalPanel.value.write(`\r\n❌ 실행 실패 (${execTimeSec}초)\r\n`)
+        terminalPanel.value.write(`\r\n❌\u3000실행 실패 (${execTimeSec}초)\r\n`)
       }
     }
   } catch (err) {
@@ -1170,7 +1177,7 @@ const doRunWithInput = async (input) => {
         ? '요청 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.'
         : (err.response?.data?.message || err.message)
       terminalPanel.value.write(`실행 실패: ${msg}\r\n`)
-      terminalPanel.value.write('❌ 실행 실패\r\n')
+      terminalPanel.value.write('❌\u3000실행 실패\r\n')
     }
   } finally {
     if (terminalPanel.value) {
@@ -1190,6 +1197,10 @@ const handleEscape = async () => {
     cancelText: '취소',
   })
   if (!ok) return
+  reportModalFromHistory.value = false
+  reportData.value = null
+  reportDetailLoading.value = true
+  showReportModal.value = true
   const sid = ideStore.sessionId
   justCreatedSessionId.value = null
   let giveUpRes = null
@@ -1223,8 +1234,7 @@ const handleEscape = async () => {
   } else {
     reportData.value = { result: { problem: { title: problemTitle.value }, resultType: 'GIVE_UP', feedback: '탈주했습니다.' } }
   }
-  reportModalFromHistory.value = false
-  showReportModal.value = true
+  reportDetailLoading.value = false
 }
 
 /** 제출 내역 탭에서 특정 결과의 리포트 보기 */

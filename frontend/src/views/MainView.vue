@@ -302,7 +302,6 @@ function getInitialPage() {
 }
 const currentPage = ref(getInitialPage())
 const postsPerPage = ref(21)
-const totalPages = ref(10)
 
 /** 현재 페이지를 URL 쿼리에 반영 (뒤로가기 시 복원용). page=1이면 쿼리에서 생략. sessionStorage에도 저장 */
 function syncPageToRoute(pageNum) {
@@ -364,7 +363,7 @@ const buildQueryParams = (page = 0) => ({
 
 // 클라이언트 측 필터링 (NORMAL 타입 + statusFilter)
 const filteredProblems = computed(() => {
-  const list = allProblems.value ?? []
+  const list = problems.value ?? []
   // 1. NORMAL 타입만 필터링
   const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
   // 2. statusFilter 적용
@@ -376,14 +375,14 @@ const filteredProblems = computed(() => {
   return normalOnly
 })
 
-// 전체 페이지 수 계산
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage)))
+// 전체 페이지 수 계산 (computed로 필터된 목록 기준)
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage.value)))
 
 // 현재 페이지에 표시할 문제 목록 (21개씩)
 const pagedProblems = computed(() => {
-  const start = (currentPage.value - 1) * postsPerPage
-  const end = start + postsPerPage
-  return filteredProblems.value.slice(start, end)
+  const perPage = postsPerPage.value
+  const start = (currentPage.value - 1) * perPage
+  return filteredProblems.value.slice(start, start + perPage)
 })
 
 // 드롭다운 상태
@@ -460,15 +459,15 @@ const fetchProblems = async () => {
   try {
     loading.value = true
     error.value = null
-    const { data, total } = await getProblemList(buildQueryParams())
+    const { data } = await getProblemList(buildQueryParams())
     problems.value = data ?? []
-    const safeTotal = Number.isFinite(Number(total)) ? Number(total) : (data?.length ?? 0)
-    totalPages.value = Math.max(1, Math.ceil(safeTotal / postsPerPage.value))
-    // URL에서 큰 페이지로 왔을 수 있음: total 초과면 보정
-    if (currentPage.value > totalPages.value) {
-      currentPage.value = totalPages.value
-      syncPageToRoute(currentPage.value)
-    }
+    // totalPages는 computed이므로 다음 tick에 갱신됨. 현재 페이지가 새 total 초과면 보정
+    nextTick(() => {
+      if (currentPage.value > totalPages.value) {
+        currentPage.value = totalPages.value
+        syncPageToRoute(currentPage.value)
+      }
+    })
   } catch (e) {
     error.value = e.response?.data?.message || e.message || '문제 목록을 불러오지 못했습니다.'
   } finally {
