@@ -35,9 +35,7 @@ public class AutoHintSchedulerService {
 
     private final ConcurrentHashMap<Long, ScheduledFuture<?>> tasks = new ConcurrentHashMap<>();
 
-    private static final Duration INTERVAL = Duration.ofMinutes(1); // test를 위해 1분으로 설정
-
-    public void start(Long sessionId) {
+    public void start(Long sessionId, Duration interval) {
 
         if (tasks.containsKey(sessionId)) {
             log.warn("Scheduler already running. sessionId={}", sessionId);
@@ -55,12 +53,12 @@ public class AutoHintSchedulerService {
                         log.error("Error occurred in auto hint scheduler for session: {}", sessionId, e);
                     }
                 },
-                Instant.now().plus(INTERVAL),
-                INTERVAL
+                Instant.now().plus(interval),
+                interval
         );
 
         tasks.put(sessionId, future);
-        log.info("Auto hint scheduler started. sessionId={}", sessionId);
+        log.info("Auto hint scheduler started. sessionId={}, interval={}", sessionId, interval);
     }
 
     public void stop(Long sessionId) {
