@@ -274,7 +274,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProblemList } from '@/api/problem'
 import { useCardStore } from '@/stores/card'
@@ -290,13 +290,42 @@ import * as sessionApi from '@/api/session'
 
 const route = useRoute()
 const router = useRouter()
-const allProblems = ref([]) // 전체 문제 목록 (API에서 가져온 원본)
+
+// 페이지/스크롤 저장용 키
+const MAIN_PAGE_STORAGE_KEY = 'main_page'
+const MAIN_SCROLL_STORAGE_KEY = 'main_scroll'
+
+const problems = ref([]) // 전체 문제 목록 (API에서 가져온 원본)
 const loading = ref(true) // 초기 로딩 (첫 페이지)
 const loadingMore = ref(false) // 추가 데이터 로딩 중
 const error = ref(null)
-const currentPage = ref(1)
-const postsPerPage = 21
 const totalFromServer = ref(0) // 서버에서 알려준 전체 개수
+
+// URL 쿼리와 동기화: 뒤로가기/메인으로 복귀 시 페이지 유지 (쿼리 없으면 sessionStorage에서 복원)
+function getInitialPage() {
+  const fromQuery = route.query.page != null ? parseInt(route.query.page, 10) : null
+  if (fromQuery != null && Number.isFinite(fromQuery)) return Math.max(1, fromQuery)
+  try {
+    const fromStorage = parseInt(sessionStorage.getItem(MAIN_PAGE_STORAGE_KEY), 10)
+    if (Number.isFinite(fromStorage) && fromStorage >= 1) return fromStorage
+  } catch (_) {}
+  return 1
+}
+const currentPage = ref(getInitialPage())
+const postsPerPage = ref(21)
+
+/** 현재 페이지를 URL 쿼리에 반영 (뒤로가기 시 복원용). page=1이면 쿼리에서 생략. sessionStorage에도 저장 */
+function syncPageToRoute(pageNum) {
+  const p = Number(pageNum)
+  if (!Number.isFinite(p) || p < 1) return
+  try {
+    sessionStorage.setItem(MAIN_PAGE_STORAGE_KEY, String(p))
+  } catch (_) {}
+  const q = { ...route.query }
+  if (p === 1) delete q.page
+  else q.page = String(p)
+  router.replace({ path: '/', query: q })
+}
 
 // idle cancel 모달 (30분 무입력 강제 종료 안내)
 const showIdleCancelModal = computed(() => route.query.idle_cancel === '1')
@@ -345,7 +374,7 @@ const buildQueryParams = (page = 0) => ({
 
 // 클라이언트 측 필터링 (NORMAL 타입 + statusFilter)
 const filteredProblems = computed(() => {
-  const list = allProblems.value ?? []
+  const list = problems.value ?? []
   // 1. NORMAL 타입만 필터링
   const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
   // 2. statusFilter 적용
@@ -361,17 +390,17 @@ const filteredProblems = computed(() => {
 const totalPages = computed(() => {
   if (!statusFilter.value && totalFromServer.value > 0) {
     // 전체 필터: 서버에서 받은 total 기준으로 페이지 수 계산 (아직 로드 안 된 데이터도 포함)
-    return Math.max(1, Math.ceil(totalFromServer.value / postsPerPage))
+    return Math.max(1, Math.ceil(totalFromServer.value / postsPerPage.value))
   }
   // statusFilter 적용 시: 실제 필터링된 데이터 기준
-  return Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage))
+  return Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage.value))
 })
 
 // 현재 페이지에 표시할 문제 목록 (21개씩)
 const pagedProblems = computed(() => {
-  const start = (currentPage.value - 1) * postsPerPage
-  const end = start + postsPerPage
-  return filteredProblems.value.slice(start, end)
+  const perPage = postsPerPage.value
+  const start = (currentPage.value - 1) * perPage
+  return filteredProblems.value.slice(start, start + perPage)
 })
 
 // 현재 페이지 데이터가 아직 로드 중인지 확인
@@ -419,6 +448,9 @@ async function onClickProblem(problem) {
   } catch (_) {
     // 404 등 = 활성 세션 없음 → 그대로 이동
   }
+  try {
+    sessionStorage.setItem(MAIN_SCROLL_STORAGE_KEY, String(window.scrollY))
+  } catch (_) {}
   router.push(`/ide/${problemId}`)
 }
 
@@ -427,6 +459,9 @@ function goToExistingProblem() {
   if (!payload) return
   showActiveSessionModal.value = false
   activeSessionPayload.value = null
+  try {
+    sessionStorage.setItem(MAIN_SCROLL_STORAGE_KEY, String(window.scrollY))
+  } catch (_) {}
   router.push(`/ide/${payload.otherProblemId}`)
 }
 
@@ -440,6 +475,9 @@ async function goToNewProblem() {
   showActiveSessionModal.value = false
   activeSessionPayload.value = null
   activeSessionLoading.value = false
+  try {
+    sessionStorage.setItem(MAIN_SCROLL_STORAGE_KEY, String(window.scrollY))
+  } catch (_) {}
   router.push(`/ide/${payload.targetProblemId}`)
 }
 
@@ -449,7 +487,7 @@ const fetchProblems = async () => {
     loading.value = true
     loadingMore.value = false
     error.value = null
-    allProblems.value = []
+    problems.value = []
     
     // 1. 첫 페이지 호출 → 빠르게 화면 표시
     const firstResult = await getProblemList(buildQueryParams(0))
@@ -457,7 +495,7 @@ const fetchProblems = async () => {
     const total = firstResult.total ?? firstData.length
     
     totalFromServer.value = total
-    allProblems.value = firstData
+    problems.value = firstData
     loading.value = false // 첫 페이지 로딩 완료 → 화면 표시
     
     // 2. 추가 페이지가 필요하면 백그라운드에서 로드
@@ -478,13 +516,37 @@ const fetchProblems = async () => {
       for (const result of results) {
         allData.push(...(result.data ?? []))
       }
-      allProblems.value = allData
+      problems.value = allData
       loadingMore.value = false
     }
+    
+    // totalPages는 computed이므로 다음 tick에 갱신됨. 현재 페이지가 새 total 초과면 보정
+    nextTick(() => {
+      if (currentPage.value > totalPages.value) {
+        currentPage.value = totalPages.value
+        syncPageToRoute(currentPage.value)
+      }
+    })
   } catch (e) {
     error.value = e.response?.data?.message || e.message || '문제 목록을 불러오지 못했습니다.'
     loading.value = false
     loadingMore.value = false
+  } finally {
+    // IDE에서 복귀 시 저장해 둔 스크롤 위치 복원 (한 번만)
+    try {
+      const saved = sessionStorage.getItem(MAIN_SCROLL_STORAGE_KEY)
+      if (saved != null) {
+        sessionStorage.removeItem(MAIN_SCROLL_STORAGE_KEY)
+        const y = parseInt(saved, 10)
+        if (Number.isFinite(y) && y >= 0) {
+          nextTick(() => {
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: y, behavior: 'auto' })
+            })
+          })
+        }
+      }
+    } catch (_) {}
   }
 }
 
@@ -494,6 +556,7 @@ const resetFilters = () => {
   algorithmSelected.value = []
   statusFilter.value = ''
   currentPage.value = 1
+  syncPageToRoute(1)
 }
 
 // 단일 Watcher: 페이지/필터/정렬을 한 곳에서만 감시해서 중복 호출 방지
@@ -518,6 +581,7 @@ const scrollToTop = () => {
 const back = () => {
   if (currentPage.value > 1) {
     currentPage.value--
+    syncPageToRoute(currentPage.value)
     scrollToTop()
   }
 }
@@ -525,6 +589,7 @@ const back = () => {
 const next = () => {
   if (currentPage.value < totalPages.value) {
     currentPage.value++
+    syncPageToRoute(currentPage.value)
     scrollToTop()
   }
 }
@@ -536,6 +601,7 @@ const goToPage = (page) => {
   const clamped = Math.min(Math.max(1, p), totalPages.value)
   if (clamped === currentPage.value) return
   currentPage.value = clamped
+  syncPageToRoute(clamped)
   scrollToTop()
 }
 
@@ -557,7 +623,34 @@ const paginationItems = computed(() => {
   return items
 })
 
-// API 호출이 필요한 필터 변경 감시 (algorithm, difficulty, sortBy)
+// 메인(/)으로 복귀 시(뒤로가기·메인으로 버튼 등) URL 또는 sessionStorage로 페이지 복원
+watch(
+  () => (route.path === '/' ? route.query.page : undefined),
+  (pageQuery) => {
+    if (route.path !== '/') return
+    const fromQuery = pageQuery != null ? parseInt(pageQuery, 10) : null
+    const p =
+      fromQuery != null && Number.isFinite(fromQuery)
+        ? Math.max(1, fromQuery)
+        : (() => {
+            try {
+              const v = parseInt(sessionStorage.getItem(MAIN_PAGE_STORAGE_KEY), 10)
+              return Number.isFinite(v) && v >= 1 ? v : 1
+            } catch (_) {
+              return 1
+            }
+          })()
+    if (p !== currentPage.value) {
+      currentPage.value = p
+      try {
+        sessionStorage.setItem(MAIN_PAGE_STORAGE_KEY, String(p))
+      } catch (_) {}
+      if (pageQuery == null && p > 1) syncPageToRoute(p)
+    }
+  },
+  { immediate: true }
+)
+
 watch(
   () => ({
     sortBy: sortBy.value,
@@ -565,16 +658,23 @@ watch(
     algorithmKey: normalizeArrayKey(algorithmSelected.value),
   }),
   (next, prev) => {
+    // prev 없음 = 최초 1회 실행. 이때는 페이지 리셋하면 안 됨(URL/sessionStorage 복원값이 덮어씌워짐)
     const criteriaChanged =
-      !prev ||
-      next.sortBy !== prev.sortBy ||
-      next.difficultyKey !== prev.difficultyKey ||
-      next.algorithmKey !== prev.algorithmKey
+      prev != null &&
+      (next.size !== prev.size ||
+        next.sortBy !== prev.sortBy ||
+        next.difficultyKey !== prev.difficultyKey ||
+        next.algorithmKey !== prev.algorithmKey)
 
-    if (criteriaChanged) {
+    // 필터/정렬(또는 size)만 바뀐 경우에만 페이지를 1로
+    if (criteriaChanged && next.page !== 1) {
       currentPage.value = 1
-      scheduleFetch(200)
+      syncPageToRoute(1)
+      return
     }
+
+    // 필터/정렬 변경은 디바운스, 페이징은 즉시
+    scheduleFetch(prev != null && criteriaChanged ? 200 : 0)
   },
   { immediate: true }
 )

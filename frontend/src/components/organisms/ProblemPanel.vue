@@ -54,10 +54,9 @@
             <transition name="fade-slide">
               <div
                 v-if="showConcept"
-                class="bg-base-200/60 p-4 rounded-lg text-[var(--color-farm-brown-dark)] whitespace-pre-wrap leading-relaxed text-[0.875rem]"
-              >
-                {{ problem.concept }}
-              </div>
+                class="problem-concept-html bg-base-200/60 p-4 rounded-lg text-[var(--color-farm-brown-dark)] leading-relaxed text-[0.875rem]"
+                v-html="problem.concept"
+              />
             </transition>
           </div>
           <div v-if="problem?.inputDescription" class="mb-6">
@@ -335,5 +334,31 @@ onMounted(() => {
 .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+/* 개념 HTML 렌더링 (API에서 내려준 HTML) */
+.problem-concept-html :deep(p) {
+  margin: 0 0 0.75em;
+  line-height: 1.6;
+}
+.problem-concept-html :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.problem-concept-html :deep(h3) {
+  margin: 1em 0 0.5em;
+  font-size: 1em;
+  font-weight: 700;
+  color: var(--color-farm-brown-dark);
+}
+.problem-concept-html :deep(h3:first-child) {
+  margin-top: 0;
+}
+.problem-concept-html :deep(strong) {
+  font-weight: 700;
+  color: var(--color-farm-brown-dark);
+}
+.problem-concept-html :deep(div[style*="border"]) {
+  margin: 0.5em 0;
+  color: var(--color-farm-brown-dark);
 }
 </style>

@@ -4,7 +4,7 @@ import api from './index'
  * 리포트 상세 조회
  * GET /api/v1/reports/{report_id}
  * @param {number|string} reportId
- * @returns {Promise<{ result: object }|null>} data.result 또는 실패 시 null (호출부에서 목 데이터 사용)
+ * @returns {Promise<object|null>} API data(ReportDetailResponseDto) 또는 실패 시 null
  */
 export const getReportDetail = async (reportId) => {
   if (reportId == null || reportId === '') return null
@@ -19,24 +19,27 @@ export const getReportDetail = async (reportId) => {
 
 /**
  * 제출 API 응답으로 리포트 객체 구성 (채점·결과용 evaluationContext 포함)
- * @param {{ data?: { resultId?, resultType?, language?, solveTime?, execTime?, memory?, feedback?, submittedAt?, evaluationContext?, awardedPoints? } }} res - submit 응답
+ * 백엔드 SubmitSessionResponseDto: resultType, evaluationContext, submissionContext, feedback, awardedPoints
+ * submissionContext: resultId, solveTime, execTime, memory, submittedAt
+ * @param {{ data?: { resultType?, evaluationContext?, submissionContext?, feedback?, awardedPoints? } }} res - submit 응답 (res.data = DTO)
  * @param {string} [problemTitle] - 문제 제목
  * @returns {{ result: object, evaluationContext?: object, xp?: number }}
  */
 export const buildReportFromSubmitResponse = (res, problemTitle = '문제 풀이 결과') => {
   const d = res?.data ?? {}
+  const sub = d.submissionContext ?? {}
   const evalCtx = d.evaluationContext ?? null
   const result = {
-    resultId: d.resultId ?? null,
+    resultId: sub.resultId ?? d.resultId ?? null,
     resultType: d.resultType ?? 'SUCCESS',
     language: d.language ?? 'PYTHON',
     problem: { problemId: 0, title: problemTitle, difficulty: 'LEVEL1', algorithm: '' },
     code: '',
-    solveTime: d.solveTime ?? 0,
-    execTime: d.execTime ?? 0,
-    memory: d.memory ?? 0,
+    solveTime: sub.solveTime ?? d.solveTime ?? 0,
+    execTime: sub.execTime ?? d.execTime ?? 0,
+    memory: sub.memory ?? d.memory ?? 0,
     feedback: d.feedback ?? '제출이 완료되었습니다.',
-    createdAt: d.submittedAt ?? new Date().toISOString(),
+    createdAt: sub.submittedAt ?? d.submittedAt ?? new Date().toISOString(),
     hintCount: null,
     hintContents: [],
     improvementDirection: null

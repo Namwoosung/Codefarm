@@ -121,9 +121,9 @@ const apiHints = ref([])
 /** 수동 힌트 전송 후 API 응답까지의 임시 메시지 (아직 apiHints에 없음) */
 const optimisticMessages = ref([])
 
-/** 힌트 목록을 채팅 메시지 형태로 변환 (과거순). AUTO는 세션 생성 이후 것만 표시 */
+/** 힌트 목록을 채팅 메시지 형태로 변환 (시간순 유지를 위해 정렬하지 않음, 병합 후 일괄 정렬). AUTO는 세션 생성 이후 것만 표시 */
 function hintsToMessages(hints) {
-  const list = Array.isArray(hints) ? [...hints].reverse() : []
+  const list = Array.isArray(hints) ? hints : []
   const sessionStart = ideStore.sessionStartedAt ?? 0
   const messages = []
   for (const h of list) {
@@ -158,12 +158,19 @@ function storeHintsToMessages(storeHints, apiHintIds) {
     }))
 }
 
-/** API 힌트 + store SSE 힌트 + 수동 힌트 임시 메시지 병합 → 채팅 메시지 (store에서 렌더링) */
+/** 메시지 정렬용 타임스탬프 (createdAt 우선, 없으면 0) */
+function msgTime(msg) {
+  const t = msg?.createdAt
+  return t ? new Date(t).getTime() : 0
+}
+
+/** API 힌트 + store SSE 힌트 + 수동 힌트 임시 메시지 병합 후 시간순 정렬 → 쓴 순서대로 채팅 */
 const chatMessages = computed(() => {
   const apiMsgs = hintsToMessages(apiHints.value)
   const apiIds = new Set(apiHints.value.map((h) => h.hintId ?? h.hint_id))
   const storeMsgs = storeHintsToMessages(ideStore.hints ?? [], apiIds)
-  return [...apiMsgs, ...storeMsgs, ...optimisticMessages.value]
+  const merged = [...apiMsgs, ...storeMsgs, ...optimisticMessages.value]
+  return merged.slice().sort((a, b) => msgTime(a) - msgTime(b))
 })
 
 /** 힌트 목록 로드 후 apiHints에 반영, 미열람 힌트는 열람 처리 */
