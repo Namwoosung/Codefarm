@@ -238,7 +238,7 @@
             <template v-for="item in paginationItems" :key="item.key">
               <button
                 type="button"
-                class="min-w-8 rounded-lg px-2 py-2 text-sm font-semibold transition-colors"
+                class="min-w-8 cursor-pointer rounded-lg px-2 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed"
                 :class="
                   item.page === currentPage
                     ? 'text-farm-brown-dark'
@@ -353,13 +353,9 @@ const statusFilterOptions = [
   { value: 'tried', label: '도전중' },
 ]
 
-// 옵션 (필요 시 여기만 수정)
+// 옵션 (필요 시 여기만 수정) — API·DB가 한글 사용
 const difficultyOptions = ['1', '2', '3', '4', '5']
-const algorithmOptions = [
-  "BRUTEFORCE",
-  "QUEUE",
-  "STACK",
-]
+const algorithmOptions = ['완전탐색', '큐', '스택']
 
 const API_PAGE_SIZE = 100 // 백엔드 최대 size 제한
 
@@ -367,7 +363,7 @@ const buildQueryParams = (page = 0) => ({
   size: API_PAGE_SIZE,
   page,
   sortBy: sortBy.value || undefined,
-  algorithm: algorithmSelected.value.length ? algorithmSelected.value.join(',') : undefined,
+  algorithm: algorithmSelected.value.length ? algorithmSelected.value : undefined,
   difficulty: difficultySelected.value.length ? difficultySelected.value.join(',') : undefined,
   problemType: 'NORMAL',
 })
@@ -484,30 +480,23 @@ const fetchProblems = async () => {
     loadingMore.value = false
     error.value = null
     allProblems.value = []
-    
-    // 1. 첫 페이지 호출 → 빠르게 화면 표시
+
     const firstResult = await getProblemList(buildQueryParams(0))
     const firstData = firstResult.data ?? []
     const total = firstResult.total ?? firstData.length
-    
+
     totalFromServer.value = total
     allProblems.value = firstData
-    loading.value = false // 첫 페이지 로딩 완료 → 화면 표시
-    
-    // 2. 추가 페이지가 필요하면 백그라운드에서 로드
+    loading.value = false
+
     const totalApiPages = Math.ceil(total / API_PAGE_SIZE)
-    
     if (totalApiPages > 1) {
       loadingMore.value = true
-      
-      // 나머지 페이지 병렬 호출 (백그라운드)
       const promises = []
       for (let page = 1; page < totalApiPages; page++) {
         promises.push(getProblemList(buildQueryParams(page)))
       }
       const results = await Promise.all(promises)
-      
-      // 결과 합치기
       const allData = [...firstData]
       for (const result of results) {
         allData.push(...(result.data ?? []))
@@ -515,8 +504,7 @@ const fetchProblems = async () => {
       allProblems.value = allData
       loadingMore.value = false
     }
-    
-    // totalPages는 computed이므로 다음 tick에 갱신됨. 현재 페이지가 새 total 초과면 보정
+
     nextTick(() => {
       if (currentPage.value > totalPages.value) {
         currentPage.value = totalPages.value
