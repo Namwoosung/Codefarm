@@ -82,7 +82,7 @@ GMS_TIMEOUT = float(os.getenv("GMS_TIMEOUT", "30.0"))
 
 # 동시요청 보호(Queue)
 QUEUE_MAXSIZE = int(os.getenv("INFER_QUEUE_MAXSIZE", "50"))
-WORKERS = int(os.getenv("INFER_WORKERS", "4"))
+WORKERS = int(os.getenv("INFER_WORKERS", "2"))
 ENQUEUE_TIMEOUT = float(os.getenv("ENQUEUE_TIMEOUT", "0.2"))
 REQUEST_MAX_WAIT = float(os.getenv("REQUEST_MAX_WAIT", "30.0"))
 
@@ -101,8 +101,8 @@ GMS_TEMPERATURE = float(os.getenv("GMS_TEMPERATURE", "0.4"))
 # p95/p99 Stabilizers (IMPORTANT)
 # ============================================================
 # ✅ GPU 동시 실행 제한: A100 80GB
-GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "4"))
-MODEL2_CONCURRENCY = int(os.getenv("MODEL2_CONCURRENCY", "4"))
+GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "3"))
+MODEL2_CONCURRENCY = int(os.getenv("MODEL2_CONCURRENCY", "2"))
 
 # ✅ GMS 동시성 제한(너무 높이면 p99/리페어율 악화 가능)
 GMS_CONCURRENCY = int(os.getenv("GMS_CONCURRENCY", str(GMS_WORKERS)))
