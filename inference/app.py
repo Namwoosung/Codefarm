@@ -63,8 +63,8 @@ def log_error(event: str, **fields):
 # ============================================================
 # Load env
 # ============================================================
-
-load_dotenv("/srv/app/app/.env")
+from dotenv import find_dotenv, load_dotenv
+load_dotenv(find_dotenv("/srv/app/app/.env"))
 
 REPORT_SERVER_TOKEN = os.getenv("REPORT_SERVER_TOKEN", "")
 REQUIRE_SERVER_TOKEN = os.getenv("REQUIRE_SERVER_TOKEN", "0") == "1"
@@ -100,8 +100,8 @@ GMS_TEMPERATURE = float(os.getenv("GMS_TEMPERATURE", "0.4"))
 # ============================================================
 # p95/p99 Stabilizers (IMPORTANT)
 # ============================================================
-# ✅ GPU 동시 실행 제한: A100 20GB에서 7B/3B 같이 쓰면 1 권장
-GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "4"))
+# ✅ GPU 동시 실행 제한: A100 80GB
+GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "3"))
 MODEL2_CONCURRENCY = int(os.getenv("MODEL2_CONCURRENCY", "2"))
 
 # ✅ GMS 동시성 제한(너무 높이면 p99/리페어율 악화 가능)

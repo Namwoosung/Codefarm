@@ -89,7 +89,7 @@ FORCE_ENGLISH_REMINDER = os.getenv("FORCE_ENGLISH_REMINDER", "1") == "1"
 CUDA_DEVICE_INDEX = int(os.getenv("CUDA_DEVICE_INDEX", "0"))
 MODEL2_MAX_MEMORY = os.getenv("MODEL2_MAX_MEMORY", "").strip()  # 예: "8GiB" (비우면 미사용)
 
-# ✅ generate 동시성 제한(프로세스 내 1개)
+# ✅ generate 동시성 제한(프로세스 내 2개)
 # _GEN_LOCK = asyncio.Lock()
 _GEN_SEM = asyncio.Semaphore(2)
 
