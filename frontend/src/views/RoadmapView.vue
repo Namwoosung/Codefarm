@@ -265,7 +265,7 @@
               </span>
             </div>
           </div>
-          <p v-else class="cf-modal-no-data">문제 정보를 불러올 수 없습니다.</p>
+          <p v-else class="cf-modal-no-data">로그인한 상태에서 문제를 추천받을 수 있습니다.</p>
         </div>
 
         <div class="cf-modal-actions">
@@ -273,12 +273,22 @@
             나중에 하기
           </button>
           <button
+            v-if="modalContent"
             type="button"
             class="cf-modal-btn cf-modal-btn-ide"
             :disabled="!modalProblemId"
             @click="goToIdeFromModal"
           >
             <span>문제 풀러 가기</span>
+            <span class="text-xl">→</span>
+          </button>
+          <button
+            v-else
+            type="button"
+            class="cf-modal-btn cf-modal-btn-ide"
+            @click="goToLoginFromModal"
+          >
+            <span>로그인/회원가입 하러 가기</span>
             <span class="text-xl">→</span>
           </button>
         </div>
@@ -705,6 +715,11 @@ function onClickRecommend(curriculumIdx) {
 
 function closeModal() {
   modalContext.value = null
+}
+
+function goToLoginFromModal() {
+  closeModal()
+  router.push({ path: '/login', query: { from: 'roadmap' } })
 }
 
 /** 풀고 있는 문제가 있을 때 다른 문제 클릭 시 모달 */
