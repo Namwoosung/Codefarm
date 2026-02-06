@@ -64,6 +64,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { formatAlgorithmLabel } from '@/utils/algorithm'
 
 const props = defineProps({
   problem: {
@@ -84,11 +85,12 @@ const displayLevel = computed(() => {
   return '?'
 })
 
-// 알고리즘 표시
+// 알고리즘 표시 (한글)
 const displayAlgorithm = computed(() => {
   const algo = props.problem?.algorithm
-  if (Array.isArray(algo)) return algo[0] || '미분류'
-  return algo || '미분류'
+  const raw = Array.isArray(algo) ? algo[0] : algo
+  if (raw == null || raw === '') return '미분류'
+  return formatAlgorithmLabel(raw)
 })
 
 // 상태 확인

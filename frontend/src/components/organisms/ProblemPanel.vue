@@ -190,6 +190,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProblemDetail } from '@/api/problem'
 import MarkdownText from '@/components/atoms/MarkdownText.vue'
+import { formatAlgorithmLabel } from '@/utils/algorithm'
 import { useIdeStore } from '@/stores/ide'
 import { getSessionResultsList } from '@/api/session'
 
@@ -236,24 +237,8 @@ const formatMemory = (memoryMB) => {
   return `${memoryMB.toLocaleString()}MiB`
 }
 
-// 알고리즘 표시명 (예: BRUTEFORCE → 브루트포스)
-const formatAlgorithm = (algorithm) => {
-  const map = {
-    BRUTEFORCE: '브루트포스',
-    GREEDY: '그리디',
-    DP: '동적 프로그래밍',
-    BFS: 'BFS',
-    DFS: 'DFS',
-    BINARY_SEARCH: '이진 탐색',
-    TWO_POINTER: '투 포인터',
-    SORT: '정렬',
-    GRAPH: '그래프',
-    STRING: '문자열',
-    MATH: '수학',
-    IMPLEMENTATION: '구현'
-  }
-  return map[algorithm] ?? algorithm ?? '-'
-}
+// 알고리즘 표시명 (한글)
+const formatAlgorithm = (algorithm) => formatAlgorithmLabel(algorithm ?? '')
 
 // 제출 내역: 결과 타입 라벨
 const resultTypeLabel = (resultType) => {

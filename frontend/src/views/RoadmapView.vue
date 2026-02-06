@@ -231,7 +231,7 @@
               </div>
               <div v-if="modalContent.problem?.algorithm" class="cf-modal-info-card">
                 <dt>알고리즘</dt>
-                <dd>{{ modalContent.problem.algorithm }}</dd>
+                <dd>{{ formatAlgorithmLabel(modalContent.problem.algorithm) }}</dd>
               </div>
               <div
                 v-if="modalContent.statistics?.submissionCount != null"
@@ -341,6 +341,7 @@ import woodPanel1 from '@/assets/roadmap/wood_panel_1.png'
 import RoadmapMap from '@/components/organisms/RoadmapMap.vue'
 import api from '@/api'
 import * as sessionApi from '@/api/session'
+import { formatAlgorithmLabel } from '@/utils/algorithm'
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 
@@ -635,7 +636,7 @@ function getStepSummary(curriculumIdx, level) {
   const parts = []
 
   if (problem?.difficulty) parts.push(`난이도 ${problem.difficulty}`)
-  if (problem?.algorithm) parts.push(`알고리즘 ${problem.algorithm}`)
+  if (problem?.algorithm) parts.push(`알고리즘 ${formatAlgorithmLabel(problem.algorithm)}`)
   if (statistics?.submissionCount != null && statistics?.successCount != null) {
     parts.push(
       `정답률 ${formatSuccessRate(statistics.successCount, statistics.submissionCount)}`
