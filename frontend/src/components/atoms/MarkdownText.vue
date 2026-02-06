@@ -5,6 +5,7 @@
 <script setup>
 import { computed } from 'vue'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 
 const props = defineProps({
   text: { type: String, default: '' },
@@ -30,9 +31,10 @@ const html = computed(() => {
   const t = props.text
   if (!t || typeof t !== 'string') return ''
   try {
-    return marked(normalizeMarkdown(t))
+    const raw = marked(normalizeMarkdown(t))
+    return DOMPurify.sanitize(raw, { ALLOWED_TAGS: ['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'strong', 'em', 'ul', 'ol', 'li', 'br', 'a', 'blockquote', 'code', 'pre'] })
   } catch {
-    return t
+    return ''
   }
 })
 </script>
