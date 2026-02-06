@@ -17,10 +17,10 @@ export const requestManualHint = async (sessionId, { userQuestion, code }) => {
     return data
   } catch (err) {
     const status = err.response?.status
-    // 502 등 게이트웨이/서버 오류: 힌트 미수신 → 당근 차감 금지 (재throw)
-    if (status >= 502 && status <= 504) throw err
-    // 404/400/403/500: 백엔드 미구현 등 → 목 데이터 반환
-    if (status === 404 || status === 400 || status === 403 || status === 500) {
+    // 5xx 서버/게이트웨이 오류: 힌트 미수신 → 당근 차감 금지 (재throw)
+    if (status >= 500 && status <= 504) throw err
+    // 404/400/403: 백엔드 미구현 등 → 목 데이터 반환
+    if (status === 404 || status === 400 || status === 403) {
       return getMockManualHintResponse(userQuestion)
     }
     // 네트워크 오류 등: 당근 차감 금지 (재throw)
