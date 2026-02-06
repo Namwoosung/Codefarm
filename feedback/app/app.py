@@ -1,4 +1,4 @@
-# index.py  (A안: 1회 호출 + 안정 fallback + 과정 중심 + previous_judgement 원문 비노출 + AI 사용 점검 규칙 + "실수 요약(1~2문장)" 섹션)
+# index.py  (A안: 1회 호출 + 안정 fallback + 과정 중심 + previous_judgement 원문 비노출 + AI 사용 점검 규칙 + "실수 요약(1~2문장)" 섹션 + JSON 응답(섹션 분리) → 서버에서 마크다운 조립)
 import os
 import re
 import json
@@ -43,7 +43,7 @@ PROCESS_BULLET_LIMIT = int(os.getenv("PROCESS_BULLET_LIMIT", "8"))
 # ✅ 추가 규칙: 3분 이하 풀이시간이면 AI 사용 여부 점검
 SUS_SOLVE_TIME_SEC = int(os.getenv("SUS_SOLVE_TIME_SEC", "180"))
 
-app = FastAPI(title="Report Feedback Server", version="2.4.0")
+app = FastAPI(title="Report Feedback Server", version="2.4.1")
 
 _http_client: Optional[httpx.AsyncClient] = None
 _cache: Dict[str, str] = {}
@@ -184,44 +184,54 @@ def summarize_labels_student_friendly(prev: List["PreviousJudgement"], limit: in
 
 
 # =========================
-# Prompt (과정 중심 + 원문 노출 금지 + "실수 요약 1~2문장" 강제)
+# Prompt (JSON 응답: 섹션 분리) -> 서버가 마크다운 조립
 # =========================
 DEVELOPER_PROMPT = """
 Answer in Korean.
 You are a kind and patient teacher speaking directly to a student.
 
 TOP PRIORITY: the student's PROCESS (what they tried repeatedly / where they got stuck / how to improve next).
-Use the JSON evidence fields: "mistake_summary" and (if present) "integrity_hint".
+Use the evidence fields: "mistake_summary" and (if present) "integrity_hint".
 DO NOT quote or reveal any raw logs, English sentences, internal labels, or system/programming terms.
 
-You MUST output ONLY the following markdown template.
-You MUST start the output with exactly: "### ✅ 결과"
-Do NOT write any text before that. Do NOT write any text after the template.
+OUTPUT FORMAT (STRICT)
+- Output must be ONE valid JSON object and nothing else.
+- No markdown outside JSON. No code blocks. No backticks. No extra text.
+- Use double quotes for all JSON strings.
 
-### ✅ 결과
-- <한 줄: 과정 칭찬 중심 + **굵은 격려 1개 이상**>
+The JSON MUST contain these keys (additional keys are allowed, but not required):
+{
+  "result": {
+    "title": "### ✅ 결과",
+    "content": "string"
+  },
+  "think_next": {
+    "title": "### 🔍 앞으로 생각해볼 것",
+    "content": "string"
+  },
+  "next_actions": {
+    "title": "### 🛠 다음에 해볼 것",
+    "items": ["string", "string"]
+  }
+}
 
-### 🔍 앞으로 생각해볼 것
-- <"지금까지 자주 실수한 부분"을 **1~2문장**으로 설명. 반드시 **굵은 표현 1개** 포함>
-
-### 🛠 다음에 해볼 것
-- <한 줄: **바로 할 행동 1** (과정 개선)>
-- <한 줄: 행동 2>
-
-Hard rules:
-- Total <= 260 characters INCLUDING markdown and newlines.
-- Exactly 3 headings and exactly 4 bullet lines (1 / 1 / 2).
-- Use ONLY '**' for bold. No other markdown.
-- No HTML tags, no code blocks, no backticks, no links.
+Rules:
+- All titles must be exactly as shown above.
+- result.content: 1 sentence, encouragement-focused, include at least one **bold** phrase.
+- think_next.content: 1~2 sentences describing frequent past mistakes, include exactly one **bold** phrase.
+- next_actions.items: exactly 2 short action sentences.
+- Do NOT include markdown except **bold** inside content strings.
+- Keep it concise for a student. Avoid awkward endings like "'...있어' 쪽이었어".
 """.strip()
 
 
 # =========================
-# Text utils
+# Text utils (마크다운 조립 후 검사에 사용)
 # =========================
 CODE_FENCE_RE = re.compile(r"```.*?```", re.DOTALL)
 ASCII_HEAVY_RE = re.compile(r"[A-Za-z]{3,}")
 _SPACE_RE = re.compile(r"\s+")
+
 
 def _trunc(s: Optional[str], n: int) -> str:
     s = (s or "").strip()
@@ -310,18 +320,16 @@ def policy_violation_reason(text: str) -> Optional[str]:
     if len(bullets) != 4:
         return "BULLET_COUNT_WRONG"
 
-    # 결과 1개 + 앞으로생각해볼것 1개 + 다음행동(2개 중 최소 1개) => '**' 최소 6개 기대
+    # 결과 1개 + 앞으로생각해볼것 1개 + 다음행동(2개) => '**' 최소 6개(쌍 3개) 기대
     if text.count("**") < 6:
         return "BOLD_MISSING"
 
-    # "앞으로 생각해볼 것" 한 불릿 안에 1~2문장 권장 검증(너무 강하게 잡으면 깨질 수 있어 약하게)
-    # 마침표/느낌표/물음표 개수로 대략 판단
+    # 약한 품질 체크(너무 단문 방지)
     lines = text.splitlines()
     try:
         idx = lines.index("### 🔍 앞으로 생각해볼 것")
         bullet = lines[idx + 1]
         sent_marks = sum(bullet.count(x) for x in [".", "!", "?", "요.", "다."])
-        # 0이면 너무 단문일 가능성이 높음
         if sent_marks == 0:
             return "MISTAKE_SUMMARY_TOO_SHORT"
     except Exception:
@@ -340,6 +348,7 @@ RAW_NOISE_PATTERNS = [
     re.compile(r"\d{4}-\d{2}-\d{2}"),
 ]
 
+
 def _clean_process_text(s: str) -> str:
     s = (s or "").strip()
     if not s:
@@ -355,8 +364,8 @@ def _clean_process_text(s: str) -> str:
 def build_mistake_summary(prev: List[PreviousJudgement], label_hints: List[str]) -> List[str]:
     """
     LLM이 1~2문장으로 요약할 소재를 주기 위한 '학생용 근거 리스트'.
-    - 원문 analysis는 정제 후 "간접표현"만
-    - label_hints는 그대로(학생용)
+    - 원문 analysis는 정제 후 간접표현만
+    - label_hints는 학생용 번역문
     """
     out: List[str] = []
     seen = set()
@@ -444,14 +453,14 @@ def fallback_feedback(mistake_summary: List[str], rt: str, integrity_hint: Optio
 
     if mistake_summary:
         ms = mistake_summary[0][:60] + ("…" if len(mistake_summary[0]) > 60 else "")
-        line2 = f"- **지금까지 실수한 부분**은 {ms} 쪽이었어. 다음엔 그 순간에 값이 어떻게 바뀌는지 한 번 더 확인해보자."
+        line2 = f"- **지금까지 자주 헷갈린 부분**은 {ms}였어. 다음엔 그 순간에 값이 어떻게 바뀌는지 한 번 더 확인해보자."
     elif integrity_hint:
-        line2 = f"- **지금까지 실수한 부분**을 기록이 없어서 추적하기 어려워. 대신 {integrity_hint}"
+        line2 = f"- **과정 기록이 거의 없어서** 자주 실수한 지점을 딱 집기 어려워. 대신 {integrity_hint}"
     else:
-        line2 = "- **지금까지 실수한 부분**은 입력/조건/초기화에서 자주 생길 수 있어. 다음엔 한 가지씩만 골라서 차근차근 확인해보자."
+        line2 = "- **지금까지 자주 헷갈린 부분**은 입력/조건/초기화에서 생기기 쉬워. 다음엔 한 가지씩만 골라 차근차근 확인해보자."
 
     line3 = "- **작은 입력 1개**로 손으로 따라가며 중간값을 체크해봐."
-    line4 = "- 같은 실수가 나오면, 그 줄 바로 위/아래에서 변수 값이 어떻게 바뀌는지 적어보자."
+    line4 = "- 같은 실수가 나오면, 그 줄 바로 위/아래에서 변수 값 변화를 한 줄로 적어보자."
 
     return "\n".join([
         "### ✅ 결과",
@@ -558,6 +567,63 @@ async def call_gms_once(payload: dict) -> str:
 
 
 # =========================
+# JSON -> Markdown assembly (약하게)
+# =========================
+def build_markdown_from_model_json(raw: str) -> str:
+    """
+    모델이 JSON으로 준 result/think_next/next_actions를
+    마크다운 템플릿(3헤더+4불릿)으로 조립한다.
+    - 파싱/키 누락에 강하게(= 기본값으로 복구)
+    """
+    try:
+        obj = json.loads(raw)
+    except Exception:
+        obj = {}
+
+    if not isinstance(obj, dict):
+        obj = {}
+
+    result = obj.get("result") or {}
+    think_next = obj.get("think_next") or {}
+    next_actions = obj.get("next_actions") or {}
+
+    if not isinstance(result, dict):
+        result = {}
+    if not isinstance(think_next, dict):
+        think_next = {}
+    if not isinstance(next_actions, dict):
+        next_actions = {}
+
+    r_title = (result.get("title") or "### ✅ 결과").strip()
+    r_content = (result.get("content") or "").strip()
+
+    t_title = (think_next.get("title") or "### 🔍 앞으로 생각해볼 것").strip()
+    t_content = (think_next.get("content") or "").strip()
+
+    n_title = (next_actions.get("title") or "### 🛠 다음에 해볼 것").strip()
+    items = next_actions.get("items") or []
+    if not isinstance(items, list):
+        items = []
+
+    item1 = (items[0] if len(items) > 0 else "").strip()
+    item2 = (items[1] if len(items) > 1 else "").strip()
+
+    # 안전: 불릿은 최소한 "-" 한 줄은 유지 (정책검사에서 잡히면 fallback)
+    md = "\n".join([
+        r_title,
+        f"- {r_content}" if r_content else "-",
+        "",
+        t_title,
+        f"- {t_content}" if t_content else "-",
+        "",
+        n_title,
+        f"- {item1}" if item1 else "-",
+        f"- {item2}" if item2 else "-",
+    ])
+    return md
+
+
+# =========================
 # Routes
 # =========================
 @app.get("/health")
@@ -611,7 +677,6 @@ async def feedback(
 
         "constraints": {
             "max_chars": MAX_FEEDBACK_CHARS,
-            "template": "3 headings + 4 bullets (1/1/2)",
             "focus": "process-first",
             "forbidden": ["정답코드", "완전한 풀이", "코드블록", "백틱", "내부 필드명/라벨", "영문/로그 원문"],
         },
@@ -624,12 +689,11 @@ async def feedback(
             {
                 "role": "user",
                 "content": (
-                    "다음 JSON만 보고 템플릿 그대로 작성해.\n"
-                    "특히 '앞으로 생각해볼 것'에는 mistake_summary를 바탕으로 "
-                    "'지금까지 자주 실수한 부분'을 **1~2문장**으로 써.\n"
-                    "mistake_summary가 비어 있으면 integrity_hint를 사용해.\n"
-                    "원문 인용/영문/로그는 절대 금지.\n"
-                    "- 반드시: 3개 섹션 + 불릿 4줄(1/1/2) + 260자 이내\n\n"
+                    "아래 JSON 근거만 보고, 요구한 JSON 스키마로만 답해.\n"
+                    "- result/think_next/next_actions를 반드시 채워.\n"
+                    "- think_next.content는 mistake_summary를 바탕으로 '지금까지 자주 실수한 부분'을 1~2문장으로.\n"
+                    "- mistake_summary가 비어 있으면 integrity_hint로 대체.\n"
+                    "- 원문 인용/영문/로그/내부 라벨 금지.\n\n"
                     + json.dumps(llm_payload, ensure_ascii=False)
                 ),
             },
@@ -639,11 +703,15 @@ async def feedback(
 
     try:
         raw = await call_gms_once(payload)
-        feedback_text = postprocess(raw)
+
+        # ✅ JSON 응답 -> 마크다운 조립 -> 기존 정책 검사 재사용
+        raw_md = build_markdown_from_model_json(raw)
+        feedback_text = postprocess(raw_md)
         reason = policy_violation_reason(feedback_text)
 
         if DEBUG_LOG:
-            print("[RAW]", raw)
+            print("[RAW JSON]", raw[:1200])
+            print("[ASSEMBLED MD]", raw_md)
             print("[POST]", feedback_text)
             print("[VIOLATION]", reason)
             print("[MISTAKE_SUMMARY]", mistake_summary)
@@ -657,6 +725,10 @@ async def feedback(
     except HTTPException as e:
         if DEBUG_LOG:
             print("[GMS ERROR FALLBACK]", e.detail)
+        feedback_text = postprocess(fallback_feedback(mistake_summary, req.result.resultType, integrity_hint))
+    except Exception as e:
+        if DEBUG_LOG:
+            print("[UNEXPECTED ERROR FALLBACK]", repr(e))
         feedback_text = postprocess(fallback_feedback(mistake_summary, req.result.resultType, integrity_hint))
 
     _cache_put(ck, feedback_text)
