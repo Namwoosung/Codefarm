@@ -63,8 +63,8 @@ def log_error(event: str, **fields):
 # ============================================================
 # Load env
 # ============================================================
-
-load_dotenv("/srv/app/app/.env")
+from dotenv import find_dotenv, load_dotenv
+load_dotenv(find_dotenv("/srv/app/app/.env"))
 
 REPORT_SERVER_TOKEN = os.getenv("REPORT_SERVER_TOKEN", "")
 REQUIRE_SERVER_TOKEN = os.getenv("REQUIRE_SERVER_TOKEN", "0") == "1"
