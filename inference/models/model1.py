@@ -27,7 +27,7 @@ DEFAULT_MODEL_DIR = os.path.join(BASE_DIR, "label_model")
 MODEL_DIR = os.getenv("LABEL_MODEL_DIR", DEFAULT_MODEL_DIR).strip()
 
 # Inference params
-DEFAULT_THRESHOLD = float(os.getenv("MODEL1_THRESHOLD", "0.25"))
+DEFAULT_THRESHOLD = float(os.getenv("MODEL1_THRESHOLD", "0.3"))
 DEFAULT_TOPK = int(os.getenv("MODEL1_TOPK", "5"))
 MAX_LEN = int(os.getenv("MODEL1_MAX_LEN", "1024"))
 
