@@ -102,7 +102,7 @@ GMS_TEMPERATURE = float(os.getenv("GMS_TEMPERATURE", "0.4"))
 # ============================================================
 # ✅ GPU 동시 실행 제한: A100 80GB
 GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "3"))
-MODEL2_CONCURRENCY = int(os.getenv("MODEL2_CONCURRENCY", "2"))
+MODEL2_CONCURRENCY = int(os.getenv("MODEL2_CONCURRENCY", "3"))
 
 # ✅ GMS 동시성 제한(너무 높이면 p99/리페어율 악화 가능)
 GMS_CONCURRENCY = int(os.getenv("GMS_CONCURRENCY", str(GMS_WORKERS)))
@@ -535,11 +535,13 @@ async def gms_worker_loop(worker_id: int):
         job = await gms_queue.get()
         try:
             # ✅ 같은 session_id는 GMS 단계에서도 순서 보장
-            lock = await get_session_lock(job.session_id)
-            async with lock:
-                log_event("job_start", worker_id=worker_id, session_id=job.session_id, stage="gms", qsize=gms_queue.qsize())
-                result = await process_gms_stage(job)
-                log_event("job_done", worker_id=worker_id, session_id=job.session_id, stage="gms")
+            # GMS session lock 제거
+            # lock = await get_session_lock(job.session_id)
+            # async with lock:
+            #     log_event("job_start", worker_id=worker_id, session_id=job.session_id, stage="gms", qsize=gms_queue.qsize())
+            #     result = await process_gms_stage(job)
+            result = await process_gms_stage(job)
+                # log_event("job_done", worker_id=worker_id, session_id=job.session_id, stage="gms")
 
             if not job.fut.done():
                 job.fut.set_result(result)
