@@ -90,7 +90,8 @@ CUDA_DEVICE_INDEX = int(os.getenv("CUDA_DEVICE_INDEX", "0"))
 MODEL2_MAX_MEMORY = os.getenv("MODEL2_MAX_MEMORY", "").strip()  # 예: "8GiB" (비우면 미사용)
 
 # ✅ generate 동시성 제한(프로세스 내 1개)
-_GEN_LOCK = asyncio.Lock()
+# _GEN_LOCK = asyncio.Lock()
+_GEN_SEM = asyncio.Semaphore(2)
 
 # ✅ load_model_once 스레드 안전
 _LOAD_LOCK = threading.Lock()
@@ -460,7 +461,7 @@ async def run_model2(model2_input: Dict[str, Any]) -> Dict[str, Any]:
     - current_judgement.analysis = model2 analysis
     - generate 동시성: 프로세스 내 1개로 제한
     """
-    async with _GEN_LOCK:
+    async with _GEN_SEM:
         analysis_pred = await asyncio.to_thread(generate_analysis, model2_input)
 
     out = dict(model2_input)
