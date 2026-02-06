@@ -16,10 +16,15 @@ export const requestManualHint = async (sessionId, { userQuestion, code }) => {
     const { data } = await api.post(`/sessions/${sessionId}/hints/manual`, { userQuestion }, { timeout: 90 * 1000 })
     return data
   } catch (err) {
-    if (err.response?.status === 404 || err.response?.status === 400 || err.response?.status === 403 || err.response?.status === 500) {
+    const status = err.response?.status
+    // 502 등 게이트웨이/서버 오류: 힌트 미수신 → 당근 차감 금지 (재throw)
+    if (status >= 502 && status <= 504) throw err
+    // 404/400/403/500: 백엔드 미구현 등 → 목 데이터 반환
+    if (status === 404 || status === 400 || status === 403 || status === 500) {
       return getMockManualHintResponse(userQuestion)
     }
-    return getMockManualHintResponse(userQuestion)
+    // 네트워크 오류 등: 당근 차감 금지 (재throw)
+    throw err
   }
 }
 
