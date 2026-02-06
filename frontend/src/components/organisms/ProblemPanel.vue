@@ -54,9 +54,14 @@
             <transition name="fade-slide">
               <div
                 v-if="showConcept"
-                class="problem-concept-html bg-base-200/60 p-4 rounded-lg text-[var(--color-farm-brown-dark)] leading-relaxed text-[0.875rem]"
-                v-html="problem.concept"
-              />
+                class="bg-base-200/60 p-4 rounded-lg"
+              >
+                <MarkdownText
+                  :text="problem.concept"
+                  variant="concept"
+                  content-class="problem-concept-html text-[var(--color-farm-brown-dark)] leading-relaxed text-[0.875rem]"
+                />
+              </div>
             </transition>
           </div>
           <div v-if="problem?.inputDescription" class="mb-6">
@@ -184,6 +189,8 @@
 import { ref, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { getProblemDetail } from '@/api/problem'
+import MarkdownText from '@/components/atoms/MarkdownText.vue'
+import { formatAlgorithmLabel } from '@/utils/algorithm'
 import { useIdeStore } from '@/stores/ide'
 import { getSessionResultsList } from '@/api/session'
 
@@ -230,24 +237,8 @@ const formatMemory = (memoryMB) => {
   return `${memoryMB.toLocaleString()}MiB`
 }
 
-// 알고리즘 표시명 (예: BRUTEFORCE → 브루트포스)
-const formatAlgorithm = (algorithm) => {
-  const map = {
-    BRUTEFORCE: '브루트포스',
-    GREEDY: '그리디',
-    DP: '동적 프로그래밍',
-    BFS: 'BFS',
-    DFS: 'DFS',
-    BINARY_SEARCH: '이진 탐색',
-    TWO_POINTER: '투 포인터',
-    SORT: '정렬',
-    GRAPH: '그래프',
-    STRING: '문자열',
-    MATH: '수학',
-    IMPLEMENTATION: '구현'
-  }
-  return map[algorithm] ?? algorithm ?? '-'
-}
+// 알고리즘 표시명 (한글)
+const formatAlgorithm = (algorithm) => formatAlgorithmLabel(algorithm ?? '')
 
 // 제출 내역: 결과 타입 라벨
 const resultTypeLabel = (resultType) => {
@@ -336,7 +327,7 @@ onMounted(() => {
   transform: translateY(-4px);
 }
 
-/* 개념 HTML 렌더링 (API에서 내려준 HTML) */
+/* 개념 마크다운 렌더링 */
 .problem-concept-html :deep(p) {
   margin: 0 0 0.75em;
   line-height: 1.6;
@@ -344,12 +335,16 @@ onMounted(() => {
 .problem-concept-html :deep(p:last-child) {
   margin-bottom: 0;
 }
+.problem-concept-html :deep(h1),
+.problem-concept-html :deep(h2),
 .problem-concept-html :deep(h3) {
   margin: 1em 0 0.5em;
   font-size: 1em;
   font-weight: 700;
   color: var(--color-farm-brown-dark);
 }
+.problem-concept-html :deep(h1:first-child),
+.problem-concept-html :deep(h2:first-child),
 .problem-concept-html :deep(h3:first-child) {
   margin-top: 0;
 }
@@ -357,8 +352,35 @@ onMounted(() => {
   font-weight: 700;
   color: var(--color-farm-brown-dark);
 }
-.problem-concept-html :deep(div[style*="border"]) {
+.problem-concept-html :deep(div[style*="border"]),
+.problem-concept-html :deep(hr) {
   margin: 0.5em 0;
   color: var(--color-farm-brown-dark);
+}
+.problem-concept-html :deep(code) {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.problem-concept-html :deep(pre) {
+  margin: 0.5em 0;
+  padding: 0.75em;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.problem-concept-html :deep(pre code) {
+  padding: 0;
+  background: none;
+}
+.problem-concept-html :deep(blockquote) {
+  margin: 0.5em 0;
+  padding-left: 1em;
+  border-left: 4px solid var(--color-farm-green-light);
+  color: var(--color-farm-brown-dark);
+}
+.problem-concept-html :deep(iconify-icon) {
+  vertical-align: middle;
 }
 </style>
