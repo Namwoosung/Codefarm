@@ -187,10 +187,10 @@
       </div>
 
       <!-- 문제 카드 리스트 -->
-      <div class="relative" :aria-busy="loading ? 'true' : 'false'">
+      <div class="relative" :aria-busy="isCurrentPageLoading ? 'true' : 'false'">
         <div
           class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 transition-opacity"
-          :class="loading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
+          :class="isCurrentPageLoading ? 'opacity-50 pointer-events-none' : 'opacity-100'"
         >
           <ProblemCard
             v-for="problem in pagedProblems"
@@ -200,7 +200,7 @@
           />
         </div>
 
-        <div v-if="loading" class="absolute inset-0 flex items-center justify-center">
+        <div v-if="isCurrentPageLoading" class="absolute inset-0 flex items-center justify-center">
           <span class="loading loading-spinner loading-lg app-loading-spinner"></span>
         </div>
 
@@ -209,6 +209,11 @@
           <button type="button" class="mt-3 text-sm font-medium text-farm-point hover:underline" @click="resetFilters">
             필터 초기화
           </button>
+        </div>
+
+        <!-- 추가 데이터 로딩 중 표시 -->
+        <div v-if="loadingMore" class="mt-4 text-center">
+          <span class="text-xs text-farm-brown/60">추가 데이터 로딩 중...</span>
         </div>
       </div>
       <!-- 페이지네이션 -->
@@ -222,7 +227,7 @@
           <button
             type="button"
             class="h-10 rounded-xl bg-transparent px-3 text-sm font-semibold text-farm-brown-dark transition-colors hover:bg-transparent hover:text-farm-brown-dark/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30 disabled:cursor-not-allowed disabled:text-farm-brown/30"
-            :disabled="loading || currentPage <= 1"
+            :disabled="isCurrentPageLoading || currentPage <= 1"
             @click="back"
           >
             이전
@@ -239,7 +244,7 @@
                     ? 'text-farm-brown-dark'
                     : 'text-farm-brown/60 hover:text-farm-brown-dark'
                 "
-                :disabled="loading"
+                :disabled="isCurrentPageLoading"
                 @click="goToPage(item.page)"
               >
                 <span
@@ -256,7 +261,7 @@
           <button
             type="button"
             class="h-10 rounded-xl bg-transparent px-3 text-sm font-semibold text-farm-brown-dark transition-colors hover:bg-transparent hover:text-farm-brown-dark/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-brown/30 disabled:cursor-not-allowed disabled:text-farm-brown/30"
-            :disabled="loading || currentPage >= totalPages"
+            :disabled="isCurrentPageLoading || currentPage >= totalPages"
             @click="next"
           >
             다음
@@ -285,12 +290,17 @@ import * as sessionApi from '@/api/session'
 
 const route = useRoute()
 const router = useRouter()
+const allProblems = ref([]) // 전체 문제 목록 (API에서 가져온 원본)
+const loading = ref(true) // 초기 로딩 (첫 페이지)
+const loadingMore = ref(false) // 추가 데이터 로딩 중
+const error = ref(null)
+const totalFromServer = ref(0) // 서버에서 알려준 전체 개수
+
+// 페이지/스크롤 저장용 키
 const MAIN_PAGE_STORAGE_KEY = 'main_page'
 const MAIN_SCROLL_STORAGE_KEY = 'main_scroll'
-const problems = ref([])
-const loading = ref(true)
-const error = ref(null)
-// URL 쿼리와 동기화: 뒤로가기/메인으로 복귀 시 페이지 유지 (쿼리 없으면 sessionStorage에서 복원)
+
+// URL 쿼리와 동기화: 뒤로가기/메인으로 복귀 시 페이지 유지
 function getInitialPage() {
   const fromQuery = route.query.page != null ? parseInt(route.query.page, 10) : null
   if (fromQuery != null && Number.isFinite(fromQuery)) return Math.max(1, fromQuery)
@@ -300,10 +310,11 @@ function getInitialPage() {
   } catch (_) {}
   return 1
 }
+
 const currentPage = ref(getInitialPage())
 const postsPerPage = ref(21)
 
-/** 현재 페이지를 URL 쿼리에 반영 (뒤로가기 시 복원용). page=1이면 쿼리에서 생략. sessionStorage에도 저장 */
+/** 현재 페이지를 URL 쿼리에 반영 (뒤로가기 시 복원용) */
 function syncPageToRoute(pageNum) {
   const p = Number(pageNum)
   if (!Number.isFinite(p) || p < 1) return
@@ -363,7 +374,7 @@ const buildQueryParams = (page = 0) => ({
 
 // 클라이언트 측 필터링 (NORMAL 타입 + statusFilter)
 const filteredProblems = computed(() => {
-  const list = problems.value ?? []
+  const list = allProblems.value ?? []
   // 1. NORMAL 타입만 필터링
   const normalOnly = list.filter((p) => (p?.problemType ?? p?.problem_type ?? 'NORMAL') === 'NORMAL')
   // 2. statusFilter 적용
@@ -375,14 +386,25 @@ const filteredProblems = computed(() => {
   return normalOnly
 })
 
-// 전체 페이지 수 계산 (computed로 필터된 목록 기준)
-const totalPages = computed(() => Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage.value)))
+// 전체 페이지 수 계산 (statusFilter가 없으면 서버 total 기준, 있으면 필터링된 개수 기준)
+const totalPages = computed(() => {
+  if (!statusFilter.value && totalFromServer.value > 0) {
+    return Math.max(1, Math.ceil(totalFromServer.value / postsPerPage.value))
+  }
+  return Math.max(1, Math.ceil(filteredProblems.value.length / postsPerPage.value))
+})
 
 // 현재 페이지에 표시할 문제 목록 (21개씩)
 const pagedProblems = computed(() => {
   const perPage = postsPerPage.value
   const start = (currentPage.value - 1) * perPage
   return filteredProblems.value.slice(start, start + perPage)
+})
+// 현재 페이지 데이터가 아직 로드 중인지 확인
+const isCurrentPageLoading = computed(() => {
+  if (loading.value) return true
+  if (!loadingMore.value) return false
+  return pagedProblems.value.length === 0
 })
 
 // 드롭다운 상태
@@ -455,38 +477,55 @@ async function goToNewProblem() {
   router.push(`/ide/${payload.targetProblemId}`)
 }
 
+// 점진적 로딩: 첫 페이지 빠르게 표시 → 나머지 백그라운드 로드
 const fetchProblems = async () => {
   try {
     loading.value = true
+    loadingMore.value = false
     error.value = null
-    const { data } = await getProblemList(buildQueryParams())
-    problems.value = data ?? []
+    allProblems.value = []
+    
+    // 1. 첫 페이지 호출 → 빠르게 화면 표시
+    const firstResult = await getProblemList(buildQueryParams(0))
+    const firstData = firstResult.data ?? []
+    const total = firstResult.total ?? firstData.length
+    
+    totalFromServer.value = total
+    allProblems.value = firstData
+    loading.value = false // 첫 페이지 로딩 완료 → 화면 표시
+    
+    // 2. 추가 페이지가 필요하면 백그라운드에서 로드
+    const totalApiPages = Math.ceil(total / API_PAGE_SIZE)
+    
+    if (totalApiPages > 1) {
+      loadingMore.value = true
+      
+      // 나머지 페이지 병렬 호출 (백그라운드)
+      const promises = []
+      for (let page = 1; page < totalApiPages; page++) {
+        promises.push(getProblemList(buildQueryParams(page)))
+      }
+      const results = await Promise.all(promises)
+      
+      // 결과 합치기
+      const allData = [...firstData]
+      for (const result of results) {
+        allData.push(...(result.data ?? []))
+      }
+      allProblems.value = allData
+      loadingMore.value = false
+    }
+    
     // totalPages는 computed이므로 다음 tick에 갱신됨. 현재 페이지가 새 total 초과면 보정
     nextTick(() => {
       if (currentPage.value > totalPages.value) {
         currentPage.value = totalPages.value
-        syncPageToRoute(currentPage.value)
       }
     })
   } catch (e) {
     error.value = e.response?.data?.message || e.message || '문제 목록을 불러오지 못했습니다.'
-  } finally {
     loading.value = false
-    // IDE에서 복귀 시 저장해 둔 스크롤 위치 복원 (한 번만)
-    try {
-      const saved = sessionStorage.getItem(MAIN_SCROLL_STORAGE_KEY)
-      if (saved != null) {
-        sessionStorage.removeItem(MAIN_SCROLL_STORAGE_KEY)
-        const y = parseInt(saved, 10)
-        if (Number.isFinite(y) && y >= 0) {
-          nextTick(() => {
-            requestAnimationFrame(() => {
-              window.scrollTo({ top: y, behavior: 'auto' })
-            })
-          })
-        }
-      }
-    } catch (_) {}
+    loadingMore.value = false
   }
 }
 
@@ -535,7 +574,7 @@ const next = () => {
 }
 
 const goToPage = (page) => {
-  if (loading.value) return
+  if (isCurrentPageLoading.value) return
   const p = Number(page)
   if (!Number.isFinite(p)) return
   const clamped = Math.min(Math.max(1, p), totalPages.value)
@@ -593,6 +632,8 @@ watch(
 
 watch(
   () => ({
+    page: currentPage.value,
+    size: postsPerPage.value,
     sortBy: sortBy.value,
     difficultyKey: normalizeArrayKey(difficultySelected.value),
     algorithmKey: normalizeArrayKey(algorithmSelected.value),
@@ -601,20 +642,17 @@ watch(
     // prev 없음 = 최초 1회 실행. 이때는 페이지 리셋하면 안 됨(URL/sessionStorage 복원값이 덮어씌워짐)
     const criteriaChanged =
       prev != null &&
-      (next.size !== prev.size ||
-        next.sortBy !== prev.sortBy ||
+      (next.sortBy !== prev.sortBy ||
         next.difficultyKey !== prev.difficultyKey ||
         next.algorithmKey !== prev.algorithmKey)
 
-    // 필터/정렬(또는 size)만 바뀐 경우에만 페이지를 1로
-    if (criteriaChanged && next.page !== 1) {
+    // 필터/정렬만 바뀐 경우에만 페이지를 1로
+    if (criteriaChanged && currentPage.value !== 1) {
       currentPage.value = 1
-      syncPageToRoute(1)
-      return
     }
 
-    // 필터/정렬 변경은 디바운스, 페이징은 즉시
-    scheduleFetch(prev != null && criteriaChanged ? 200 : 0)
+    // 필터/정렬 변경은 디바운스, 최초/페이징은 즉시
+    scheduleFetch(criteriaChanged ? 200 : 0)
   },
   { immediate: true }
 )
