@@ -53,9 +53,10 @@
                 <iconify-icon icon="mdi:message-text" class="text-2xl text-[var(--color-farm-green)]"></iconify-icon>
                 <h3 class="text-base font-bold text-[var(--color-farm-green-dark)]">선생님 피드백</h3>
               </div>
-              <p class="text-[var(--color-farm-brown-dark)] text-base leading-relaxed whitespace-pre-wrap break-words m-0">
-                {{ report.result.feedback }}
-              </p>
+              <MarkdownText
+                :text="report.result.feedback"
+                content-class="text-[var(--color-farm-brown-dark)] text-base leading-relaxed break-words m-0"
+              />
             </div>
             <div v-else-if="report?.result" class="mb-6 rounded-xl border border-[var(--color-farm-cream)] bg-[var(--color-farm-cream)]/40 p-4">
               <p class="text-[var(--color-farm-brown)] text-sm m-0">제출이 완료되었습니다.</p>
@@ -151,6 +152,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import MarkdownText from '@/components/atoms/MarkdownText.vue'
 
 const props = defineProps({
   show: { type: Boolean, default: false },

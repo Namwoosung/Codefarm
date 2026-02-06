@@ -159,9 +159,10 @@
 
                     <div v-if="page.report?.feedback" class="mt-4 rounded-xl border border-farm-brown/15 bg-farm-cream/40 p-3">
                       <p class="text-sm font-black text-farm-brown-dark mb-1">피드백</p>
-                      <p class="text-sm text-farm-brown-dark/80 leading-relaxed">
-                        {{ page.report.feedback }}
-                      </p>
+                      <MarkdownText
+                        :text="page.report.feedback"
+                        content-class="text-sm text-farm-brown-dark/80 leading-relaxed"
+                      />
                     </div>
                   </template>
                   <template v-else>
@@ -211,6 +212,7 @@ import { PageFlip } from 'page-flip'
 import { useProfileStore } from '@/stores/profile'
 import { useCardStore } from '@/stores/card'
 import ReportModal from '@/components/organisms/ReportModal.vue'
+import MarkdownText from '@/components/atoms/MarkdownText.vue'
 import { getReportDetail } from '@/api/reports'
 
 // 리포트 조회
