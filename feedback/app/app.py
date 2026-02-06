@@ -274,7 +274,7 @@ def postprocess(text: str) -> str:
     lines = [ln.strip() for ln in (text or "").splitlines()]
     lines = [ln for ln in lines if ln]
 
-    norm = []
+    norm: List[str] = []
     for ln in lines:
         if ln.startswith("-") and not ln.startswith("- "):
             ln = "- " + ln[1:].lstrip()
@@ -289,6 +289,7 @@ def postprocess(text: str) -> str:
 
 
 def policy_violation_reason(text: str) -> Optional[str]:
+    # ✅ UX 강제 최소화: 보안/형식 최소 체크만
     if not (text or "").strip():
         return "EMPTY"
     if len(text) > MAX_FEEDBACK_CHARS:
@@ -639,12 +640,18 @@ async def feedback(
     if REQUIRE_SERVER_TOKEN and x_report_server_token != REPORT_SERVER_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid server token")
 
+    # -------------------------
+    # 2) Cache
+    # -------------------------
     ck = make_cache_key(req)
-    cached = _cache_get(ck)
-    if cached is not None:
-        if DEBUG_LOG:
-            print(f"[CACHE HIT] request_id={req.request_id}")
-        return {"request_id": req.request_id, "feedback": cached}
+
+    # 원본 확인 모드에서는 캐시 우회
+    if not RETURN_RAW:
+        cached = _cache_get(ck)
+        if cached is not None:
+            if DEBUG_LOG:
+                print(f"[CACHE HIT] request_id={req.request_id}")
+            return {"request_id": req.request_id, "feedback": cached}
 
     recent_prev = req.previous_judgement[-PREV_LIMIT:]
     label_hints = summarize_labels_student_friendly(recent_prev, limit=5)
@@ -682,7 +689,10 @@ async def feedback(
         },
     }
 
-    payload = {
+    # -------------------------
+    # 4) Build GMS payload
+    # -------------------------
+    gms_payload: Dict[str, Any] = {
         "model": MODEL,
         "messages": [
             {"role": "developer", "content": DEVELOPER_PROMPT},
@@ -701,8 +711,21 @@ async def feedback(
         "max_completion_tokens": MAX_COMPLETION_TOKENS,
     }
 
+    if USE_RESPONSE_FORMAT:
+        gms_payload["response_format"] = {"type": "json_object"}
+
+    # -------------------------
+    # 5) Call + parse (명확한 JSON 파싱 실패 감지)
+    # -------------------------
+    def _try_parse_json_object(raw: str) -> Optional[Dict[str, Any]]:
+        try:
+            obj = json.loads(raw)
+            return obj if isinstance(obj, dict) else None
+        except Exception:
+            return None
+
     try:
-        raw = await call_gms_once(payload)
+        raw = await call_gms_once(gms_payload)
 
         # ✅ JSON 응답 -> 마크다운 조립 -> 기존 정책 검사 재사용
         raw_md = build_markdown_from_model_json(raw)
