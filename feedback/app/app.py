@@ -1,4 +1,18 @@
-# index.py  (A안: 1회 호출 + 안정 fallback + 과정 중심 + previous_judgement 원문 비노출 + AI 사용 점검 규칙 + "실수 요약(1~2문장)" 섹션 + JSON 응답(섹션 분리) → 서버에서 마크다운 조립)
+# index.py  (A안: 1회 호출 + 안정 fallback + 과정 중심 + previous_judgement 원문 비노출 + AI 사용 점검 규칙
+#          + "실수 요약(1~2문장)" 섹션 + JSON 응답(섹션 분리) → 서버에서 마크다운 조립)
+#
+# 완화(UX 강제 최소화):
+# - Bold 강제 제거(프롬프트/정책검사)
+# - 헤더/불릿 개수 강제 제거(보안/형식 최소 체크만 유지)
+# - title은 서버에서 고정(모델 title 흔들림 방지)
+# - postprocess() 중복 정의 제거(1개만 유지)
+#
+# 강화 사항(기존 유지):
+# - MAX_COMPLETION_TOKENS 기본값 320(ENV 없으면), 최소 180
+# - response_format(json_object) 지원 시 강제(ENV: USE_RESPONSE_FORMAT=1/0)
+# - JSON 파싱 실패를 명확히 감지(JSON_PARSE_ERROR)하여 즉시 fallback
+# - RETURN_RAW=1이면: GMS 최초 raw(content) 그대로 반환 + 캐시/검열/후처리/폴백 우회
+
 import os
 import re
 import json
@@ -27,7 +41,12 @@ HTTP_TIMEOUT = httpx.Timeout(
 )
 
 MAX_FEEDBACK_CHARS = int(os.getenv("MAX_FEEDBACK_CHARS", "260"))
-MAX_COMPLETION_TOKENS = int(os.getenv("MAX_COMPLETION_TOKENS", "140"))
+
+# ✅ 기본값 상향(ENV 없으면 320)
+MAX_COMPLETION_TOKENS = int(os.getenv("MAX_COMPLETION_TOKENS", "320"))
+if MAX_COMPLETION_TOKENS < 180:
+    MAX_COMPLETION_TOKENS = 180
+
 DEBUG_LOG = os.getenv("DEBUG_LOG", "1") == "1"
 
 CACHE_SIZE = int(os.getenv("CACHE_SIZE", "512"))
@@ -43,7 +62,13 @@ PROCESS_BULLET_LIMIT = int(os.getenv("PROCESS_BULLET_LIMIT", "8"))
 # ✅ 추가 규칙: 3분 이하 풀이시간이면 AI 사용 여부 점검
 SUS_SOLVE_TIME_SEC = int(os.getenv("SUS_SOLVE_TIME_SEC", "180"))
 
-app = FastAPI(title="Report Feedback Server", version="2.4.1")
+# ✅ 원본 확인 모드
+RETURN_RAW = os.getenv("RETURN_RAW", "0") == "1"
+
+# ✅ response_format(json_object) 사용 여부 (지원 시)
+USE_RESPONSE_FORMAT = os.getenv("USE_RESPONSE_FORMAT", "1") == "1"
+
+app = FastAPI(title="Report Feedback Server", version="2.4.3")
 
 _http_client: Optional[httpx.AsyncClient] = None
 _cache: Dict[str, str] = {}
@@ -202,26 +227,25 @@ OUTPUT FORMAT (STRICT)
 The JSON MUST contain these keys (additional keys are allowed, but not required):
 {
   "result": {
-    "title": "### ✅ 결과",
+    "title": "string",
     "content": "string"
   },
   "think_next": {
-    "title": "### 🔍 앞으로 생각해볼 것",
+    "title": "string",
     "content": "string"
   },
   "next_actions": {
-    "title": "### 🛠 다음에 해볼 것",
+    "title": "string",
     "items": ["string", "string"]
   }
 }
 
 Rules:
-- All titles must be exactly as shown above.
-- result.content: 1 sentence, encouragement-focused, include at least one **bold** phrase.
-- think_next.content: 1~2 sentences describing frequent past mistakes, include exactly one **bold** phrase.
+- result.content: 1 sentence, encouragement-focused.
+- think_next.content: 1~2 sentences describing frequent past mistakes.
 - next_actions.items: exactly 2 short action sentences.
-- Do NOT include markdown except **bold** inside content strings.
-- Keep it concise for a student. Avoid awkward endings like "'...있어' 쪽이었어".
+- Do NOT include markdown in content strings.
+- Keep it concise for a student.
 """.strip()
 
 
@@ -245,18 +269,6 @@ def sanitize_llm_text(text: str) -> str:
     return text.strip()
 
 
-def _strip_forbidden_terms(text: str) -> str:
-    text = text.replace("SUCCESS", "정답으로 통과")
-    text = text.replace("GIVE_UP", "오류가 발생")
-    for tok in FORBIDDEN_TOKENS:
-        if tok in ("SUCCESS", "GIVE_UP"):
-            continue
-        if tok:
-            text = text.replace(tok, "")
-    text = LABEL_LIKE_PATTERN.sub("", text)
-    return re.sub(r"\s+", " ", text).strip()
-
-
 def _keep_from_first_heading(text: str) -> str:
     if not text:
         return text
@@ -266,15 +278,33 @@ def _keep_from_first_heading(text: str) -> str:
     return text[idx:].lstrip()
 
 
+def _strip_forbidden_terms_keep_lines(text: str) -> str:
+    # ✅ 줄바꿈 보존 + 라인 단위 토큰 제거
+    text = text.replace("SUCCESS", "정답으로 통과").replace("GIVE_UP", "오류가 발생")
+
+    lines = text.splitlines()
+    out_lines: List[str] = []
+    for ln in lines:
+        for tok in FORBIDDEN_TOKENS:
+            if tok in ("SUCCESS", "GIVE_UP"):
+                continue
+            if tok:
+                ln = ln.replace(tok, "")
+        ln = LABEL_LIKE_PATTERN.sub("", ln)
+        ln = re.sub(r"[ \t]+", " ", ln).strip()
+        out_lines.append(ln)
+    return "\n".join(out_lines).strip()
+
+
 def postprocess(text: str) -> str:
     text = sanitize_llm_text(text)
     text = _keep_from_first_heading(text)
-    text = _strip_forbidden_terms(text)
+    text = _strip_forbidden_terms_keep_lines(text)
 
     lines = [ln.strip() for ln in (text or "").splitlines()]
     lines = [ln for ln in lines if ln]
 
-    norm = []
+    norm: List[str] = []
     for ln in lines:
         if ln.startswith("-") and not ln.startswith("- "):
             ln = "- " + ln[1:].lstrip()
@@ -289,51 +319,24 @@ def postprocess(text: str) -> str:
 
 
 def policy_violation_reason(text: str) -> Optional[str]:
+    # ✅ UX 강제 최소화: 보안/형식 최소 체크만
     if not (text or "").strip():
         return "EMPTY"
     if len(text) > MAX_FEEDBACK_CHARS:
         return "TOO_LONG"
     if "```" in text or "`" in text:
         return "CODE_FORMAT"
-    if not text.lstrip().startswith("### ✅ 결과"):
-        return "PREFIX_TEXT_NOT_ALLOWED"
 
+    # 원문 로그/영문 덩어리 방지(보안/UX)
     if ASCII_HEAVY_RE.search(text):
         return "RAW_LOG_LEAK"
 
+    # 내부 토큰/라벨 누출 방지(보안)
     for tok in FORBIDDEN_TOKENS:
         if tok and tok in text:
             return "INTERNAL_TERM_LEAK"
     if LABEL_LIKE_PATTERN.search(text):
         return "LABEL_LIKE_LEAK"
-
-    required = ["### ✅ 결과", "### 🔍 앞으로 생각해볼 것", "### 🛠 다음에 해볼 것"]
-    for h in required:
-        if h not in text:
-            return "MD_STRUCTURE_MISSING"
-
-    headers = [ln for ln in text.splitlines() if ln.startswith("### ")]
-    if len(headers) != 3:
-        return "MD_TOO_MANY_HEADERS"
-
-    bullets = [ln for ln in text.splitlines() if ln.startswith("- ")]
-    if len(bullets) != 4:
-        return "BULLET_COUNT_WRONG"
-
-    # 결과 1개 + 앞으로생각해볼것 1개 + 다음행동(2개) => '**' 최소 6개(쌍 3개) 기대
-    if text.count("**") < 6:
-        return "BOLD_MISSING"
-
-    # 약한 품질 체크(너무 단문 방지)
-    lines = text.splitlines()
-    try:
-        idx = lines.index("### 🔍 앞으로 생각해볼 것")
-        bullet = lines[idx + 1]
-        sent_marks = sum(bullet.count(x) for x in [".", "!", "?", "요.", "다."])
-        if sent_marks == 0:
-            return "MISTAKE_SUMMARY_TOO_SHORT"
-    except Exception:
-        pass
 
     return None
 
@@ -362,15 +365,9 @@ def _clean_process_text(s: str) -> str:
 
 
 def build_mistake_summary(prev: List[PreviousJudgement], label_hints: List[str]) -> List[str]:
-    """
-    LLM이 1~2문장으로 요약할 소재를 주기 위한 '학생용 근거 리스트'.
-    - 원문 analysis는 정제 후 간접표현만
-    - label_hints는 학생용 번역문
-    """
     out: List[str] = []
     seen = set()
 
-    # 라벨 힌트 우선
     for h in (label_hints or []):
         if h and h not in seen:
             seen.add(h)
@@ -378,7 +375,6 @@ def build_mistake_summary(prev: List[PreviousJudgement], label_hints: List[str])
         if len(out) >= 6:
             return out
 
-    # analysis에서 정제한 흔적 추가
     for pj in reversed(prev):
         cleaned = _clean_process_text(pj.analysis)
         if not cleaned:
@@ -438,8 +434,8 @@ def build_integrity_hint(req: FeedbackRequest) -> Optional[str]:
     if not solve_time_suspicious(req):
         return None
     if code_looks_ai_generated(req.code.content):
-        return "풀이 시간이 아주 짧고 코드가 한 번에 완성된 느낌이라, 다음엔 **스스로 먼저** 풀어보고 막힌 부분만 도움을 받아보자."
-    return "풀이 시간이 아주 짧아서, 다음엔 **스스로 푼 과정**(중간 생각/메모)을 남기며 풀어보면 실력이 더 빨리 늘어."
+        return "풀이 시간이 아주 짧고 코드가 한 번에 완성된 느낌이라, 다음엔 스스로 먼저 풀어보고 막힌 부분만 도움을 받아보자."
+    return "풀이 시간이 아주 짧아서, 다음엔 스스로 푼 과정(중간 생각/메모)을 남기며 풀어보면 실력이 더 빨리 늘어."
 
 
 # =========================
@@ -447,19 +443,19 @@ def build_integrity_hint(req: FeedbackRequest) -> Optional[str]:
 # =========================
 def fallback_feedback(mistake_summary: List[str], rt: str, integrity_hint: Optional[str]) -> str:
     if rt == "SUCCESS":
-        line1 = "- **끝까지 스스로 점검하며 마무리한 게 정말 좋아!**"
+        line1 = "- 끝까지 스스로 점검하며 마무리한 게 정말 좋아!"
     else:
-        line1 = "- **괜찮아, 과정에서 배우면 돼!** 이번엔 오류가 났어."
+        line1 = "- 괜찮아, 과정에서 배우면 돼! 이번엔 오류가 났어."
 
     if mistake_summary:
         ms = mistake_summary[0][:60] + ("…" if len(mistake_summary[0]) > 60 else "")
-        line2 = f"- **지금까지 자주 헷갈린 부분**은 {ms}였어. 다음엔 그 순간에 값이 어떻게 바뀌는지 한 번 더 확인해보자."
+        line2 = f"- 지금까지 자주 헷갈린 부분은 {ms}였어. 다음엔 그 순간에 값이 어떻게 바뀌는지 한 번 더 확인해보자."
     elif integrity_hint:
-        line2 = f"- **과정 기록이 거의 없어서** 자주 실수한 지점을 딱 집기 어려워. 대신 {integrity_hint}"
+        line2 = f"- 과정 기록이 거의 없어서 자주 실수한 지점을 딱 집기 어려워. 대신 {integrity_hint}"
     else:
-        line2 = "- **지금까지 자주 헷갈린 부분**은 입력/조건/초기화에서 생기기 쉬워. 다음엔 한 가지씩만 골라 차근차근 확인해보자."
+        line2 = "- 지금까지 자주 헷갈린 부분은 입력/조건/초기화에서 생기기 쉬워. 다음엔 한 가지씩만 골라 차근차근 확인해보자."
 
-    line3 = "- **작은 입력 1개**로 손으로 따라가며 중간값을 체크해봐."
+    line3 = "- 작은 입력 1개로 손으로 따라가며 중간값을 체크해봐."
     line4 = "- 같은 실수가 나오면, 그 줄 바로 위/아래에서 변수 값 변화를 한 줄로 적어보자."
 
     return "\n".join([
@@ -567,63 +563,6 @@ async def call_gms_once(payload: dict) -> str:
 
 
 # =========================
-# JSON -> Markdown assembly (약하게)
-# =========================
-def build_markdown_from_model_json(raw: str) -> str:
-    """
-    모델이 JSON으로 준 result/think_next/next_actions를
-    마크다운 템플릿(3헤더+4불릿)으로 조립한다.
-    - 파싱/키 누락에 강하게(= 기본값으로 복구)
-    """
-    try:
-        obj = json.loads(raw)
-    except Exception:
-        obj = {}
-
-    if not isinstance(obj, dict):
-        obj = {}
-
-    result = obj.get("result") or {}
-    think_next = obj.get("think_next") or {}
-    next_actions = obj.get("next_actions") or {}
-
-    if not isinstance(result, dict):
-        result = {}
-    if not isinstance(think_next, dict):
-        think_next = {}
-    if not isinstance(next_actions, dict):
-        next_actions = {}
-
-    r_title = (result.get("title") or "### ✅ 결과").strip()
-    r_content = (result.get("content") or "").strip()
-
-    t_title = (think_next.get("title") or "### 🔍 앞으로 생각해볼 것").strip()
-    t_content = (think_next.get("content") or "").strip()
-
-    n_title = (next_actions.get("title") or "### 🛠 다음에 해볼 것").strip()
-    items = next_actions.get("items") or []
-    if not isinstance(items, list):
-        items = []
-
-    item1 = (items[0] if len(items) > 0 else "").strip()
-    item2 = (items[1] if len(items) > 1 else "").strip()
-
-    # 안전: 불릿은 최소한 "-" 한 줄은 유지 (정책검사에서 잡히면 fallback)
-    md = "\n".join([
-        r_title,
-        f"- {r_content}" if r_content else "-",
-        "",
-        t_title,
-        f"- {t_content}" if t_content else "-",
-        "",
-        n_title,
-        f"- {item1}" if item1 else "-",
-        f"- {item2}" if item2 else "-",
-    ])
-    return md
-
-
-# =========================
 # Routes
 # =========================
 @app.get("/health")
@@ -636,23 +575,32 @@ async def feedback(
     req: FeedbackRequest,
     x_report_server_token: Optional[str] = Header(None, alias="X-REPORT-SERVER-TOKEN"),
 ):
+    # -------------------------
+    # 1) Auth
+    # -------------------------
     if REQUIRE_SERVER_TOKEN and x_report_server_token != REPORT_SERVER_TOKEN:
         raise HTTPException(status_code=401, detail="Invalid server token")
 
+    # -------------------------
+    # 2) Cache
+    # -------------------------
     ck = make_cache_key(req)
-    cached = _cache_get(ck)
-    if cached is not None:
-        if DEBUG_LOG:
-            print(f"[CACHE HIT] request_id={req.request_id}")
-        return {"request_id": req.request_id, "feedback": cached}
 
+    # 원본 확인 모드에서는 캐시 우회
+    if not RETURN_RAW:
+        cached = _cache_get(ck)
+        if cached is not None:
+            if DEBUG_LOG:
+                print(f"[CACHE HIT] request_id={req.request_id}")
+            return {"request_id": req.request_id, "feedback": cached}
+
+    # -------------------------
+    # 3) Evidence build
+    # -------------------------
     recent_prev = req.previous_judgement[-PREV_LIMIT:]
     label_hints = summarize_labels_student_friendly(recent_prev, limit=5)
-
-    # ✅ "실수 요약" 근거(학생용 소재)
     mistake_summary = build_mistake_summary(recent_prev, label_hints)
 
-    # ✅ 근거가 비면 integrity 힌트
     integrity_hint = None
     if (not recent_prev) or (not mistake_summary):
         integrity_hint = build_integrity_hint(req)
@@ -670,11 +618,8 @@ async def feedback(
         "user": {"age": req.user.age, "coding_level": req.user.coding_level},
         "code": {"language": req.code.language, "content": _trunc(req.code.content, TRUNC_CODE)},
         "result": {"resultType": req.result.resultType},
-
-        # ✅ 학생 출력에 안전한 소재만
         "mistake_summary": mistake_summary,
         "integrity_hint": integrity_hint,
-
         "constraints": {
             "max_chars": MAX_FEEDBACK_CHARS,
             "focus": "process-first",
@@ -682,7 +627,10 @@ async def feedback(
         },
     }
 
-    payload = {
+    # -------------------------
+    # 4) Build GMS payload
+    # -------------------------
+    gms_payload: Dict[str, Any] = {
         "model": MODEL,
         "messages": [
             {"role": "developer", "content": DEVELOPER_PROMPT},
@@ -701,19 +649,89 @@ async def feedback(
         "max_completion_tokens": MAX_COMPLETION_TOKENS,
     }
 
-    try:
-        raw = await call_gms_once(payload)
+    if USE_RESPONSE_FORMAT:
+        gms_payload["response_format"] = {"type": "json_object"}
 
-        # ✅ JSON 응답 -> 마크다운 조립 -> 기존 정책 검사 재사용
-        raw_md = build_markdown_from_model_json(raw)
+    # -------------------------
+    # 5) Call + parse (명확한 JSON 파싱 실패 감지)
+    # -------------------------
+    def _try_parse_json_object(raw: str) -> Optional[Dict[str, Any]]:
+        try:
+            obj = json.loads(raw)
+            return obj if isinstance(obj, dict) else None
+        except Exception:
+            return None
+
+    try:
+        raw = await call_gms_once(gms_payload)
+
+        # ✅ 원본 확인 모드: 그대로 반환
+        if RETURN_RAW:
+            if DEBUG_LOG:
+                print("[RETURN_RAW=1] raw only")
+                print("[RAW]", raw[:2000])
+                print("[MISTAKE_SUMMARY]", mistake_summary)
+                print("[INTEGRITY_HINT]", integrity_hint)
+                print("[MAX_COMPLETION_TOKENS]", MAX_COMPLETION_TOKENS, "USE_RESPONSE_FORMAT=", USE_RESPONSE_FORMAT)
+            return {"request_id": req.request_id, "feedback": raw}
+
+        obj = _try_parse_json_object(raw)
+        if obj is None:
+            if DEBUG_LOG:
+                print("[RAW]", raw[:2000])
+                print("[PARSE]", "JSON_PARSE_ERROR")
+                print("[MAX_COMPLETION_TOKENS]", MAX_COMPLETION_TOKENS, "USE_RESPONSE_FORMAT=", USE_RESPONSE_FORMAT)
+                print("[MISTAKE_SUMMARY]", mistake_summary)
+                print("[INTEGRITY_HINT]", integrity_hint)
+
+            feedback_text = postprocess(fallback_feedback(mistake_summary, req.result.resultType, integrity_hint))
+            _cache_put(ck, feedback_text)
+            return {"request_id": req.request_id, "feedback": feedback_text}
+
+        # -------------------------
+        # 6) Assemble markdown (title은 서버에서 고정)
+        # -------------------------
+        result = obj.get("result") or {}
+        think_next = obj.get("think_next") or {}
+        next_actions = obj.get("next_actions") or {}
+
+        if not isinstance(result, dict):
+            result = {}
+        if not isinstance(think_next, dict):
+            think_next = {}
+        if not isinstance(next_actions, dict):
+            next_actions = {}
+
+        r_content = (result.get("content") or "").strip()
+        t_content = (think_next.get("content") or "").strip()
+
+        items = next_actions.get("items") or []
+        if not isinstance(items, list):
+            items = []
+        item1 = (items[0] if len(items) > 0 else "").strip()
+        item2 = (items[1] if len(items) > 1 else "").strip()
+
+        raw_md = "\n".join([
+            "### ✅ 결과",
+            f"- {r_content}" if r_content else "-",
+            "",
+            "### 🔍 앞으로 생각해볼 것",
+            f"- {t_content}" if t_content else "-",
+            "",
+            "### 🛠 다음에 해볼 것",
+            f"- {item1}" if item1 else "-",
+            f"- {item2}" if item2 else "-",
+        ])
+
         feedback_text = postprocess(raw_md)
         reason = policy_violation_reason(feedback_text)
 
         if DEBUG_LOG:
-            print("[RAW JSON]", raw[:1200])
+            print("[RAW JSON OK]", json.dumps(obj, ensure_ascii=False)[:2000])
             print("[ASSEMBLED MD]", raw_md)
             print("[POST]", feedback_text)
             print("[VIOLATION]", reason)
+            print("[MAX_COMPLETION_TOKENS]", MAX_COMPLETION_TOKENS, "USE_RESPONSE_FORMAT=", USE_RESPONSE_FORMAT)
             print("[MISTAKE_SUMMARY]", mistake_summary)
             print("[INTEGRITY_HINT]", integrity_hint)
 
@@ -724,12 +742,25 @@ async def feedback(
 
     except HTTPException as e:
         if DEBUG_LOG:
-            print("[GMS ERROR FALLBACK]", e.detail)
-        feedback_text = postprocess(fallback_feedback(mistake_summary, req.result.resultType, integrity_hint))
-    except Exception as e:
-        if DEBUG_LOG:
-            print("[UNEXPECTED ERROR FALLBACK]", repr(e))
+            print("[GMS ERROR]", e.detail)
+            print("[MAX_COMPLETION_TOKENS]", MAX_COMPLETION_TOKENS, "USE_RESPONSE_FORMAT=", USE_RESPONSE_FORMAT)
+
+        if RETURN_RAW:
+            return {"request_id": req.request_id, "feedback": f"[GMS ERROR] {e.detail}"}
+
         feedback_text = postprocess(fallback_feedback(mistake_summary, req.result.resultType, integrity_hint))
 
-    _cache_put(ck, feedback_text)
+    except Exception as e:
+        if DEBUG_LOG:
+            print("[UNEXPECTED ERROR]", repr(e))
+            print("[MAX_COMPLETION_TOKENS]", MAX_COMPLETION_TOKENS, "USE_RESPONSE_FORMAT=", USE_RESPONSE_FORMAT)
+
+        if RETURN_RAW:
+            return {"request_id": req.request_id, "feedback": f"[UNEXPECTED ERROR] {repr(e)}"}
+
+        feedback_text = postprocess(fallback_feedback(mistake_summary, req.result.resultType, integrity_hint))
+
+    if not RETURN_RAW:
+        _cache_put(ck, feedback_text)
+
     return {"request_id": req.request_id, "feedback": feedback_text}
