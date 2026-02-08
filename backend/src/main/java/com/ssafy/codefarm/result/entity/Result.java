@@ -4,7 +4,6 @@ import com.ssafy.codefarm.session.entity.Session;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
@@ -48,7 +47,6 @@ public class Result {
     @Column(columnDefinition = "TEXT")
     private String feedback;
 
-    @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
 
@@ -57,6 +55,11 @@ public class Result {
     @JoinColumn(name = "session_id")
     @OnDelete(action = OnDeleteAction.CASCADE)
     private Session session;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 
     public void updateFeedback(String feedback) {
         this.feedback = feedback;
