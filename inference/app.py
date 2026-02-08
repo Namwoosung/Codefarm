@@ -91,8 +91,8 @@ GMS_QUEUE_MAXSIZE = int(os.getenv("GMS_QUEUE_MAXSIZE", str(QUEUE_MAXSIZE)))
 GMS_WORKERS = int(os.getenv("GMS_WORKERS", "8"))
 GMS_ENQUEUE_TIMEOUT = float(os.getenv("GMS_ENQUEUE_TIMEOUT", "0.2"))  # ✅ 추가: gms 큐 put timeout
 
-MODEL1_TIMEOUT = float(os.getenv("MODEL1_TIMEOUT", "15.0"))
-MODEL2_TIMEOUT = float(os.getenv("MODEL2_TIMEOUT", "15.0"))
+MODEL1_TIMEOUT = float(os.getenv("MODEL1_TIMEOUT", "20.0"))
+MODEL2_TIMEOUT = float(os.getenv("MODEL2_TIMEOUT", "20.0"))
 
 GMS_MAX_TOKENS = int(os.getenv("GMS_MAX_TOKENS", "700"))
 GMS_TEMPERATURE = float(os.getenv("GMS_TEMPERATURE", "0.4"))
@@ -101,7 +101,7 @@ GMS_TEMPERATURE = float(os.getenv("GMS_TEMPERATURE", "0.4"))
 # p95/p99 Stabilizers (IMPORTANT)
 # ============================================================
 # ✅ GPU 동시 실행 제한: A100 80GB
-GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "1"))
+GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "2"))
 MODEL2_CONCURRENCY = int(os.getenv("MODEL2_CONCURRENCY", "1"))
 
 # ✅ GMS 동시성 제한(너무 높이면 p99/리페어율 악화 가능)
@@ -259,7 +259,7 @@ async def auth_middleware(request: Request, call_next):
 
 def _build_http_client() -> httpx.AsyncClient:
     limits = httpx.Limits(max_connections=200, max_keepalive_connections=50)
-    timeout = httpx.Timeout(GMS_TIMEOUT, connect=min(5.0, GMS_TIMEOUT))
+    timeout = httpx.Timeout(GMS_TIMEOUT, connect=min(10.0, GMS_TIMEOUT))
     return httpx.AsyncClient(timeout=timeout, limits=limits, http2=True)
 
 
