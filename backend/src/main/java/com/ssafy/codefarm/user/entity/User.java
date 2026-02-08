@@ -3,7 +3,6 @@ package com.ssafy.codefarm.user.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -57,9 +56,13 @@ public class User {
     @Builder.Default
     private Integer point = 0;
 
-    @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 
     public void updateProfile(String name, String nickname, Integer age, Integer codingLevel) {
 
