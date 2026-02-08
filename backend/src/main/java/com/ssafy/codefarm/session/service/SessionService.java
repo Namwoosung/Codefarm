@@ -500,21 +500,21 @@ public class SessionService {
 
             result.updateFeedback(feedback);
 
-            // ctx.session().close();
+             ctx.session().close();
 
             Long sid = ctx.session().getId();
 
-//            TransactionSynchronizationManager.registerSynchronization(
-//                    new TransactionSynchronization() {
-//                        @Override
-//                        public void afterCommit() {
-//                            sessionCodeRedisService.delete(sid);
-//                            log.info("Redis deleted after GIVE_UP commit. sessionId={}", sid);
-//                            autoHintSchedulerService.stop(sid);
-//                            hintService.clearSession(sid);
-//                        }
-//                    }
-//            );
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            sessionCodeRedisService.delete(sid);
+                            log.info("Redis deleted after GIVE_UP commit. sessionId={}", sid);
+                            autoHintSchedulerService.stop(sid);
+                            hintService.clearSession(sid);
+                        }
+                    }
+            );
 
             return GiveUpSessionResponseDto.from(result);
         });
