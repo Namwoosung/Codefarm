@@ -101,7 +101,7 @@ GMS_TEMPERATURE = float(os.getenv("GMS_TEMPERATURE", "0.4"))
 # p95/p99 Stabilizers (IMPORTANT)
 # ============================================================
 # ✅ GPU 동시 실행 제한: A100 80GB
-GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "1"))
+GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "2"))
 MODEL2_CONCURRENCY = int(os.getenv("MODEL2_CONCURRENCY", "1"))
 
 # ✅ GMS 동시성 제한(너무 높이면 p99/리페어율 악화 가능)
