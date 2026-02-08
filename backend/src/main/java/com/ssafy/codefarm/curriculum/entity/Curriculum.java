@@ -3,7 +3,6 @@ package com.ssafy.codefarm.curriculum.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -38,7 +37,11 @@ public class Curriculum {
     @NotNull
     private Integer curriculumDifficulty;
 
-    @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }
