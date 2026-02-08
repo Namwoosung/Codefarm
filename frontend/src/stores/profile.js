@@ -28,7 +28,7 @@ export const useProfileStore = defineStore('profile', () => {
                 // noop
             }
         } catch (err) {
-            console.log(err?.response?.data?.message ?? err?.message ?? err)
+            // console.log(err?.response?.data?.message ?? err?.message ?? err)
         }
     }
     const updateUser = async (payload) => {
@@ -57,10 +57,10 @@ export const useProfileStore = defineStore('profile', () => {
                 // noop
             }
 
-            console.log(res.data?.message)
+            // console.log(res.data?.message)
             return res.data
         } catch (err) {
-            console.log(err?.response?.data?.message ?? err?.message ?? err)
+            // console.log(err?.response?.data?.message ?? err?.message ?? err)
             throw err
         }
     }
@@ -74,10 +74,10 @@ export const useProfileStore = defineStore('profile', () => {
             reports.value = res.data.data
             reportsFetched.value = true
             lastReportListKey.value = key
-            console.log(res.data.message)
-            console.log(res.data.data)
+            // console.log(res.data.message)
+            // console.log(res.data.data)
         } catch (err) {
-            console.log(err?.response?.data?.message ?? err?.message ?? err)
+            // console.log(err?.response?.data?.message ?? err?.message ?? err)
         }
     }
 
@@ -100,9 +100,9 @@ export const useProfileStore = defineStore('profile', () => {
         try {
             const res = await getReportDetail(reportId)
             report.value = res.data.data
-            console.log(res.data.data)
+            // console.log(res.data.data)
         } catch (err) {
-            console.log(err.data.message)
+            // console.log(err.data.message)
         }
     }
     return {

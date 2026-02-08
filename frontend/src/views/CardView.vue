@@ -266,7 +266,7 @@ onMounted(async () => {
     await profile.userinfo()
     await cardStore.cardList()
   } catch (err) {
-    console.warn('[CardView] mounted fetch failed:', err)
+    // console.warn('[CardView] mounted fetch failed:', err)
   } finally {
     isInitialLoading.value = false
   }
@@ -285,7 +285,7 @@ const gachaCard = async () => {
     await cardStore.cardDraw()
     await profile.userinfo()
     selectedCard.value = cardStore.newcard?.card ?? cardStore.newcard
-    console.log('남은 포인트:', user.value.point)
+    // console.log('남은 포인트:', user.value.point)
     isGachaModal.value = true
     lockScroll()
   }

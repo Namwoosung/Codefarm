@@ -82,7 +82,7 @@ onMounted(async () => {
   try {
     await profile.userinfo()
   } catch (err) {
-    console.warn('[ProfileView] mounted fetch failed:', err)
+    // console.warn('[ProfileView] mounted fetch failed:', err)
   }
 })
 

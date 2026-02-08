@@ -141,7 +141,7 @@ const login = async () => {
     await nextTick()
     router.push('/')
   } catch (e) {
-    console.error(e)
+    // console.error(e)
   }
 }
 

@@ -482,7 +482,7 @@ async function fetchCurriculums() {
       fetchRecommendedForCurriculum(4),
     ])
   } catch (error) {
-    console.error('Failed to fetch curriculums', error)
+    // console.error('Failed to fetch curriculums', error)
     curriculums.value = []
   } finally {
     curriculumsLoading.value = false
@@ -542,10 +542,10 @@ async function fetchRecommendedForCurriculum(curriculumIdx) {
         [curriculumIdx]: 'UNAUTHORIZED',
       }
     } else {
-      console.error(
-        `Failed to fetch recommend for curriculum ${curriculumId}`,
-        error
-      )
+      // console.error(
+      //   `Failed to fetch recommend for curriculum ${curriculumId}`,
+      //   error
+      // )
     }
   }
 }
