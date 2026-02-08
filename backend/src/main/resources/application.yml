@@ -13,7 +13,7 @@ spring:
   datasource:
     driver-class-name: org.postgresql.Driver
     # JDBC URL에 타임아웃 파라미터 추가 (초 단위)
-    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_NAME}?connectTimeout=10&socketTimeout=10
+    url: jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_NAME}?connectTimeout=10&socketTimeout=10&options=-c%20TimeZone=Asia/Seoul
     username: ${POSTGRES_USER}
     password: ${POSTGRES_PASSWORD}
     hikari:
