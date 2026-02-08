@@ -102,6 +102,28 @@ cache:
 trivy_fs:
   stage: security
   tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  variables:
+    TRIVY_SEVERITY: "CRITICAL,HIGH"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+      variables:
+        TRIVY_EXIT_CODE: "0"   # 발견돼도 통과
+    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
+      variables:
+        TRIVY_EXIT_CODE: "1"   # 운영은 차단
+  script:
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/execution:${CI_COMMIT_SHA}
+    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/feedback:${CI_COMMIT_SHA}
+
+trivy_fs:
+  tags: [ec2-mono]
+  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
+  stage: security
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
   script:
     - trivy fs --severity HIGH,CRITICAL .
   rules:
