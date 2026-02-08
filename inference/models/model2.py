@@ -91,7 +91,7 @@ MODEL2_MAX_MEMORY = os.getenv("MODEL2_MAX_MEMORY", "").strip()  # 예: "8GiB" (�
 
 # ✅ generate 동시성 제한(프로세스 내 2개)
 # _GEN_LOCK = asyncio.Lock()
-_GEN_SEM = asyncio.Semaphore(1)
+_GEN_SEM = asyncio.Semaphore(2)
 
 # ✅ load_model_once 스레드 안전
 _LOAD_LOCK = threading.Lock()
