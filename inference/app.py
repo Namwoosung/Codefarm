@@ -1,5 +1,6 @@
 # app.py (pipeline split: infer_queue + gms_queue)  -- p95/p99 stabilized
 import os
+import re
 import json
 import time
 import uuid
@@ -7,6 +8,9 @@ import asyncio
 import inspect
 import logging
 import traceback
+import hashlib
+from collections import deque
+from difflib import SequenceMatcher
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from contextvars import ContextVar
@@ -211,6 +215,80 @@ async def get_session_lock(session_id: str) -> asyncio.Lock:
 
 
 # ============================================================
+# Hint Dedup (Hard guard using previous_judgement + session cache)
+# ============================================================
+
+HINT_DEDUP_WINDOW_SEC = float(os.getenv("HINT_DEDUP_WINDOW_SEC", "900"))  # 15m
+HINT_DEDUP_MAX_PER_SESSION = int(os.getenv("HINT_DEDUP_MAX_PER_SESSION", "20"))
+HINT_NEAR_DUP_RATIO = float(os.getenv("HINT_NEAR_DUP_RATIO", "0.92"))  # near-dup threshold
+
+_recent_hint_hashes: Dict[str, deque] = {}  # session_id -> deque[(ts, hash)]
+_recent_hint_guard = asyncio.Lock()
+
+_ws_re = re.compile(r"\s+")
+_punct_re = re.compile(r"[^\w가-힣]+")
+
+
+def _normalize_hint(s: str) -> str:
+    s = (s or "").strip().lower()
+    s = _ws_re.sub(" ", s)
+    s = _punct_re.sub("", s)
+    s = _ws_re.sub(" ", s).strip()
+    return s
+
+
+def _hint_hash(norm: str) -> str:
+    return hashlib.sha256((norm or "").encode("utf-8")).hexdigest()
+
+
+def _extract_prev_hints(req_payload: Dict[str, Any]) -> List[str]:
+    prev = req_payload.get("previous_judgement") or []
+    out: List[str] = []
+    if isinstance(prev, list):
+        for it in prev:
+            if isinstance(it, dict):
+                h = it.get("hint")
+                if isinstance(h, str) and h.strip():
+                    out.append(h.strip())
+    return out
+
+
+def _is_near_duplicate(a_norm: str, b_norm: str) -> bool:
+    if not a_norm or not b_norm:
+        return False
+    if a_norm == b_norm:
+        return True
+    la, lb = len(a_norm), len(b_norm)
+    if min(la, lb) == 0:
+        return False
+    if max(la, lb) / max(1, min(la, lb)) > 1.6:
+        return False
+    ratio = SequenceMatcher(None, a_norm, b_norm).ratio()
+    return ratio >= HINT_NEAR_DUP_RATIO
+
+
+async def _seen_in_session_cache(session_id: str, hint_hash: str) -> bool:
+    now = time.time()
+    async with _recent_hint_guard:
+        dq = _recent_hint_hashes.get(session_id)
+        if dq is None:
+            dq = deque()
+            _recent_hint_hashes[session_id] = dq
+
+        while dq and (now - dq[0][0]) > HINT_DEDUP_WINDOW_SEC:
+            dq.popleft()
+
+        if any(prev_h == hint_hash for _, prev_h in dq):
+            return True
+
+        dq.append((now, hint_hash))
+        while len(dq) > HINT_DEDUP_MAX_PER_SESSION:
+            dq.popleft()
+
+        return False
+
+
+# ============================================================
 # Utils
 # ============================================================
 
@@ -280,7 +358,7 @@ async def gms_chat(
         "max_completion_tokens": max_tokens,
     }
 
-    async with _gms_sem:  # ✅ p95/p99 안정화(외부 API 병렬 상한)
+    async with _gms_sem:
         t0 = time.perf_counter()
         client: httpx.AsyncClient = app.state.http
         r = await client.post(GMS_CHAT_URL, headers=headers, json=body)
@@ -346,14 +424,9 @@ def build_model2_input(req_payload: Dict[str, Any], mistake_type: List[str]) -> 
 # ============================================================
 
 async def process_models(req_payload: Dict[str, Any], session_id: str) -> Dict[str, Any]:
-    """
-    MODEL1/MODEL2까지만 수행하고, GMS 입력(gms_input)과 메타를 반환
-    """
     log_event("pipeline_model_start", session_id=session_id)
 
-    # ✅ GPU 전체 동시 실행 제한(가장 중요)
     async with _gpu_sem:
-        # 1) MODEL1
         try:
             m1 = await call_maybe_async(run_model1, req_payload, timeout=MODEL1_TIMEOUT, stage="model1")
         except asyncio.TimeoutError:
@@ -372,13 +445,10 @@ async def process_models(req_payload: Dict[str, Any], session_id: str) -> Dict[s
 
         log_event("model1_labels", labels=mistake_type, n=len(mistake_type))
 
-        # 2) MODEL2 input
         model2_input = build_model2_input(req_payload, mistake_type)
         prompt_len = len(model2_input.get("prompt", "") or "")
         log_event("model2_input_built", prompt_len=prompt_len)
 
-        # 3) MODEL2 -> gms_input dict
-        # ✅ model2 generate는 더 강하게 serialize(권장: 1)
         async with _model2_sem:
             try:
                 gms_input = await call_maybe_async(run_model2, model2_input, timeout=MODEL2_TIMEOUT, stage="model2")
@@ -409,11 +479,17 @@ async def process_models(req_payload: Dict[str, Any], session_id: str) -> Dict[s
 # ============================================================
 
 async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
-    """
-    GMS 호출 및 JSON 파싱/리페어 포함, 최종 API 응답 dict 반환
-    """
     session_id = job.session_id
     log_event("pipeline_gms_start", session_id=session_id)
+
+    # ✅ problem_type=Curriculum이면, utils.prompt.build_gms_messages 내부에서 커리큘럼 프롬프트가 적용되도록
+    #    (gms_input.problem_information.problem_type 가 전달되어야 함)
+    pi = (job.gms_input.get("problem_information") or {})
+    log_event(
+        "gms_prompt_mode",
+        session_id=session_id,
+        problem_id=str(pi.get("problem_id") or ""),
+    )
 
     messages = build_gms_messages(job.gms_input)
     log_event("gms_call", n_messages=len(messages))
@@ -421,7 +497,6 @@ async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
     raw = await gms_chat(messages)
     log_event("gms_raw_len", n=len(raw or ""))
 
-    # parse + banned + repair 1회
     try:
         obj = parse_json(raw)
         if has_banned(obj):
@@ -444,7 +519,6 @@ async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
 
         log_event("gms_repair_ok")
 
-    # hint 추출 (should_send=false면 hint=null)
     should_send = bool(obj.get("should_send", True))
 
     hint_content_val = obj.get("hint_content", None)
@@ -458,6 +532,38 @@ async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
     else:
         hint = hint_content if hint_content else None
         log_event("hint_ready", should_send=True, hint_len=(len(hint) if hint else 0))
+
+    # ✅ Hard Dedup (previous_judgement + session cache)
+    if hint is not None:
+        prev_hints = _extract_prev_hints(job.payload)
+        hint_norm = _normalize_hint(hint)
+        h_hash = _hint_hash(hint_norm)
+
+        duplicated_by_prev = False
+        for ph in prev_hints:
+            ph_norm = _normalize_hint(ph)
+            if not ph_norm:
+                continue
+            if ph_norm == hint_norm or _is_near_duplicate(hint_norm, ph_norm):
+                duplicated_by_prev = True
+                break
+
+        if duplicated_by_prev:
+            log_event(
+                "hint_dedup_suppressed",
+                reason="previous_judgement",
+                prev_n=len(prev_hints),
+                hint_len=len(hint),
+            )
+            hint = None
+        else:
+            log_event("hint_dedup_checked", prev_n=len(prev_hints), hint_norm_len=len(hint_norm))
+
+        if hint is not None:
+            seen = await _seen_in_session_cache(session_id, h_hash)
+            if seen:
+                log_event("hint_dedup_suppressed", reason="session_cache", hint_len=len(hint))
+                hint = None
 
     judged_at = now_iso()
     log_event("pipeline_gms_done", session_id=session_id)
@@ -477,21 +583,16 @@ async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
 # ============================================================
 
 async def infer_worker_loop(worker_id: int):
-    """
-    Stage 1 worker: infer_queue 소비 -> MODEL1/MODEL2 수행 -> gms_queue로 넘김
-    """
     log_event("worker_start", worker_id=worker_id, stage="infer")
     while True:
         job = await infer_queue.get()
         try:
-            # ✅ session 단위 순서 보장: 모델 단계도 session lock 적용
             lock = await get_session_lock(job.session_id)
             async with lock:
                 log_event("job_start", worker_id=worker_id, session_id=job.session_id, stage="infer", qsize=infer_queue.qsize())
                 m = await process_models(job.payload, job.session_id)
                 log_event("job_done", worker_id=worker_id, session_id=job.session_id, stage="infer")
 
-            # ✅ GMS stage로 넘김 (여기서는 lock을 잡지 않음)
             gjob = GmsJob(
                 session_id=job.session_id,
                 payload=job.payload,
@@ -501,7 +602,6 @@ async def infer_worker_loop(worker_id: int):
                 fut=job.fut,
             )
 
-            # ✅ gms_queue가 꽉 찬 경우 infer worker가 영구 대기하지 않도록 timeout 적용
             try:
                 await asyncio.wait_for(gms_queue.put(gjob), timeout=GMS_ENQUEUE_TIMEOUT)
                 log_event("enqueue_gms_ok", session_id=job.session_id, qsize=gms_queue.qsize())
@@ -527,22 +627,11 @@ async def infer_worker_loop(worker_id: int):
 
 
 async def gms_worker_loop(worker_id: int):
-    """
-    Stage 2 worker: gms_queue 소비 -> GMS 호출/파싱/리페어 -> fut에 최종 결과 set
-    """
     log_event("worker_start", worker_id=worker_id, stage="gms")
     while True:
         job = await gms_queue.get()
         try:
-            # ✅ 같은 session_id는 GMS 단계에서도 순서 보장
-            # GMS session lock 제거
-            # lock = await get_session_lock(job.session_id)
-            # async with lock:
-            #     log_event("job_start", worker_id=worker_id, session_id=job.session_id, stage="gms", qsize=gms_queue.qsize())
-            #     result = await process_gms_stage(job)
             result = await process_gms_stage(job)
-                # log_event("job_done", worker_id=worker_id, session_id=job.session_id, stage="gms")
-
             if not job.fut.done():
                 job.fut.set_result(result)
 
@@ -574,12 +663,13 @@ async def startup():
         gpu_concurrency=GPU_CONCURRENCY,
         model2_concurrency=MODEL2_CONCURRENCY,
         gms_concurrency=GMS_CONCURRENCY,
+        hint_dedup_window_sec=HINT_DEDUP_WINDOW_SEC,
+        hint_near_dup_ratio=HINT_NEAR_DUP_RATIO,
+        hint_dedup_max_per_session=HINT_DEDUP_MAX_PER_SESSION,
     )
 
-    # ✅ http client reuse
     app.state.http = _build_http_client()
 
-    # ✅ stage workers
     for i in range(WORKERS):
         asyncio.create_task(infer_worker_loop(i))
     for i in range(GMS_WORKERS):
@@ -612,6 +702,9 @@ def health():
         "gpu_concurrency": GPU_CONCURRENCY,
         "model2_concurrency": MODEL2_CONCURRENCY,
         "gms_concurrency": GMS_CONCURRENCY,
+        "hint_dedup_window_sec": HINT_DEDUP_WINDOW_SEC,
+        "hint_near_dup_ratio": HINT_NEAR_DUP_RATIO,
+        "hint_dedup_max_per_session": HINT_DEDUP_MAX_PER_SESSION,
     }
 
 
