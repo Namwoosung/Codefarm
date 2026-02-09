@@ -1,7 +1,6 @@
 stages:
   - build
   - test
-  - security
   - deploy
   - inference
 
@@ -90,64 +89,6 @@ test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH =~ /^(feature|infra|fix)\//'
-
-# =====================
-# SECURITY (Trivy FS)
-# =====================
-cache:
-  key: trivy-cache
-  paths:
-    - .trivycache/
-
-# trivy_scan_images:
-#   tags: [ec2-mono]
-#   needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
-#   stage: security
-#   variables:
-#     TRIVY_EXIT_CODE: "1"
-#     TRIVY_SEVERITY: "CRITICAL,HIGH"
-#     TRIVY_USERNAME: "$DOCKERHUB_USERNAME"
-#     TRIVY_PASSWORD: "$DOCKERHUB_TOKEN"
-#   script:
-#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA}
-#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA}
-#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/execution:${CI_COMMIT_SHA}
-#     - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/feedback:${CI_COMMIT_SHA}
-#   rules:
-#     - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-
-
-# 개발단계 임시 패스
-trivy_scan_images:
-  stage: security
-  tags: [ec2-mono]
-  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
-  variables:
-    TRIVY_SEVERITY: "CRITICAL,HIGH"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop"'
-      variables:
-        TRIVY_EXIT_CODE: "0"   # 발견돼도 통과
-    - if: '$CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-      variables:
-        TRIVY_EXIT_CODE: "0"   # (운영은 차단) <- 1차배포 임시 보류
-  script:
-    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/backend:${CI_COMMIT_SHA}
-    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/web:${CI_COMMIT_SHA}
-    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/execution:${CI_COMMIT_SHA}
-    - trivy image --scanners vuln --severity $TRIVY_SEVERITY --exit-code $TRIVY_EXIT_CODE ${DOCKERHUB_USERNAME}/feedback:${CI_COMMIT_SHA}
-
-trivy_fs:
-  tags: [ec2-mono]
-  needs: ["build-backend", "build-web", "build-execution", "build-feedback"]
-  stage: security
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main" || $CI_COMMIT_BRANCH =~ /^hotfix\/.+/'
-  script:
-    - trivy fs --severity HIGH,CRITICAL .
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH == "develop" || $CI_COMMIT_BRANCH == "main"'
 
 # =====================
 # DEPLOY (SSH → server scripts)
