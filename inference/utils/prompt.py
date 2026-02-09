@@ -8,16 +8,16 @@ import json
 # Terms policy
 # =========================
 
-# 일반(비커리큘럼)에서는 너무 메타/전문 용어를 피하고 싶을 때 유지
+# 일반에서는 너무 메타/전문 용어를 피하고 싶을 때 유지
 BANNED_TERMS_GENERAL = [
     "브루트포스", "최적화", "투포인터", "로직", "정의",
     "시간복잡도", "빅오", "자료구조", "알고리즘"
 ]
 
-# 커리큘럼에서는 초보 설명에 필요한 말(예: 알고리즘/자료구조)을 과도하게 금지하면 설명이 막힘
-# => 커리큘럼 모드에서는 금지어를 더 좁게 잡는다(정답/완성코드 금지는 별도 강제)
+# 커리큘럼 모드에서는 초보 설명에 필요한 말(예: 알고리즘/자료구조)을 과도하게 금지하면 설명이 막힘
+# => 커리큘럼 모드에서는 불필요한 전문 최적화 용어만 제한
 BANNED_TERMS_CURRICULUM = [
-    "빅오", "시간복잡도", "최적화"  # 초보 단계에서 불필요한 전문 최적화 용어만 제한
+    "빅오", "시간복잡도", "최적화"
 ]
 
 _JSON_ONLY_REMINDER = (
@@ -55,9 +55,28 @@ def _sanitize_for_prompt(obj: Any, max_len: int = 800) -> str:
     s = re.sub(r"\s+", " ", s).strip()
     return _trunc(s, max_len)
 
-def _is_curriculum_problem(pi: Dict[str, Any]) -> bool:
-    pt = (pi.get("problem_type") or pi.get("type") or "").strip().lower()
-    return pt == "curriculum"
+# =========================
+# Curriculum routing (NO problem_type)
+# =========================
+# ✅ problem_type 관련 내용은 전부 제거
+# ✅ algorithm 값이 아래 중 하나면 "커리큘럼 모드"로 간주
+_CURRICULUM_ALGO_RAW = {
+    "입력과 출력",
+    "조건문",
+    "반복문",
+}
+
+def _is_curriculum_by_algorithm(raw_algo: str) -> bool:
+    a = (raw_algo or "").strip()
+    if not a:
+        return False
+    if a in _CURRICULUM_ALGO_RAW:
+        return True
+    # 괄호/부가설명 포함 케이스 대응: "조건문(기초)" 등
+    for key in _CURRICULUM_ALGO_RAW:
+        if key and key in a:
+            return True
+    return False
 
 def _classify_user_question(user_q: str) -> str:
     q = (user_q or "").strip()
@@ -81,6 +100,11 @@ def _classify_user_question(user_q: str) -> str:
 # =========================
 
 _ALGO_SYNONYMS: Dict[str, str] = {
+    # ✅ curriculum 대상(입력/출력)
+    "입력과 출력": "io",
+    "입출력": "io",
+    "input/output": "io",
+
     # condition
     "조건문": "condition",
     "if": "condition",
@@ -105,7 +129,7 @@ _ALGO_SYNONYMS: Dict[str, str] = {
     "queue": "queue",
     "큐": "queue",
     "선입선출": "queue",
-    "덱": "queue",  # 덱/큐로 분류(설명은 큐 기반으로)
+    "덱": "queue",
 
     # brute force / search
     "완전탐색": "search",
@@ -120,21 +144,16 @@ _ALGO_SYNONYMS: Dict[str, str] = {
 }
 
 def _normalize_algorithm(raw_algo: str) -> str:
-    """
-    한국어/영어/혼합 algorithm 값을 정규화해서 템플릿 선택에 사용.
-    """
     a = (raw_algo or "").strip()
     if not a:
         return "unknown"
     a_low = a.lower()
 
-    # 정확 매핑 우선
     if a in _ALGO_SYNONYMS:
         return _ALGO_SYNONYMS[a]
     if a_low in _ALGO_SYNONYMS:
         return _ALGO_SYNONYMS[a_low]
 
-    # 포함 매칭(예: "조건문(기초)" 같은 형태)
     for k, v in _ALGO_SYNONYMS.items():
         if k and (k in a or k in a_low):
             return v
@@ -142,9 +161,8 @@ def _normalize_algorithm(raw_algo: str) -> str:
     return "unknown"
 
 def _algo_display_name(algo_norm: str, raw_algo: str) -> str:
-    """
-    모델에게 보여줄 쉬운 이름(학생용).
-    """
+    if algo_norm == "io":
+        return "입력과 출력(받고, 그대로/형식 맞춰 내보내기)"
     if algo_norm == "condition":
         return "조건(만약 ~라면) 확인"
     if algo_norm == "loop":
@@ -166,15 +184,16 @@ def _algo_display_name(algo_norm: str, raw_algo: str) -> str:
 # =========================
 
 def _curriculum_how_template(algo_norm: str) -> str:
-    """
-    커리큘럼 + HOW 질문일 때, 힌트를 안정적으로 만들기 위한 짧은 템플릿.
-    - 1~4문장 내에서 끝나도록 설계
-    - 정답/완성코드 금지
-    """
+    if algo_norm == "io":
+        return (
+            "입력에서 어떤 값을 몇 개 받는지부터 순서대로 적어봐. "
+            "그 값을 그대로 출력하는지, 아니면 모양(띄어쓰기/줄바꿈)을 바꿔서 출력하는지 확인해. "
+            "예시 입력을 넣었을 때 출력이 예시 출력과 똑같이 나오는지 마지막에 비교해."
+        )
     if algo_norm == "condition":
         return (
             "먼저 어떤 경우에 A를, 어떤 경우에 B를 출력해야 하는지 조건을 2~3개로 나눠 적어봐. "
-            "그 다음 점수/값을 조건에 넣어보면서 어느 구간에 들어가는지 확인해. "
+            "그 다음 값들을 조건에 넣어보면서 어느 경우에 해당하는지 확인해. "
             "마지막에 출력 글자(대소문자, 줄바꿈)가 문제랑 똑같은지 확인해."
         )
     if algo_norm == "loop":
@@ -195,7 +214,6 @@ def _curriculum_how_template(algo_norm: str) -> str:
             "값을 넣는 순서와 꺼내는 순서를 작은 예시로 직접 적어보면 실수가 줄어. "
             "비어있을 때 꺼내려고 하는 상황이 없는지도 확인해."
         )
-    # unknown / 기타
     return (
         "먼저 입력이 무엇인지, 출력이 무엇인지 한 줄로 다시 적어봐. "
         "작은 예시 1개로 손으로 과정을 따라가며 중간 값이 어떻게 바뀌는지 확인해. "
@@ -225,14 +243,16 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
     problem_desc = _trunc(str(pi.get("description") or ""), 900)
     latest_code = _trunc(latest_code, 1200)
 
-    is_curriculum = _is_curriculum_problem(pi)
+    raw_algo = str(pi.get("algorithm") or "").strip()
+
+    # ✅ problem_type 없이 algorithm으로 커리큘럼 모드 판단
+    is_curriculum = _is_curriculum_by_algorithm(raw_algo)
+
     q_type = _classify_user_question(user_q)
 
-    raw_algo = str(pi.get("algorithm") or "").strip()
     algo_norm = _normalize_algorithm(raw_algo)
     algo_disp = _algo_display_name(algo_norm, raw_algo)
 
-    # 커리큘럼+HOW면 템플릿을 "강제 참고"로 제공(출력 안정화)
     curriculum_how_template = ""
     if is_curriculum and q_type == "HOW":
         curriculum_how_template = _curriculum_how_template(algo_norm)
@@ -287,7 +307,7 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
   - 힌트는 더 자세히(하지만 정답/완성코드는 금지) 설명해야 한다.
   - hint_style은 DIRECTIVE를 우선으로 선택한다.
   - {algo_disp} 관점에서 "어떤 순서로 생각하면 되는지"를 알려준다.
-  - 가능하면 간단한 메서드/동작을 쉬운 말로 설명한다(예: 넣기/빼기/앞에서 꺼내기/조건 비교).
+  - 가능하면 간단한 동작을 쉬운 말로 설명한다(예: 입력 받기/출력하기/조건 비교/반복하기).
 
 [HOW 질문 템플릿 고정 규칙]
 - is_curriculum=true AND q_type=HOW 이면:
@@ -332,7 +352,6 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
 
 [문제 정보]
 - 난이도(1~5): {pi.get("difficulty")}
-- problem_type: {pi.get("problem_type") or "(없음)"}
 - algorithm_raw: {raw_algo if raw_algo else "(없음)"}
 - algorithm_norm: {algo_norm}
 - algorithm_hint: {algo_disp}
