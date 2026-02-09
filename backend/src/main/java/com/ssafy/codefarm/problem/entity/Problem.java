@@ -3,7 +3,6 @@ package com.ssafy.codefarm.problem.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 
@@ -69,7 +68,11 @@ public class Problem {
     @Enumerated(EnumType.STRING)
     private ProblemType problemType;
 
-    @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+    }
 }

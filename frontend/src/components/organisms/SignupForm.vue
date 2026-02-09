@@ -613,7 +613,7 @@ const checkEmail = async () => {
     
     emailCheckStatus.value = isAvailable ? 'available' : 'duplicate'
   } catch (error) {
-    console.error('이메일 중복 확인 실패:', error)
+    // console.error('이메일 중복 확인 실패:', error)
     emailCheckStatus.value = ''
     // 에러 발생 시 상태 초기화 (사용자가 다시 시도할 수 있도록)
   } finally {
@@ -663,7 +663,7 @@ const checkNickname = async () => {
     
     nicknameCheckStatus.value = isAvailable ? 'available' : 'duplicate'
   } catch (error) {
-    console.error('닉네임 중복 확인 실패:', error)
+    // console.error('닉네임 중복 확인 실패:', error)
     nicknameCheckStatus.value = ''
     // 에러 발생 시 상태 초기화 (사용자가 다시 시도할 수 있도록)
   } finally {

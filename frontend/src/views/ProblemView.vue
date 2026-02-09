@@ -147,7 +147,7 @@ const loadProblem = async () => {
     // userStatus = data.userStatus
     // statistics = data.statistics
   } catch (error) {
-    console.error('문제를 불러오는 중 오류가 발생했습니다:', error)
+    // console.error('문제를 불러오는 중 오류가 발생했습니다:', error)
     // TODO: 에러 처리 UI 추가
   }
 }

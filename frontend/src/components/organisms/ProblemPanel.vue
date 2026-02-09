@@ -290,7 +290,7 @@ const loadProblem = async () => {
     problem.value = data.problem
     emit('problem-loaded', data.problem)
   } catch (error) {
-    console.error('문제를 불러오는 중 오류가 발생했습니다:', error)
+    // console.error('문제를 불러오는 중 오류가 발생했습니다:', error)
     problem.value = null
   } finally {
     problemLoading.value = false

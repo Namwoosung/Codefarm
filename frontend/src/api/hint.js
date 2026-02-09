@@ -135,11 +135,11 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
       if (!ac.signal.aborted) ac.abort()
     }, HINT_SSE_TIMEOUT_MS)
 
-    if (reconnectAttempts > 0) {
-      console.log(`[SSE] 재연결 시도 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) sessionId=${sessionId}`)
-    } else {
-      console.log(`[SSE] 연결 시작 sessionId=${sessionId}`)
-    }
+    // if (reconnectAttempts > 0) {
+    //   console.log(`[SSE] 재연결 시도 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) sessionId=${sessionId}`)
+    // } else {
+    //   console.log(`[SSE] 연결 시작 sessionId=${sessionId}`)
+    // }
 
     fetch(url, { signal: ac.signal, headers })
       .then((res) => {
@@ -147,7 +147,7 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
         if (aborted) return
         if (!res.ok) {
           const status = res.status
-          console.warn(`[SSE] HTTP ${status} sessionId=${sessionId}`)
+          // console.warn(`[SSE] HTTP ${status} sessionId=${sessionId}`)
           if (FATAL_STATUS_CODES.includes(status)) {
             reportError({ status, fatal: true })
             return
@@ -155,7 +155,7 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
           reportError({ status })
           return
         }
-        console.log(`[SSE] 연결 성공 sessionId=${sessionId}`)
+        // console.log(`[SSE] 연결 성공 sessionId=${sessionId}`)
         reconnectAttempts = 0
 
         const reader = res.body.getReader()
@@ -166,14 +166,14 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
             try {
               const data = ev.data ? JSON.parse(ev.data) : null
               if (ev.event === 'CONNECTED' && callbacks.onConnected) {
-                console.log('[SSE] CONNECTED 이벤트 수신', data)
+                // console.log('[SSE] CONNECTED 이벤트 수신', data)
                 callbacks.onConnected(data)
               } else if (ev.event === 'AUTO_HINT' && callbacks.onAutoHint) {
-                console.log('[SSE] AUTO_HINT 이벤트 수신', data)
+                // console.log('[SSE] AUTO_HINT 이벤트 수신', data)
                 callbacks.onAutoHint(data)
               }
             } catch (e) {
-              console.warn('[SSE] 이벤트 파싱 실패', e)
+              // console.warn('[SSE] 이벤트 파싱 실패', e)
             }
           }
         })
@@ -184,7 +184,7 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
               if (aborted) return
               if (done) {
                 parser.reset?.({ consume: true })
-                console.log('[SSE] 스트림 종료, 재연결 대기 sessionId=', sessionId)
+                // console.log('[SSE] 스트림 종료, 재연결 대기 sessionId=', sessionId)
                 scheduleReconnect()
                 return
               }
@@ -194,7 +194,7 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
             })
             .catch((e) => {
               if (aborted || ac?.signal?.aborted) return
-              console.warn('[SSE] 스트림 읽기 오류', e?.message ?? e)
+              // console.warn('[SSE] 스트림 읽기 오류', e?.message ?? e)
               scheduleReconnect()
             })
         }
@@ -203,7 +203,7 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
       .catch((e) => {
         clearTimeout(timeoutId)
         if (aborted || ac?.signal?.aborted) return
-        console.warn('[SSE] fetch 오류', e?.message ?? e)
+        // console.warn('[SSE] fetch 오류', e?.message ?? e)
         scheduleReconnect()
       })
   }
@@ -211,12 +211,12 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
   const scheduleReconnect = () => {
     if (aborted) return
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      console.warn(`[SSE] 재연결 최대 횟수(${MAX_RECONNECT_ATTEMPTS}) 초과, 중단 sessionId=${sessionId}`)
+      // console.warn(`[SSE] 재연결 최대 횟수(${MAX_RECONNECT_ATTEMPTS}) 초과, 중단 sessionId=${sessionId}`)
       reportError({ fatal: true })
       return
     }
     reconnectAttempts++
-    console.log(`[SSE] ${RECONNECT_INTERVAL_MS / 1000}초 후 재연결 예정 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`)
+    // console.log(`[SSE] ${RECONNECT_INTERVAL_MS / 1000}초 후 재연결 예정 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`)
     reconnectTimeoutId = setTimeout(connect, RECONNECT_INTERVAL_MS)
   }
 
@@ -226,6 +226,6 @@ export function subscribeHintSSE(sessionId, callbacks = {}) {
     aborted = true
     stopReconnect()
     if (ac) ac.abort()
-    console.log('[SSE] 구독 해제 sessionId=', sessionId)
+    // console.log('[SSE] 구독 해제 sessionId=', sessionId)
   }
 }

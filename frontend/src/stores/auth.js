@@ -49,7 +49,7 @@ export const useAuthStore = defineStore('auth', () => {
     loading.value = true
     errCode.value = null
     errorMessage.value = null
-    console.log('login 호출')
+    // console.log('login 호출')
 
     // 로그인 전 이전 유저 데이터 초기화 (회원 전환 시 이전 정보 남는 문제 방지)
     try {
@@ -65,16 +65,16 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = data.token?.accessToken ?? data.accessToken ?? null
       if (token.value) localStorage.setItem('token', token.value)
       if (user.value) localStorage.setItem('user', JSON.stringify(user.value))
-      console.log('토큰 저장 완료')
+      // console.log('토큰 저장 완료')
         return res.data
     } catch (err) {
       errCode.value = err?.response?.data?.errorCode ?? null
       errorMessage.value = err?.response?.data?.message ?? null
-      console.log('login 실패', err)
+      // console.log('login 실패', err)
       throw err
     } finally {
       loading.value = false
-      console.log('login 완료')
+      // console.log('login 완료')
     }
   }
 

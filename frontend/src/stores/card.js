@@ -23,7 +23,7 @@ export const useCardStore = defineStore('card', () => {
       cards.value = (Array.isArray(raw) ? raw : Object.values(raw)).map(normalizeCard).filter(Boolean)
       cardsFetched.value = true
     } catch (err) {
-      console.warn('[card.cardList] failed:', err?.response?.status, err?.response?.data ?? err)
+      // console.warn('[card.cardList] failed:', err?.response?.status, err?.response?.data ?? err)
     }
   }
 
@@ -38,7 +38,7 @@ export const useCardStore = defineStore('card', () => {
             const drawnCard = normalizeCard(payload)
             if (drawnCard) cards.value = [...cards.value, { ...drawnCard, count: 1 }]
             drawMessage.value = '새 카드가 도감에 추가되었습니다!'
-            console.log('새 카드가 도감에 추가되었습니다!')
+            // console.log('새 카드가 도감에 추가되었습니다!')
         } else {
             const drawnCard = normalizeCard(payload)
             if (drawnCard) {
@@ -60,10 +60,10 @@ export const useCardStore = defineStore('card', () => {
               }
             }
             drawMessage.value = '이미 보유 중인 카드입니다.'
-            console.log('이미 보유 중인 카드입니다.')
+            // console.log('이미 보유 중인 카드입니다.')
         }
     } catch (err) {
-        console.warn('[card.cardDraw] failed:', err?.response?.status, err?.response?.data ?? err)
+        // console.warn('[card.cardDraw] failed:', err?.response?.status, err?.response?.data ?? err)
     }
   }
 
@@ -72,7 +72,7 @@ export const useCardStore = defineStore('card', () => {
       const res = await getCardRankings()
       rankingList.value = res.data.data?.topCollectors
     } catch (err) {
-      console.warn('[card.ranking] failed:', err?.response?.status, err?.response?.data ?? err)
+      // console.warn('[card.ranking] failed:', err?.response?.status, err?.response?.data ?? err)
     }
   }
 
