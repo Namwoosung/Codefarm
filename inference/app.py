@@ -74,7 +74,7 @@ def log_error(event: str, **fields):
 # Load env
 # ============================================================
 # NOTE: Windows 로컬에서도 동작하게 find_dotenv 우선
-load_dotenv(find_dotenv("./srv/app/app/.env"))
+load_dotenv(find_dotenv("/srv/app/app/.env"))
 
 REPORT_SERVER_TOKEN = os.getenv("REPORT_SERVER_TOKEN", "")
 REQUIRE_SERVER_TOKEN = os.getenv("REQUIRE_SERVER_TOKEN", "0") == "1"
