@@ -32,7 +32,7 @@ from utils.prompt_builder import (
     dedup_labels,
 )
 from utils.prompt import build_gms_messages
-from utils.json_utils import parse_json, has_banned_text  # ✅ A안: hint_content만 금지어 검사
+from utils.json_utils import parse_json, has_banned 
 
 
 # ============================================================
