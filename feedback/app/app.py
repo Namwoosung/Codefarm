@@ -1,23 +1,16 @@
-# index.py  (A안: 1회 호출 + 안정 fallback + 과정 중심 + previous_judgement 원문 비노출 + AI 사용 점검 규칙
-#          + "실수 요약(1~2문장)" 섹션 + JSON 응답(섹션 분리) → 서버에서 마크다운 조립)
-#
-# 완화(UX 강제 최소화):
-# - Bold 강제 제거(프롬프트/정책검사)
-# - 헤더/불릿 개수 강제 제거(보안/형식 최소 체크만 유지)
-# - title은 서버에서 고정(모델 title 흔들림 방지)
-# - postprocess() 중복 정의 제거(1개만 유지)
-#
-# 강화 사항(기존 유지):
-# - MAX_COMPLETION_TOKENS 기본값 320(ENV 없으면), 최소 180
-# - response_format(json_object) 지원 시 강제(ENV: USE_RESPONSE_FORMAT=1/0)
-# - JSON 파싱 실패를 명확히 감지(JSON_PARSE_ERROR)하여 즉시 fallback
-# - RETURN_RAW=1이면: GMS 최초 raw(content) 그대로 반환 + 캐시/검열/후처리/폴백 우회
+# index.py  (완화 캐시 적용 버전)
+# 핵심 변경점:
+# 1) 캐시 키를 "슬라이스 기반" -> "전체 해시 기반(Strict)"으로 변경하여
+#    '비슷한 요청'이 아니라 '사실상 동일한 요청'에서만 캐시 HIT가 나도록 완화.
+# 2) 캐시 스코프를 사용자 단위로 분리(user.id 포함)하여 사용자 간 피드백 섞임 방지.
+# 3) (선택) TTL 도입: CACHE_TTL_SEC 초가 지나면 캐시 무효화(기본 10분).
 
 import os
 import re
 import json
+import time
 import hashlib
-from typing import Optional, Literal, Dict, Any, List
+from typing import Optional, Literal, Dict, Any, List, Tuple
 
 import httpx
 from fastapi import FastAPI, HTTPException, Header
@@ -42,36 +35,38 @@ HTTP_TIMEOUT = httpx.Timeout(
 
 MAX_FEEDBACK_CHARS = int(os.getenv("MAX_FEEDBACK_CHARS", "260"))
 
-# ✅ 기본값 상향(ENV 없으면 320)
 MAX_COMPLETION_TOKENS = int(os.getenv("MAX_COMPLETION_TOKENS", "320"))
 if MAX_COMPLETION_TOKENS < 180:
     MAX_COMPLETION_TOKENS = 180
 
 DEBUG_LOG = os.getenv("DEBUG_LOG", "1") == "1"
 
+# ✅ 완화 캐시 설정
+CACHE_ENABLED = os.getenv("CACHE_ENABLED", "1") == "1"
 CACHE_SIZE = int(os.getenv("CACHE_SIZE", "512"))
+CACHE_TTL_SEC = int(os.getenv("CACHE_TTL_SEC", "600"))  # 기본 10분
+# TTL을 끄고 싶으면 0으로
+if CACHE_TTL_SEC < 0:
+    CACHE_TTL_SEC = 0
 
 TRUNC_PROBLEM_DESC = int(os.getenv("TRUNC_PROBLEM_DESC", "450"))
 TRUNC_IO_DESC = int(os.getenv("TRUNC_IO_DESC", "200"))
 TRUNC_CODE = int(os.getenv("TRUNC_CODE", "900"))
 
-# 과정 중심: previous_judgement 많이 사용하되 "원문 노출 금지"
 PREV_LIMIT = int(os.getenv("PREV_LIMIT", "12"))
 PROCESS_BULLET_LIMIT = int(os.getenv("PROCESS_BULLET_LIMIT", "8"))
 
-# ✅ 추가 규칙: 3분 이하 풀이시간이면 AI 사용 여부 점검
 SUS_SOLVE_TIME_SEC = int(os.getenv("SUS_SOLVE_TIME_SEC", "180"))
 
-# ✅ 원본 확인 모드
 RETURN_RAW = os.getenv("RETURN_RAW", "0") == "1"
-
-# ✅ response_format(json_object) 사용 여부 (지원 시)
 USE_RESPONSE_FORMAT = os.getenv("USE_RESPONSE_FORMAT", "1") == "1"
 
-app = FastAPI(title="Report Feedback Server", version="2.4.3")
+app = FastAPI(title="Report Feedback Server", version="2.4.3-relaxed-cache")
 
 _http_client: Optional[httpx.AsyncClient] = None
-_cache: Dict[str, str] = {}
+
+# ✅ 캐시: key -> (value, created_at_epoch)
+_cache: Dict[str, Tuple[str, float]] = {}
 _cache_order: List[str] = []
 
 
@@ -279,7 +274,6 @@ def _keep_from_first_heading(text: str) -> str:
 
 
 def _strip_forbidden_terms_keep_lines(text: str) -> str:
-    # ✅ 줄바꿈 보존 + 라인 단위 토큰 제거
     text = text.replace("SUCCESS", "정답으로 통과").replace("GIVE_UP", "오류가 발생")
 
     lines = text.splitlines()
@@ -319,7 +313,6 @@ def postprocess(text: str) -> str:
 
 
 def policy_violation_reason(text: str) -> Optional[str]:
-    # ✅ UX 강제 최소화: 보안/형식 최소 체크만
     if not (text or "").strip():
         return "EMPTY"
     if len(text) > MAX_FEEDBACK_CHARS:
@@ -327,11 +320,9 @@ def policy_violation_reason(text: str) -> Optional[str]:
     if "```" in text or "`" in text:
         return "CODE_FORMAT"
 
-    # 원문 로그/영문 덩어리 방지(보안/UX)
     if ASCII_HEAVY_RE.search(text):
         return "RAW_LOG_LEAK"
 
-    # 내부 토큰/라벨 누출 방지(보안)
     for tok in FORBIDDEN_TOKENS:
         if tok and tok in text:
             return "INTERNAL_TERM_LEAK"
@@ -439,7 +430,7 @@ def build_integrity_hint(req: FeedbackRequest) -> Optional[str]:
 
 
 # =========================
-# Fallback (mistake_summary가 비어도 동작)
+# Fallback
 # =========================
 def fallback_feedback(mistake_summary: List[str], rt: str, integrity_hint: Optional[str]) -> str:
     if rt == "SUCCESS":
@@ -472,32 +463,91 @@ def fallback_feedback(mistake_summary: List[str], rt: str, integrity_hint: Optio
 
 
 # =========================
-# Cache
+# ✅ 완화 캐시(Strict key + TTL + user scope)
 # =========================
+def _sha256_text(s: str) -> str:
+    return hashlib.sha256((s or "").encode("utf-8")).hexdigest()
+
+
 def make_cache_key(req: FeedbackRequest) -> str:
+    """
+    완화 캐시(=보수적 캐시):
+    - '비슷한 요청'이 아니라 '사실상 동일한 요청'에서만 캐시 HIT가 나도록
+      슬라이스 대신 전체 해시를 사용.
+    - user.id 포함: 사용자 간 캐시 섞임 방지.
+    - problem description/input/output 포함: 같은 title이라도 내용이 다르면 MISS.
+    """
     pj_slice = req.previous_judgement[-PREV_LIMIT:]
     payload = {
-        "p": {"title": req.problem.title, "difficulty": req.problem.difficulty, "algo": req.problem.algorithm},
-        "u": {"lvl": req.user.coding_level, "age": req.user.age},
-        "c": (req.code.content or "")[:400],
+        "u": {"id": req.user.id, "lvl": req.user.coding_level, "age": req.user.age},
+        "p": {
+            "title": req.problem.title,
+            "difficulty": req.problem.difficulty,
+            "algo": req.problem.algorithm,
+            "desc_h": _sha256_text(req.problem.description),
+            "in_h": _sha256_text(req.problem.input_description),
+            "out_h": _sha256_text(req.problem.output_description),
+        },
+        "c": {
+            "lang": req.code.language,
+            "content_h": _sha256_text(req.code.content),
+            "len": len(req.code.content or ""),
+        },
         "r": {"type": req.result.resultType, "solveTime": req.result.solveTime},
-        "pj": [{"t": pj.judged_at, "a": (pj.analysis or "")[:120], "m": pj.mistake_type[:5]} for pj in pj_slice],
+        "pj": [
+            {
+                "t": pj.judged_at,
+                "analysis_h": _sha256_text(pj.analysis),
+                "m": sorted([str(x) for x in (pj.mistake_type or [])]),
+            }
+            for pj in pj_slice
+        ],
     }
     s = json.dumps(payload, ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
+def _cache_is_expired(created_at: float) -> bool:
+    if CACHE_TTL_SEC == 0:
+        return False
+    return (time.time() - created_at) > CACHE_TTL_SEC
+
+
 def _cache_get(key: str) -> Optional[str]:
-    return _cache.get(key)
+    if not CACHE_ENABLED:
+        return None
+    item = _cache.get(key)
+    if item is None:
+        return None
+    value, created_at = item
+    if _cache_is_expired(created_at):
+        # 만료된 항목 제거
+        _cache.pop(key, None)
+        try:
+            _cache_order.remove(key)
+        except ValueError:
+            pass
+        if DEBUG_LOG:
+            print(f"[CACHE EXPIRED] key={key[:8]}")
+        return None
+    return value
 
 
 def _cache_put(key: str, value: str) -> None:
-    if key in _cache:
-        _cache[key] = value
+    if not CACHE_ENABLED:
         return
-    _cache[key] = value
+
+    now = time.time()
+
+    if key in _cache:
+        _cache[key] = (value, now)
+        return
+
+    _cache[key] = (value, now)
     _cache_order.append(key)
-    if len(_cache_order) > CACHE_SIZE:
+
+    # 용량 초과 시 evict
+    while len(_cache_order) > CACHE_SIZE:
         old = _cache_order.pop(0)
         _cache.pop(old, None)
 
@@ -582,16 +632,16 @@ async def feedback(
         raise HTTPException(status_code=401, detail="Invalid server token")
 
     # -------------------------
-    # 2) Cache
+    # 2) Cache (완화 캐시: strict key + TTL + user scope)
     # -------------------------
     ck = make_cache_key(req)
 
     # 원본 확인 모드에서는 캐시 우회
-    if not RETURN_RAW:
+    if (not RETURN_RAW) and CACHE_ENABLED:
         cached = _cache_get(ck)
         if cached is not None:
             if DEBUG_LOG:
-                print(f"[CACHE HIT] request_id={req.request_id}")
+                print(f"[CACHE HIT] request_id={req.request_id} key={ck[:8]} ttl={CACHE_TTL_SEC}s")
             return {"request_id": req.request_id, "feedback": cached}
 
     # -------------------------
@@ -665,7 +715,6 @@ async def feedback(
     try:
         raw = await call_gms_once(gms_payload)
 
-        # ✅ 원본 확인 모드: 그대로 반환
         if RETURN_RAW:
             if DEBUG_LOG:
                 print("[RETURN_RAW=1] raw only")
