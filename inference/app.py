@@ -20,14 +20,20 @@ import httpx
 from fastapi import FastAPI, HTTPException, Path, Request
 from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 from utils.auth import verify_server_token
 from models.model1 import run_model1
 from models.model2 import run_model2
-from utils.prompt_builder import build_prompt, sanitize_payload_for_model2, is_known_label, dedup_labels
+from utils.prompt_builder import (
+    build_prompt,
+    sanitize_payload_for_model2,
+    is_known_label,
+    dedup_labels,
+)
 from utils.prompt import build_gms_messages
-from utils.json_utils import parse_json, has_banned
+from utils.json_utils import parse_json, has_banned_text  # ✅ A안: hint_content만 금지어 검사
+
 
 # ============================================================
 # Logging (request-scoped rid + JSON line logs)
@@ -67,7 +73,7 @@ def log_error(event: str, **fields):
 # ============================================================
 # Load env
 # ============================================================
-from dotenv import find_dotenv, load_dotenv
+# NOTE: Windows 로컬에서도 동작하게 find_dotenv 우선
 load_dotenv(find_dotenv("/srv/app/app/.env"))
 
 REPORT_SERVER_TOKEN = os.getenv("REPORT_SERVER_TOKEN", "")
@@ -80,7 +86,10 @@ GMS_API_KEY = os.getenv("GMS_API_KEY") or os.getenv("GMS_KEY")
 if not GMS_API_KEY:
     raise RuntimeError("GMS_API_KEY (or GMS_KEY) is missing in .env")
 
-GMS_CHAT_URL = os.getenv("GMS_CHAT_URL", "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions")
+GMS_CHAT_URL = os.getenv(
+    "GMS_CHAT_URL",
+    "https://gms.ssafy.io/gmsapi/api.openai.com/v1/chat/completions",
+)
 GMS_MODEL = os.getenv("GMS_MODEL", "gpt-4o-mini")
 GMS_TIMEOUT = float(os.getenv("GMS_TIMEOUT", "30.0"))
 
@@ -93,7 +102,7 @@ REQUEST_MAX_WAIT = float(os.getenv("REQUEST_MAX_WAIT", "30.0"))
 # ✅ GMS stage 분리 후: 별도 워커/큐 설정
 GMS_QUEUE_MAXSIZE = int(os.getenv("GMS_QUEUE_MAXSIZE", str(QUEUE_MAXSIZE)))
 GMS_WORKERS = int(os.getenv("GMS_WORKERS", "8"))
-GMS_ENQUEUE_TIMEOUT = float(os.getenv("GMS_ENQUEUE_TIMEOUT", "0.2"))  # ✅ 추가: gms 큐 put timeout
+GMS_ENQUEUE_TIMEOUT = float(os.getenv("GMS_ENQUEUE_TIMEOUT", "0.2"))
 
 MODEL1_TIMEOUT = float(os.getenv("MODEL1_TIMEOUT", "20.0"))
 MODEL2_TIMEOUT = float(os.getenv("MODEL2_TIMEOUT", "20.0"))
@@ -104,11 +113,8 @@ GMS_TEMPERATURE = float(os.getenv("GMS_TEMPERATURE", "0.4"))
 # ============================================================
 # p95/p99 Stabilizers (IMPORTANT)
 # ============================================================
-# ✅ GPU 동시 실행 제한: A100 80GB
 GPU_CONCURRENCY = int(os.getenv("GPU_CONCURRENCY", "2"))
 MODEL2_CONCURRENCY = int(os.getenv("MODEL2_CONCURRENCY", "2"))
-
-# ✅ GMS 동시성 제한(너무 높이면 p99/리페어율 악화 가능)
 GMS_CONCURRENCY = int(os.getenv("GMS_CONCURRENCY", str(GMS_WORKERS)))
 
 _gpu_sem = asyncio.Semaphore(max(1, GPU_CONCURRENCY))
@@ -120,7 +126,10 @@ _gms_sem = asyncio.Semaphore(max(1, GMS_CONCURRENCY))
 # App
 # ============================================================
 
-app = FastAPI(title="Hint Server (M1->M2(prompt)->GMS) v8-pipeline+p95p99", version="8.1.0")
+app = FastAPI(
+    title="Hint Server (M1->M2(prompt)->GMS) v8-pipeline+p95p99",
+    version="8.1.0",
+)
 
 
 # ============================================================
@@ -163,9 +172,10 @@ class HintRequest(BaseModel):
     user_question: Optional[str] = None
 
 
-# =========================
+# ============================================================
 # Response Schemas
-# =========================
+# ============================================================
+
 class CurrentJudgementOut(BaseModel):
     judged_at: str
     mistake_type: List[str]
@@ -333,12 +343,23 @@ async def auth_middleware(request: Request, call_next):
 
 # ============================================================
 # HTTP client (reused)
+# - Windows에서 http2=True 사용 시 h2 미설치로 ImportError 발생 가능
+# - 설치되어 있으면 http2, 아니면 http1.1로 fallback
 # ============================================================
 
 def _build_http_client() -> httpx.AsyncClient:
     limits = httpx.Limits(max_connections=200, max_keepalive_connections=50)
     timeout = httpx.Timeout(GMS_TIMEOUT, connect=min(10.0, GMS_TIMEOUT))
-    return httpx.AsyncClient(timeout=timeout, limits=limits, http2=True)
+
+    http2_enabled = False
+    try:
+        import h2  # noqa: F401
+        http2_enabled = True
+    except Exception:
+        http2_enabled = False
+
+    log_event("http_client_build", http2=http2_enabled)
+    return httpx.AsyncClient(timeout=timeout, limits=limits, http2=http2_enabled)
 
 
 # ============================================================
@@ -482,8 +503,6 @@ async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
     session_id = job.session_id
     log_event("pipeline_gms_start", session_id=session_id)
 
-    # ✅ problem_type=Curriculum이면, utils.prompt.build_gms_messages 내부에서 커리큘럼 프롬프트가 적용되도록
-    #    (gms_input.problem_information.problem_type 가 전달되어야 함)
     pi = (job.gms_input.get("problem_information") or {})
     log_event(
         "gms_prompt_mode",
@@ -499,23 +518,38 @@ async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
 
     try:
         obj = parse_json(raw)
-        if has_banned(obj):
-            raise ValueError("banned terms")
+
+        # ✅ A안(추천): 금지어 검사를 "hint_content"만 검사
+        hint_text = obj.get("hint_content", None)
+        if isinstance(hint_text, str) and hint_text.strip():
+            if has_banned_text(hint_text):
+                raise ValueError("banned terms in hint_content")
+
         log_event("gms_parse_ok")
     except Exception as e:
         log_error("gms_parse_fail", err=str(e), raw_head=(raw or "")[:400])
 
         repair_messages = messages + [
             {"role": "assistant", "content": raw},
-            {"role": "user", "content": "규칙을 어겼어. 금지 단어 없이, 아주 쉬운 말로, JSON만 다시 출력해줘."},
+            {
+                "role": "user",
+                "content": "규칙을 어겼어. 금지 단어 없이, 아주 쉬운 말로, JSON 하나만 다시 출력해줘.",
+            },
         ]
         raw2 = await gms_chat(repair_messages)
         log_event("gms_repair_raw_len", n=len(raw2 or ""))
 
         obj = parse_json(raw2)
-        if has_banned(obj):
-            log_error("gms_banned_after_repair", obj_head=str(obj)[:400])
-            raise HTTPException(status_code=500, detail="Banned terms still present after repair.")
+
+        # ✅ A안(추천): repair 후에도 hint_content만 검사
+        hint_text2 = obj.get("hint_content", None)
+        if isinstance(hint_text2, str) and hint_text2.strip():
+            if has_banned_text(hint_text2):
+                log_error("gms_banned_after_repair", obj_head=str(obj)[:400])
+                raise HTTPException(
+                    status_code=500,
+                    detail="Banned terms still present after repair (hint_content).",
+                )
 
         log_event("gms_repair_ok")
 
@@ -589,7 +623,13 @@ async def infer_worker_loop(worker_id: int):
         try:
             lock = await get_session_lock(job.session_id)
             async with lock:
-                log_event("job_start", worker_id=worker_id, session_id=job.session_id, stage="infer", qsize=infer_queue.qsize())
+                log_event(
+                    "job_start",
+                    worker_id=worker_id,
+                    session_id=job.session_id,
+                    stage="infer",
+                    qsize=infer_queue.qsize(),
+                )
                 m = await process_models(job.payload, job.session_id)
                 log_event("job_done", worker_id=worker_id, session_id=job.session_id, stage="infer")
 
@@ -608,14 +648,24 @@ async def infer_worker_loop(worker_id: int):
             except asyncio.TimeoutError:
                 log_error("enqueue_gms_timeout", session_id=job.session_id, qsize=gms_queue.qsize())
                 if not job.fut.done():
-                    job.fut.set_exception(HTTPException(status_code=429, detail="Too many requests (gms queue busy/full)"))
+                    job.fut.set_exception(
+                        HTTPException(status_code=429, detail="Too many requests (gms queue busy/full)")
+                    )
             except Exception as e:
                 log_error("enqueue_gms_fail", session_id=job.session_id, err=str(e))
                 if not job.fut.done():
-                    job.fut.set_exception(HTTPException(status_code=500, detail=f"Failed to enqueue gms job: {e}"))
+                    job.fut.set_exception(
+                        HTTPException(status_code=500, detail=f"Failed to enqueue gms job: {e}")
+                    )
 
         except HTTPException as he:
-            log_error("job_fail", worker_id=worker_id, session_id=job.session_id, stage="infer", err=str(he.detail))
+            log_error(
+                "job_fail",
+                worker_id=worker_id,
+                session_id=job.session_id,
+                stage="infer",
+                err=str(he.detail),
+            )
             if not job.fut.done():
                 job.fut.set_exception(he)
         except Exception as e:
@@ -636,7 +686,13 @@ async def gms_worker_loop(worker_id: int):
                 job.fut.set_result(result)
 
         except HTTPException as he:
-            log_error("job_fail", worker_id=worker_id, session_id=job.session_id, stage="gms", err=str(he.detail))
+            log_error(
+                "job_fail",
+                worker_id=worker_id,
+                session_id=job.session_id,
+                stage="gms",
+                err=str(he.detail),
+            )
             if not job.fut.done():
                 job.fut.set_exception(he)
         except Exception as e:
