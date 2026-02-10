@@ -14,8 +14,12 @@ BANNED_TERMS_GENERAL = [
     "시간복잡도", "빅오", "자료구조", "알고리즘"
 ]
 
+<<<<<<< HEAD
 # 커리큘럼 모드에서는 초보 설명에 필요한 말(예: 알고리즘/자료구조)을 과도하게 금지하면 설명이 막힘
 # => 커리큘럼 모드에서는 불필요한 전문 최적화 용어만 제한
+=======
+# 커리큘럼 모드에서는 불필요한 전문 최적화 용어만 제한
+>>>>>>> 1e6114e (fix(ai) : correct inference propmpt & banned policy)
 BANNED_TERMS_CURRICULUM = [
     "빅오", "시간복잡도", "최적화"
 ]
@@ -221,6 +225,58 @@ def _curriculum_how_template(algo_norm: str) -> str:
     )
 
 # =========================
+# Code-history summarizer (NEW)
+# =========================
+
+_WS_RE = re.compile(r"\s+")
+_PUNCT_RE = re.compile(r"[^\w가-힣]+")
+
+def _looks_incomplete(code: str) -> bool:
+    code = (code or "").rstrip()
+    if not code:
+        return False
+    tail = code.splitlines()[-1].rstrip() if code.splitlines() else ""
+    if not tail:
+        return False
+    return tail.endswith((":","(","[","{","\\",","))
+
+def _summarize_code_history(code_history: List[Dict[str, Any]], last_k: int = 5) -> str:
+    """
+    code_history 전체를 길게 주지 않고, '무엇이 빠졌는지/어디서 멈췄는지'를 판단할 신호만 제공.
+    """
+    if not isinstance(code_history, list) or not code_history:
+        return "NO_CODE"
+
+    recent = [x for x in code_history[-last_k:] if isinstance(x, dict)]
+    if not recent:
+        return "NO_CODE"
+
+    codes = [(r.get("code") or "") for r in recent]
+    last_code = (codes[-1] or "").strip()
+    nonempty_cnt = sum(1 for c in codes if (c or "").strip())
+
+    has_input = "input(" in last_code
+    has_print = "print(" in last_code
+    has_split = ".split(" in last_code
+    has_int_cast = "int(" in last_code or "map(int" in last_code
+    has_if = "if " in last_code
+    has_for = "for " in last_code
+    has_while = "while " in last_code
+
+    incomplete = _looks_incomplete(last_code)
+
+    lens = [len((c or "").strip()) for c in codes]
+    stagnant = (len(lens) >= 2) and ((max(lens) - min(lens)) <= 20)
+
+    return (
+        "CODE_HISTORY_SUMMARY: "
+        f"snapshots={len(recent)}, nonempty={nonempty_cnt}, "
+        f"has_input={has_input}, has_print={has_print}, has_split={has_split}, has_int_cast={has_int_cast}, "
+        f"has_if={has_if}, has_for={has_for}, has_while={has_while}, "
+        f"looks_incomplete={incomplete}, stagnant={stagnant}, last_len={len(last_code)}"
+    )
+
+# =========================
 # Main builder
 # =========================
 
@@ -234,14 +290,20 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
     cj = gms_input.get("current_judgement", {}) or {}
 
     latest_code = ""
+    prev_code = ""
     if isinstance(code_history, list) and code_history:
         last = code_history[-1] or {}
         if isinstance(last, dict):
             latest_code = (last.get("code") or "")
+        if len(code_history) >= 2 and isinstance(code_history[-2], dict):
+            prev_code = (code_history[-2].get("code") or "")
 
     prev_hints = _extract_prev_hints(prev, limit=5)
     problem_desc = _trunc(str(pi.get("description") or ""), 900)
     latest_code = _trunc(latest_code, 1200)
+    prev_code = _trunc(prev_code, 600)
+
+    code_history_summary = _summarize_code_history(code_history, last_k=5)
 
     raw_algo = str(pi.get("algorithm") or "").strip()
 
@@ -300,6 +362,22 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
   - 중복 판단을 절대 하지 마(이전 힌트와 비슷해도 무조건 새 힌트 제공)
   - hint_content는 반드시 null이 아니어야 함
   - dedup_reason는 "" 로 비워
+
+[코드 기반 힌트 규칙 - 매우 중요]
+- 반드시 code_history/현재 코드/직전 코드를 먼저 보고, "지금 빠진 게 뭐인지"를 찾아서 말해.
+- 힌트는 아래 중 최소 1가지를 꼭 포함해야 해:
+  (1) 다음에 추가하면 좋은 코드 단계(예: 입력 받기 → 변수에 저장 → 조건/반복 처리 → 출력)
+  (2) 입력/출력 형식에서 빠진 것 같다는 점검(예: 줄바꿈/띄어쓰기/YES NO 철자/출력 개수)
+  (3) 코드가 중간에 끊긴 것 같다는 경고(예: 괄호/콜론/들여쓰기/print 누락)
+- "뭔가 빠진 것 같지 않아?" 같은 말투는 허용하지만, 공격적으로 말하면 안 돼.
+- 정답/완성코드는 금지. 대신 "다음에 뭘 먼저 써야 할지"를 행동 단위로 안내해.
+
+[입력/출력 실수 탐지 우선순위(io/초급)]
+- algorithm_norm이 io/condition/loop이면, 가장 먼저 아래를 의심해:
+  1) 입력을 덜 받았거나(필요한 개수보다 적게 input)
+  2) int 변환/분리(split)가 빠졌거나
+  3) 출력 형식(띄어쓰기/줄바꿈/문자 정확도)이 예시와 다르거나
+- 위 3개 중 가장 가능성 큰 1개를 골라 힌트로 말해.
 
 [커리큘럼 특별 규칙 - 매우 중요]
 - is_curriculum=true 이고, 학생 질문이 있고(q_type이 HOW/CONCEPT 중 하나)라면:
@@ -371,6 +449,12 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
 
 [학생 질문(user_question)]
 {user_q if user_q else "(질문 없음)"}
+
+[코드 진행 요약(code_history)]
+{code_history_summary}
+
+[직전 코드(바로 전 스냅샷)]
+{prev_code if prev_code else "(없음)"}
 
 [현재 코드]
 {latest_code if latest_code else "(아직 코드가 없음)"}
