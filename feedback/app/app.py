@@ -183,12 +183,7 @@ def load_extra_labels() -> List[str]:
 EXTRA_LABELS = load_extra_labels()
 FORBIDDEN_TOKENS = set(INTERNAL_TOKENS_BASE) | set(LABEL_MAP.keys()) | set(EXTRA_LABELS)
 LABEL_LIKE_PATTERN = re.compile(r"\b[A-Z][A-Za-z0-9]*_(?:[A-Za-z0-9]+_?)+\b")
-IGNORED_LABELS = {
-    "Input_T_MissingOrWrong",
-    "NoCode_AfterMistake",
-    "NoCode_AfterNoIssue",
-    "NoCode_Persistent",
-}
+
 
 def explain_label_student_friendly(label: str) -> str:
     return LABEL_MAP.get(label, "기본 규칙(입력/출력/조건)을 확인하는 과정에서 작은 실수가 있었어")
@@ -198,8 +193,6 @@ def summarize_labels_student_friendly(prev: List["PreviousJudgement"], limit: in
     out: List[str] = []
     for pj in prev:
         for lab in (pj.mistake_type or []):
-            if lab in IGNORED_LABELS:
-                continue
             out.append(explain_label_student_friendly(str(lab)))
     seen = set()
     uniq = []
@@ -248,6 +241,18 @@ Rules:
 - next_actions.items: exactly 2 short action sentences.
 - Do NOT include markdown in content strings.
 - Keep it concise for a student.
+
+LABEL OVERRIDE:
+
+- Ignore any mistake types, labels, or predefined error categories.
+- Do NOT classify or name error types.
+- Do NOT infer feedback from labels or label-derived summaries.
+
+Instead:
+- Judge directly from the student's code, the problem description, and the overall context.
+- Describe what the code currently does and where the reasoning flow may be unclear or interrupted.
+- Focus on observable behavior in the code, not on predefined mistake categories.
+
 """.strip()
 
 
