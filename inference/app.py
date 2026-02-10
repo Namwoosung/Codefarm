@@ -32,7 +32,7 @@ from utils.prompt_builder import (
     dedup_labels,
 )
 from utils.prompt import build_gms_messages
-from utils.json_utils import parse_json, has_banned_text  # ✅ A안: hint_content만 금지어 검사
+from utils.json_utils import parse_json, has_banned 
 
 
 # ============================================================
@@ -522,7 +522,7 @@ async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
         # ✅ A안(추천): 금지어 검사를 "hint_content"만 검사
         hint_text = obj.get("hint_content", None)
         if isinstance(hint_text, str) and hint_text.strip():
-            if has_banned_text(hint_text):
+            if has_banned(hint_text):
                 raise ValueError("banned terms in hint_content")
 
         log_event("gms_parse_ok")
@@ -544,7 +544,7 @@ async def process_gms_stage(job: GmsJob) -> Dict[str, Any]:
         # ✅ A안(추천): repair 후에도 hint_content만 검사
         hint_text2 = obj.get("hint_content", None)
         if isinstance(hint_text2, str) and hint_text2.strip():
-            if has_banned_text(hint_text2):
+            if has_banned(hint_text2):
                 log_error("gms_banned_after_repair", obj_head=str(obj)[:400])
                 raise HTTPException(
                     status_code=500,
