@@ -691,6 +691,7 @@ async def feedback(
                     "- result/think_next/next_actions를 반드시 채워.\n"
                     "- think_next.content는 mistake_summary를 바탕으로 '지금까지 자주 실수한 부분'을 1~2문장으로.\n"
                     "- mistake_summary가 비어 있으면 integrity_hint로 대체.\n"
+                    "- 입력/초기화/예외 처리 같은 일반적인 조언은 코드에 근거가 있을 때만 언급해.\n"
                     "- 원문 인용/영문/로그/내부 라벨 금지.\n\n"
                     + json.dumps(llm_payload, ensure_ascii=False)
                 ),
