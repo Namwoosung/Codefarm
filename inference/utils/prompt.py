@@ -186,10 +186,11 @@ def _algo_display_name(algo_norm: str, raw_algo: str) -> str:
 def _curriculum_how_template(algo_norm: str) -> str:
     if algo_norm == "io":
         return (
-            "입력에서 어떤 값을 몇 개 받는지부터 순서대로 적어봐. "
-            "그 값을 그대로 출력하는지, 아니면 모양(띄어쓰기/줄바꿈)을 바꿔서 출력하는지 확인해. "
-            "예시 입력을 넣었을 때 출력이 예시 출력과 똑같이 나오는지 마지막에 비교해."
+            "input()으로 받은 값은 한 줄 문자열이야. "
+            "그대로 map(int, input())을 쓰면 글자 하나씩 숫자로 바뀔 수 있어. "
+            "공백을 기준으로 나누는 과정이 필요한지 코드에서 다시 확인해봐."
         )
+
     if algo_norm == "condition":
         return (
             "먼저 어떤 경우에 A를, 어떤 경우에 B를 출력해야 하는지 조건을 2~3개로 나눠 적어봐. "
