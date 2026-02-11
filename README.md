@@ -20,6 +20,9 @@
 ---
 
 ## 🔎 목차
+
+<div align="center">
+
 - [🙌 팀원 구성](#-팀원-구성)
 - [🪄 기술 스택](#-기술-스택)
 - [🛠️ 아키텍처](#-아키텍처)
@@ -29,6 +32,8 @@
 - [🖼️ 화면 설계서](#-화면-설계서)
 - [🗄️ ERD](#-ERD)
 - [🗓️ Jira Issues](#-Jira-Issues)
+
+</div>
 
 ---
 
@@ -94,7 +99,10 @@
 
 ## 🪄 기술 스택
 
+<div align="center">
+
 ### 🫡 Frontend
+
 <img src="https://img.shields.io/badge/html5-badge?style=for-the-badge&logo=html5&logoColor=white&color=%23E34F26"/>
 <img src="https://img.shields.io/badge/css-badge?style=for-the-badge&logo=css&logoColor=white&color=%23663399"/>
 <img src="https://img.shields.io/badge/javascript-badge?style=for-the-badge&logo=javascript&logoColor=white&color=%23F7DF1E"/>
@@ -122,6 +130,66 @@
 <img src="https://img.shields.io/badge/prometheus-badge?style=for-the-badge&logo=prometheus&logoColor=white&color=%23E6522C"/>
 <img src="https://img.shields.io/badge/grafana-badge?style=for-the-badge&logo=grafana&logoColor=white&color=%23F46800"/>
 
+<table>
+  <tr>
+    <th>Category</th>
+    <th>Specification</th>
+  </tr>
+  <tr>
+    <td><b>Instance Type</b></td>
+    <td>AWS EC2 t2.xlarge</td>
+  </tr>
+  <tr>
+    <td><b>CPU</b></td>
+    <td>4 vCPUs</td>
+  </tr>
+  <tr>
+    <td><b>RAM</b></td>
+    <td>16 GB</td>
+  </tr>
+  <tr>
+    <td><b>Storage</b></td>
+    <td>SSD 320 GB</td>
+  </tr>
+  <tr>
+    <td><b>Docker</b></td>
+    <td>29.1.5</td>
+  </tr>
+  <tr>
+    <td><b>Docker Compose</b></td>
+    <td>v2.25.0</td>
+  </tr>
+  <tr>
+    <td><b>CI/CD</b></td>
+    <td>GitLab CI/CD</td>
+  </tr>
+  <tr>
+    <td><b>CI Runner</b></td>
+    <td>Self-hosted GitLab Runner (Docker executor)</td>
+  </tr>
+  <tr>
+    <td><b>Nginx</b></td>
+    <td>nginx/1.29.5</td>
+  </tr>
+  <tr>
+    <td><b>K6</b></td>
+    <td>v1.5.0</td>
+  </tr>
+  <tr>
+    <td><b>Prometheus</b></td>
+    <td>3.9.1</td>
+  </tr>
+  <tr>
+    <td><b>Grafana</b></td>
+    <td>12.3.2</td>
+  </tr>
+  <tr>
+    <td><b>Webhook Handler</b></td>
+    <td>Python 3.11-slim, FastAPI 0.128.0, Uvicorn[standard] 0.40.0</td>
+  </tr>
+</table>
+
+
 ### 😀 Collaboration
 <img src="https://img.shields.io/badge/git-badge?style=for-the-badge&logo=git&logoColor=white&color=%23F05032"/>
 <img src="https://img.shields.io/badge/gitlab-badge?style=for-the-badge&logo=gitlab&logoColor=white&color=%23FC6D26"/>
@@ -129,11 +197,14 @@
 <img src="https://img.shields.io/badge/notion-badge?style=for-the-badge&logo=notion&logoColor=white&color=%23000000"/>
 <img src="https://img.shields.io/badge/jira-badge?style=for-the-badge&logo=jira&logoColor=white&color=%230052CC"/>
 
+</div>
 
 ## 🛠️ 아키텍처
 <img src="./assets/architecture.png"/>
 
 ## 📲 기능 구성
+
+<div align="center">
 
 | 모든 문제 | 커리큘럼 |
 | :---: | :---: |
@@ -154,6 +225,8 @@
 | 힌트 | 피드백 |
 | :---: | :---: |
 | ![hints](./assets/hints.png) | ![feedback](./assets/feedback.png) |
+
+</div>
 
 ## 📂 디렉터리 구조
 
