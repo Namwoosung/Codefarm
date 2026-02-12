@@ -26,9 +26,6 @@
 - [📲 기능 구성](#-기능-구성)
 - [📂 디렉터리 구조](#-디렉터리-구조)
 - [📦 프로젝트 산출물](#-프로젝트-산출물)
-- [🖼️ 화면 설계서](#-화면-설계서)
-- [🗄️ ERD](#-ERD)
-- [🗓️ Jira Issues](#-Jira-Issues)
 
 ---
 
@@ -39,25 +36,28 @@
     <td align="center">
       <img src="./assets/park_seoyeon.jpg" width="240" height="280" alt="park_seoyeon" />
       <br/>
+      <b>박서연</b>
       <ul>
-        <li>... 구현</li>
-        <li>... 구현</li>
+        <li>UI/UX 디자인 및 화면 설계</li>
+        <li>서비스 비주얼 및 인터페이스 디자인</li>
       </ul>
     </td>
     <td align="center">
       <img src="./assets/choi_yeonjae.jpg" width="240" height="280" alt="choi_yeonjae" />
       <br/>
+      <b>최연제</b>
       <ul>
-        <li>... 구현</li>
-        <li>... 구현</li>
+        <li>프론트엔드 전반(Vue.js, Vite, Pinia) 구현</li>
+        <li>IDE, 로드맵, 카드, 마이페이지, 힌트/피드백 UI 구현</li>
       </ul>
     </td>
     <td align="center">
       <img src="./assets/kim_minkyung.jpg" width="240" height="280" alt="kim_minkyung" />
       <br/>
+      <b>김민경</b>
       <ul>
-        <li>... 구현</li>
-        <li>... 구현</li>
+        <li>AI Inference 서버(FastAPI, PyTorch) 구현</li>
+        <li>코드 피드백 서버(Feedback API) 및 힌트 생성 기능 구현</li>
       </ul>
     </td>
   </tr>
@@ -66,25 +66,28 @@
     <td align="center">
       <img src="./assets/nam_woosung.jpg" width="240" height="280" alt="nam_woosung" />
       <br/>
+      <b>남우성</b>
       <ul>
-        <li>... 구현</li>
-        <li>... 구현</li>
+        <li>백엔드(Spring Boot) Session, Hint, User, Card, Curriculum 구현</li>
+        <li>Execution/Feedback 서버 연동 및 API 설계</li>
       </ul>
     </td>
     <td align="center">
       <img src="./assets/kim_hyeongtaek.jpg" width="240" height="280" alt="kim_hyeongtaek" />
       <br/>
+      <b>김형택</b>
       <ul>
-        <li>... 구현</li>
-        <li>... 구현</li>
+        <li>DevOps 인프라(GitLab CI/CD, Docker, Nginx) 전담 구축</li>
+        <li>프로젝트 총괄 및 배포 워크플로우 관리</li>
       </ul>
     </td>
     <td align="center">
       <img src="./assets/jeong_mungi.jpg" width="240" height="280" alt="jeong_mungi" />
       <br/>
+      <b>정문기</b>
       <ul>
-        <li>... 구현</li>
-        <li>... 구현</li>
+        <li>데이터 파트 담당 및 AI 영역 협업</li>
+        <li>AI Inference 서버 및 모델 로딩 최적화 구현</li>
       </ul>
     </td>
   </tr>
@@ -106,6 +109,45 @@
 <img src="https://img.shields.io/badge/vite-badge?style=for-the-badge&logo=vite&logoColor=white&color=%239135FF"/>
 <img src="https://img.shields.io/badge/cursor-badge?style=for-the-badge&logo=cursor&logoColor=white&color=%23000000"/>
 
+<table>
+  <tr>
+    <th>Category</th>
+    <th>Specification</th>
+  </tr>
+  <tr>
+    <td><b>Framework</b></td>
+    <td>Vue 3.5.26</td>
+  </tr>
+  <tr>
+    <td><b>Build Tool</b></td>
+    <td>Vite 7.3.0</td>
+  </tr>
+  <tr>
+    <td><b>State Management</b></td>
+    <td>Pinia 3.0.4</td>
+  </tr>
+  <tr>
+    <td><b>Router</b></td>
+    <td>Vue Router 4.6.4</td>
+  </tr>
+  <tr>
+    <td><b>CSS</b></td>
+    <td>Tailwind CSS 4.1.18, DaisyUI 5.5.14, SASS</td>
+  </tr>
+  <tr>
+    <td><b>Code Editor</b></td>
+    <td>Monaco Editor 0.55.1</td>
+  </tr>
+  <tr>
+    <td><b>UI Component</b></td>
+    <td>PrimeVue 4.5.4</td>
+  </tr>
+  <tr>
+    <td><b>Node.js</b></td>
+    <td>^20.19.0 || >=22.12.0</td>
+  </tr>
+</table>
+
 ### 🤓 Backend
 <img src="https://img.shields.io/badge/intellijidea-badge?style=for-the-badge&logo=intellijidea&logoColor=white&color=%23000000"/>
 <img src="https://img.shields.io/badge/springboot-badge?style=for-the-badge&logo=springboot&logoColor=white"/>
@@ -113,10 +155,80 @@
 <img src="https://img.shields.io/badge/postgresql-badge?style=for-the-badge&logo=postgresql&logoColor=white&color=%234169E1"/>
 <img src="https://img.shields.io/badge/redis-badge?style=for-the-badge&logo=redis&logoColor=white&color=%23FF4438"/>
 
+<table>
+  <tr>
+    <th>Category</th>
+    <th>Specification</th>
+  </tr>
+  <tr>
+    <td><b>Framework</b></td>
+    <td>Spring Boot 3.5.9</td>
+  </tr>
+  <tr>
+    <td><b>Java</b></td>
+    <td>Java 17</td>
+  </tr>
+  <tr>
+    <td><b>Build Tool</b></td>
+    <td>Gradle 8.x</td>
+  </tr>
+  <tr>
+    <td><b>Database</b></td>
+    <td>PostgreSQL</td>
+  </tr>
+  <tr>
+    <td><b>Cache</b></td>
+    <td>Redis (Spring Data Redis)</td>
+  </tr>
+  <tr>
+    <td><b>ORM</b></td>
+    <td>Spring Data JPA, QueryDSL 5.0.0</td>
+  </tr>
+  <tr>
+    <td><b>Auth</b></td>
+    <td>Spring Security, JJWT 0.11.5</td>
+  </tr>
+  <tr>
+    <td><b>HTTP Client</b></td>
+    <td>Spring WebFlux (WebClient)</td>
+  </tr>
+</table>
+
 ### 🧐 AI / Data
 <img src="https://img.shields.io/badge/fastapi-badge?style=for-the-badge&logo=fastapi&logoColor=white&color=%23009688"/>
 <img src="https://img.shields.io/badge/python-badge?style=for-the-badge&logo=python&logoColor=white&color=%233776AB"/>
 <img src="https://img.shields.io/badge/pytorch-badge?style=for-the-badge&logo=pytorch&logoColor=white&color=%23EE4C2C"/>
+
+<table>
+  <tr>
+    <th>Category</th>
+    <th>Specification</th>
+  </tr>
+  <tr>
+    <td><b>Framework</b></td>
+    <td>FastAPI 0.128.0</td>
+  </tr>
+  <tr>
+    <td><b>Runtime</b></td>
+    <td>Python 3.11, Uvicorn 0.40.0</td>
+  </tr>
+  <tr>
+    <td><b>Deep Learning</b></td>
+    <td>PyTorch 2.7.0 (CUDA 12.8), Transformers 4.56.2</td>
+  </tr>
+  <tr>
+    <td><b>LLM / Fine-tuning</b></td>
+    <td>PEFT 0.18.1, BitsAndBytes 0.49.1</td>
+  </tr>
+  <tr>
+    <td><b>Inference (힌트)</b></td>
+    <td>Label Classifier + Text Generation 모델</td>
+  </tr>
+  <tr>
+    <td><b>Feedback Server</b></td>
+    <td>FastAPI, httpx, GMS API 연동</td>
+  </tr>
+</table>
 
 ### 🥱 DevOps
 <img src="https://img.shields.io/badge/docker-badge?style=for-the-badge&logo=docker&logoColor=white&color=%232496ED"/>
@@ -1029,8 +1141,9 @@
 
 ## 📦 프로젝트 산출물
 
-## 🖼️ 화면 설계서
+### 🖼️ 화면 설계서
 
-## 🗄️ ERD
+### 🗄️ ERD
+![codefarm_erd](./assets/codefarm%20erd.png)
 
-## 🗓️ Jira Issues
+### 🗓️ Jira Issues
