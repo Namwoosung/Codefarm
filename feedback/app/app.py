@@ -241,6 +241,18 @@ Rules:
 - next_actions.items: exactly 2 short action sentences.
 - Do NOT include markdown in content strings.
 - Keep it concise for a student.
+
+LABEL OVERRIDE:
+
+- Ignore any mistake types, labels, or predefined error categories.
+- Do NOT classify or name error types.
+- Do NOT infer feedback from labels or label-derived summaries.
+
+Instead:
+- Judge directly from the student's code, the problem description, and the overall context.
+- Describe what the code currently does and where the reasoning flow may be unclear or interrupted.
+- Focus on observable behavior in the code, not on predefined mistake categories.
+
 """.strip()
 
 
