@@ -6,7 +6,7 @@
 
 <br/>
 
-- **개발 기간** : 2026.01.06 ~ 2026.02.13 **(6주)**
+- **개발 기간** : 2026.01.06 ~ 2026.02.13 **(3주)**
 - **플랫폼** : Web
 - **개발 인원** : 6명
 - **기관** : 삼성 청년 SW · AI 아카데미 14기
@@ -139,7 +139,6 @@
     <td><b>Code Editor</b></td>
     <td>Monaco Editor 0.55.1</td>
   </tr>
-  <tr>
     <td><b>Node.js</b></td>
     <td>^20.19.0 || >=22.12.0</td>
   </tr>
@@ -160,8 +159,12 @@
     <td>eventsource-parser 3.0.6 (힌트 스트리밍)</td>
   </tr>
   <tr>
+    <td><b>Lint / Format</b></td>
+    <td>ESLint 9.39.2, Prettier 3.8.1</td>
+  </tr>
+  <tr>
     <td><b>Animation / Effect</b></td>
-    <td>Vue Transition, page-flip 2.0.7, canvas-confetti 1.9.4</td>
+    <td>Vue Transition, Custom @keyframes, page-flip 2.0.7, canvas-confetti 1.9.4</td>
   </tr>
 </table>
 
