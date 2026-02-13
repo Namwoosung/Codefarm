@@ -198,6 +198,8 @@
 <img src="https://img.shields.io/badge/fastapi-badge?style=for-the-badge&logo=fastapi&logoColor=white&color=%23009688"/>
 <img src="https://img.shields.io/badge/python-badge?style=for-the-badge&logo=python&logoColor=white&color=%233776AB"/>
 <img src="https://img.shields.io/badge/pytorch-badge?style=for-the-badge&logo=pytorch&logoColor=white&color=%23EE4C2C"/>
+<img src="https://img.shields.io/badge/codellama-%23000000.svg?style=for-the-badge&logo=ollama&logoColor=white"/>
+
 
 <table>
   <tr>
@@ -210,23 +212,23 @@
   </tr>
   <tr>
     <td><b>Runtime</b></td>
-    <td>Python 3.11, Uvicorn 0.40.0</td>
+    <td>Uvicorn 0.40.0</td>
   </tr>
   <tr>
-    <td><b>Deep Learning</b></td>
-    <td>PyTorch 2.7.0 (CUDA 12.8), Transformers 4.56.2</td>
+    <td><b>Deep Learning Env</b></td>
+    <td>Python 3.11.9, PyTorch 2.7.0 (CUDA 12.8), Transformers 4.56.2</td>
   </tr>
   <tr>
-    <td><b>LLM / Fine-tuning</b></td>
-    <td>PEFT 0.18.1, BitsAndBytes 0.49.1</td>
+    <td><b>Fine-tuning</b></td>
+    <td>PEFT 0.18.1, BitsAndBytes 0.49.1, QLoRA</td>
   </tr>
   <tr>
     <td><b>Inference (힌트)</b></td>
-    <td>Label Classifier + Text Generation 모델</td>
+    <td>Label Classifier(CodeLlama 7B), Text Generation(CodeLlama 3B)</td>
   </tr>
   <tr>
     <td><b>Feedback Server</b></td>
-    <td>FastAPI, httpx, GMS API 연동</td>
+    <td>httpx, OpenAI API KEY(gpt-4o-mini)</td>
   </tr>
 </table>
 
