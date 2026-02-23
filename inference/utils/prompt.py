@@ -78,15 +78,21 @@ def _is_curriculum_by_algorithm(raw_algo: str) -> bool:
             return True
     return False
 
+# =========================
+# Question classification (OUTPUT 추가 + "출력"을 DEBUG에서 제거)
+# =========================
 def _classify_user_question(user_q: str) -> str:
     q = (user_q or "").strip()
     if not q:
         return "NONE"
 
+    output_kw = ["출력", "print", "어떻게 내", "어떻게 출력", "출력 방법"]
     how_kw = ["어떻게", "방법", "풀이", "설명", "알려", "풀어", "작성", "짜", "구현", "어케"]
     concept_kw = ["개념", "뜻", "차이", "왜", "원리", "무슨", "의미", "설명해줘"]
-    debug_kw = ["왜 안", "안돼", "오류", "에러", "틀려", "런타임", "출력", "입력", "테스트", "통과", "틀렸"]
+    debug_kw = ["왜 안", "안돼", "오류", "에러", "틀려", "런타임", "테스트", "통과", "틀렸"]
 
+    if any(k in q for k in output_kw):
+        return "OUTPUT"
     if any(k in q for k in how_kw):
         return "HOW"
     if any(k in q for k in concept_kw):
@@ -94,6 +100,11 @@ def _classify_user_question(user_q: str) -> str:
     if any(k in q for k in debug_kw):
         return "DEBUG"
     return "OTHER"
+
+def _is_output_question(user_q: str) -> bool:
+    q = (user_q or "").lower()
+    keywords = ["출력", "print", "어떻게 내", "어떻게 출력", "출력 방법"]
+    return any(k in q for k in keywords)
 
 # =========================
 # Algorithm name mapping (KR/EN -> normalized)
@@ -180,44 +191,51 @@ def _algo_display_name(algo_norm: str, raw_algo: str) -> str:
     return (raw_algo or "기본 규칙")
 
 # =========================
-# Curriculum HOW templates (short, stable)
+# Curriculum templates
 # =========================
-
 def _curriculum_how_template(algo_norm: str) -> str:
     if algo_norm == "io":
         return (
-            "입력에서 어떤 값을 몇 개 받는지부터 순서대로 적어봐. "
-            "그 값을 그대로 출력하는지, 아니면 모양(띄어쓰기/줄바꿈)을 바꿔서 출력하는지 확인해. "
-            "예시 입력을 넣었을 때 출력이 예시 출력과 똑같이 나오는지 마지막에 비교해."
+            "input()으로 받은 값은 한 줄 문자열이야. "
+            "map(int, input())처럼 쓰면 글자 하나씩 숫자로 바뀔 수 있어. "
+            "공백으로 나눈 뒤 숫자로 바꾸는 과정이 필요한지 확인해봐."
         )
     if algo_norm == "condition":
         return (
-            "먼저 어떤 경우에 A를, 어떤 경우에 B를 출력해야 하는지 조건을 2~3개로 나눠 적어봐. "
-            "그 다음 값들을 조건에 넣어보면서 어느 경우에 해당하는지 확인해. "
-            "마지막에 출력 글자(대소문자, 줄바꿈)가 문제랑 똑같은지 확인해."
+            "어떤 경우에 A를, 어떤 경우에 B를 출력해야 하는지 먼저 나눠 적어봐. "
+            "값을 조건에 하나씩 넣어보면서 어디에 해당하는지 확인해."
         )
     if algo_norm == "loop":
         return (
-            "반복이 몇 번 도는지(입력으로 N이나 T가 있는지) 먼저 확인해. "
-            "반복 안에서 해야 할 일을 한 줄로 정리한 뒤, 작은 예시로 1~2번만 손으로 따라가봐. "
-            "반복이 끝날 때 값이 초기화되어야 하는지도 점검해."
+            "반복이 몇 번 도는지 먼저 확인해. "
+            "작은 예시로 1~2번만 손으로 따라가보면 이해가 쉬워."
         )
     if algo_norm == "stack":
         return (
-            "값을 하나씩 보면서 0이 아니면 '쌓기', 0이면 '하나 되돌리기(빼기)'라고 생각해봐. "
-            "쌓아둔 게 비어있을 때 0이 나오면 그냥 넘어가야 하는지도 확인해. "
-            "끝나고 남은 것들을 합치거나 개수를 세면 돼."
+            "0이 아니면 쌓고, 0이면 하나 되돌린다고 생각해봐. "
+            "비어있을 때 0이 나오면 그냥 넘어가야 하는지도 확인해."
         )
     if algo_norm == "queue":
         return (
-            "먼저 들어온 것을 먼저 처리해야 하니, '앞에서 꺼내기' 순서를 지키는지 생각해봐. "
-            "값을 넣는 순서와 꺼내는 순서를 작은 예시로 직접 적어보면 실수가 줄어. "
-            "비어있을 때 꺼내려고 하는 상황이 없는지도 확인해."
+            "먼저 들어온 것을 먼저 처리해야 해. "
+            "작은 예시를 적어서 넣는 순서와 꺼내는 순서를 직접 확인해봐."
         )
     return (
-        "먼저 입력이 무엇인지, 출력이 무엇인지 한 줄로 다시 적어봐. "
-        "작은 예시 1개로 손으로 과정을 따라가며 중간 값이 어떻게 바뀌는지 확인해. "
-        "마지막 출력 형식이 문제 설명과 같은지도 점검해."
+        "입력이 무엇이고 출력이 무엇인지 한 줄로 다시 적어봐. "
+        "작은 예시 1개로 과정을 따라가며 확인해."
+    )
+
+def _curriculum_output_template_io() -> str:
+    return (
+        "출력은 print()로 할 수 있어. "
+        "리스트를 그대로 출력하면 대괄호([ ])가 같이 나올 수 있어. "
+        "값들만 문제에서 원하는 모양(공백/줄바꿈)으로 나오게 하려면 어떻게 출력해야 할지 생각해봐."
+    )
+
+def _curriculum_concept_template(algo_disp: str) -> str:
+    return (
+        f"{algo_disp}에서 가장 중요한 동작이 무엇인지 먼저 떠올려봐. "
+        "그 동작이 코드에서 어디에 있는지도 찾아보면 이해가 쉬워."
     )
 
 # =========================
@@ -253,12 +271,33 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
     algo_norm = _normalize_algorithm(raw_algo)
     algo_disp = _algo_display_name(algo_norm, raw_algo)
 
-    curriculum_how_template = ""
-    if is_curriculum and q_type == "HOW":
-        curriculum_how_template = _curriculum_how_template(algo_norm)
+    # =========================
+    # ✅ 커리큘럼 템플릿 선택 (출력 질문 최우선)
+    # =========================
+    curriculum_template = ""
+    curriculum_focus = "NONE"  # DEBUG용/설명용 표시만
+
+    if is_curriculum and user_q:
+        # 1) 출력 질문이면 "출력"에만 집중
+        if algo_norm == "io" and (q_type == "OUTPUT" or _is_output_question(user_q)):
+            curriculum_template = _curriculum_output_template_io()
+            curriculum_focus = "OUTPUT"
+
+        # 2) HOW 질문(일반 흐름)
+        elif q_type == "HOW":
+            curriculum_template = _curriculum_how_template(algo_norm)
+            curriculum_focus = "HOW"
+
+        # 3) CONCEPT 질문
+        elif q_type == "CONCEPT":
+            curriculum_template = _curriculum_concept_template(algo_disp)
+            curriculum_focus = "CONCEPT"
 
     banned_terms = BANNED_TERMS_CURRICULUM if is_curriculum else BANNED_TERMS_GENERAL
 
+    # =========================
+    # Developer prompt (정책/규칙)
+    # =========================
     developer = f"""
 너는 초등~중등 학생에게 코딩 힌트를 주는 튜터다. 반드시 아주 쉬운 한국어만 사용한다.
 정답(완성 코드/정답 값)을 직접 주면 안 된다. 학생이 스스로 생각하도록 방향만 준다.
@@ -272,7 +311,6 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
 [출력 형식]
 {_JSON_ONLY_REMINDER}
 반드시 다음 스키마를 만족하는 JSON 하나만 출력해(추가 키 금지).
-
 키 순서까지 지켜:
 1) should_send
 2) feedback_type
@@ -301,19 +339,14 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
   - hint_content는 반드시 null이 아니어야 함
   - dedup_reason는 "" 로 비워
 
-[커리큘럼 특별 규칙 - 매우 중요]
-- is_curriculum=true 이고, 학생 질문이 있고(q_type이 HOW/CONCEPT 중 하나)라면:
-  - 학생이 처음 배우는 중일 가능성이 높다.
-  - 힌트는 더 자세히(하지만 정답/완성코드는 금지) 설명해야 한다.
-  - hint_style은 DIRECTIVE를 우선으로 선택한다.
-  - {algo_disp} 관점에서 "어떤 순서로 생각하면 되는지"를 알려준다.
-  - 가능하면 간단한 동작을 쉬운 말로 설명한다(예: 입력 받기/출력하기/조건 비교/반복하기).
-
-[HOW 질문 템플릿 고정 규칙]
-- is_curriculum=true AND q_type=HOW 이면:
-  - 아래 [HOW_TEMPLATE]의 흐름을 최대한 그대로 사용해.
-  - 문장 수는 2~4문장으로 줄여.
-  - 정답/완성코드/정답 값은 절대 주지 마.
+[커리큘럼 규칙 - 최우선(질문 있을 때)]
+- is_curriculum=true 이고 학생 질문이 있으면, 일반 규칙보다 아래 규칙을 우선 적용해.
+- 커리큘럼 + OUTPUT 질문이면:
+  - 출력에만 집중해서 설명해(입력 얘기 최소화).
+  - hint_style은 DIRECTIVE를 우선.
+- 커리큘럼 + HOW/CONCEPT 질문이면:
+  - 사고 순서를 알려주는 방식으로 더 자세히(하지만 정답/완성코드 금지).
+  - hint_style은 DIRECTIVE를 우선.
 
 [질문 유효성 규칙]
 - 학생 질문이 욕설/무관 질문이면:
@@ -337,7 +370,7 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
 - hint_style:
   - IMMEDIATE면 DIRECTIVE 우선
   - DELAYED면 SOCRATIC 우선
-  - 단, 커리큘럼+HOW/CONCEPT 질문이면 DIRECTIVE 우선
+  - 단, 커리큘럼+질문이면 DIRECTIVE 우선
 
 [힌트 작성 규칙]
 - 1~4문장, 아주 쉬운 말.
@@ -345,6 +378,9 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
 - 출력/입력 형식 실수 방지도 포함 가능(YES/NO 철자, 줄바꿈 등).
 """.strip()
 
+    # =========================
+    # User prompt (컨텍스트)
+    # =========================
     user = f"""
 [학생 정보]
 - 나이: {ui.get("age")}
@@ -361,9 +397,10 @@ def build_gms_messages(gms_input: Dict[str, Any]) -> List[Dict[str, str]]:
 [커리큘럼/질문 신호]
 - is_curriculum: {str(is_curriculum).lower()}
 - question_type: {q_type}
+- curriculum_focus: {curriculum_focus}
 
-[HOW_TEMPLATE] (is_curriculum=true & q_type=HOW일 때만 참고)
-{curriculum_how_template if curriculum_how_template else "(해당 없음)"}
+[CURRICULUM_TEMPLATE] (is_curriculum=true & 질문 있을 때 참고)
+{curriculum_template if curriculum_template else "(해당 없음)"}
 
 [시간]
 - started_at: {gms_input.get("started_at")}
