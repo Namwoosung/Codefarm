@@ -39,7 +39,7 @@
       <br/>
       <b>박서연</b>
       <ul>
-        <li>UI/UX 디자인 및 화면 설계</li>
+        <li>프론트엔드 전반(Vue.js, Vite, Pinia) 구현</li>
         <li>서비스 비주얼 및 인터페이스 디자인</li>
       </ul>
     </td>
@@ -1171,6 +1171,7 @@
 ## 📦 프로젝트 산출물
 
 ### 🖼️ 화면 설계서
+![codefarm_wireframe](./assets/wireframe.png)
 
 ### 🗄️ ERD
 
