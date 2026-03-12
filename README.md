@@ -333,7 +333,7 @@
 
 ## 🛠️ 아키텍처
 
-<img src="./assets/architecture.png"/>
+<img src="./assets/architecture.jpg"/>
 
 ## 📲 기능 구성
 
